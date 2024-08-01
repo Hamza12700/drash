@@ -1,11 +1,11 @@
 # Drash
 Put files/directories to drash.
 
-drash is a CLI app that trashes files and directories and stores the path of that file where it was removed from.
+Drash is a CLI app that trashes files and directories and stores the path of that file where it was removed from.
 
 Command line arguments:
 
-```bash
+```
 Arguments:
   [FILE]  File to drash
 
@@ -45,4 +45,7 @@ Remove all files from the drash directory:
 
 ```bash
 drash --empty
+Would empty the following drash directories:
+  - /home/hamza/.local/share/Drash
+Proceed? (Y/n): y
 ```

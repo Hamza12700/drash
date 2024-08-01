@@ -1,6 +1,7 @@
 use anyhow::Ok;
 use clap::Parser;
 use std::{
+  collections::HashMap,
   env, fs,
   io::{self, Write},
   path::{Path, PathBuf},
@@ -21,6 +22,10 @@ struct Args {
   /// Empty drash
   #[arg(short, long)]
   empty: bool,
+
+  /// Restore from drash chosen files
+  #[arg(short, long)]
+  restore: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -88,7 +93,7 @@ fn main() -> anyhow::Result<()> {
     for path in paths {
       let path = path?;
       let file_info = fs::read_to_string(&path.path())?;
-      
+
       for line in file_info.lines() {
         if line.starts_with("Path=") {
           let path_value = line.trim_start_matches("Path=");
@@ -97,6 +102,41 @@ fn main() -> anyhow::Result<()> {
         }
       }
     }
+  }
+
+  if args.restore {
+    let mut len = 0;
+    let mut files: HashMap<usize, PathBuf> = HashMap::new();
+    let paths = fs::read_dir(&drash_info_dir)?;
+
+    for (idx, path) in paths.enumerate() {
+      let path = path?;
+      let file_info = fs::read_to_string(&path.path())?;
+
+      for line in file_info.lines() {
+        if line.starts_with("Path=") {
+          let path_value = line.trim_start_matches("Path=");
+          println!("  {idx} {path_value}");
+          files.insert(idx, Path::new(path_value).to_path_buf());
+        }
+      }
+      len = idx;
+    }
+
+    print!("What file to restore [0..{len}]: ");
+    io::stdout().flush()?;
+    let mut user_input = String::new();
+    io::stdin().read_line(&mut user_input)?;
+
+    let user_input: usize = user_input.trim().parse()?;
+    if user_input > len {
+      eprintln!("Out of range 0..{len}");
+      exit(1);
+    }
+    let file = files.get(&user_input).unwrap();
+    let file_name = file.file_name().unwrap();
+    fs::rename(&drash_files.join(file_name), file)?;
+    fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())))?;
   }
 
   Ok(())

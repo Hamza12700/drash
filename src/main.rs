@@ -1,7 +1,8 @@
+use anyhow::Ok;
 use clap::Parser;
 use std::{
   env, fs,
-  io::Write,
+  io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
 };
@@ -47,7 +48,7 @@ fn main() -> anyhow::Result<()> {
     })?;
   }
   let args = Args::parse();
-  
+
   if let Some(file) = args.file.as_ref() {
     let current_file = env::current_dir()?.join(file);
     let mut buffer = fs::OpenOptions::new()
@@ -63,7 +64,22 @@ fn main() -> anyhow::Result<()> {
   }
 
   if args.empty {
-    !unimplemented!("need to work on this")
+    println!("Would empty the following drash directories:");
+    println!("  - {}", &drash_dir.display());
+    print!("Proceed? (Y/n): ");
+    io::stdout().flush()?;
+
+    let mut user_input = String::new();
+    io::stdin().read_line(&mut user_input)?;
+    if user_input == "n" {
+      exit(0);
+    }
+
+    fs::remove_dir_all(&drash_files)?;
+    fs::remove_dir_all(&drash_info_dir)?;
+
+    fs::create_dir(&drash_files)?;
+    fs::create_dir(&drash_info_dir)?;
   }
 
   if args.list {

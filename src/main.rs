@@ -13,6 +13,7 @@ use std::{
 #[command(version)]
 struct Args {
   /// File to drash
+  #[arg(required = true)]
   file: Option<PathBuf>,
 
   /// List files/directories in the drash

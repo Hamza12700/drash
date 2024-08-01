@@ -83,7 +83,20 @@ fn main() -> anyhow::Result<()> {
   }
 
   if args.list {
-    unimplemented!("also need to work on this");
+    let mut idx = 0;
+    let paths = fs::read_dir(&drash_info_dir)?;
+    for path in paths {
+      let path = path?;
+      let file_info = fs::read_to_string(&path.path())?;
+      
+      for line in file_info.lines() {
+        if line.starts_with("Path=") {
+          let path_value = line.trim_start_matches("Path=");
+          println!("[{idx}] {path_value}");
+          idx += 1;
+        }
+      }
+    }
   }
 
   Ok(())

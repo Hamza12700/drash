@@ -18,13 +18,13 @@ Options:
 ## Usage
 Drash a file or directory:
 
-```bash
+```
 drash foo
 ```
 
 List drashed files:
 
-```bash
+```
 drsah --list
 0 /home/hamza/proptotyping/drash/check
 1 /home/hamza/proptotyping/drash/foo
@@ -33,7 +33,7 @@ drsah --list
 
 Restore a drashed file:
 
-```bash
+```
 drash --restore
   0 /home/hamza/proptotyping/drash/check
   1 /home/hamza/proptotyping/drash/foo
@@ -43,7 +43,7 @@ What file to restore [0..2]: 2
 
 Remove all files from the drash directory:
 
-```bash
+```
 drash --empty
 Would empty the following drash directories:
   - /home/hamza/.local/share/Drash

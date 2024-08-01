@@ -97,7 +97,7 @@ fn main() -> anyhow::Result<()> {
       for line in file_info.lines() {
         if line.starts_with("Path=") {
           let path_value = line.trim_start_matches("Path=");
-          println!("[{idx}] {path_value}");
+          println!("{idx} {path_value}");
           idx += 1;
         }
       }

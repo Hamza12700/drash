@@ -73,6 +73,11 @@ fn main() -> anyhow::Result<()> {
   }
 
   if args.empty {
+    let files = fs::read_dir(&drash_files)?;
+    if files.count() == 0 {
+      println!("Drashcan is alraedy empty");
+      exit(0);
+    }
     println!("Would empty the following drash directories:");
     println!("  - {}", &drash_dir.display());
     print!("Proceed? (Y/n): ");
@@ -80,7 +85,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut user_input = String::new();
     io::stdin().read_line(&mut user_input)?;
-    if user_input == "n" {
+    if user_input.trim() == "n" {
       exit(0);
     }
 

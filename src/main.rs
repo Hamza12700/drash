@@ -58,6 +58,10 @@ fn main() -> anyhow::Result<()> {
   if args.files.len() >= 1 {
     let files: &Vec<PathBuf> = args.files.as_ref();
     for file in files {
+      if !Path::new(file).exists() {
+        eprintln!("file not found: {:?}", file.file_name().unwrap());
+        exit(1);
+      }
       let current_file = env::current_dir()?.join(file);
       let mut buffer = fs::OpenOptions::new()
         .write(true)

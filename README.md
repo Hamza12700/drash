@@ -7,7 +7,7 @@ Command line arguments:
 
 ```
 Arguments:
-  [FILE]  File to drash
+  [FILES]...  File to drash
 
 Options:
   -l, --list     List files/directories in the drash

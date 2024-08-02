@@ -35,23 +35,23 @@ fn main() -> anyhow::Result<()> {
   let drash_info_dir = Path::new(&drash_dir).join("info");
 
   if !drash_dir.exists() {
-    fs::create_dir(&drash_dir).inspect_err(|err| {
+    if let Err(err) = fs::create_dir(&drash_dir) {
       eprintln!("Failed to create directory at {:?}", drash_dir);
       eprintln!("Error message: {err}");
       exit(1);
-    })?;
+    }
 
-    fs::create_dir(Path::new(&drash_dir).join("info")).inspect_err(|err| {
+    if let Err(err) = fs::create_dir(Path::new(&drash_dir).join("info")) {
       eprintln!("Failed to create directory at {:?}", drash_info_dir);
       eprintln!("Error message: {err}");
       exit(1);
-    })?;
+    }
 
-    fs::create_dir(&drash_files).inspect_err(|err| {
+    if let Err(err) = fs::create_dir(&drash_files) {
       eprintln!("Failed to create directory at {:?}", drash_files);
       eprintln!("Error message: {err}");
       exit(1);
-    })?;
+    }
   }
   let args = Args::parse();
 

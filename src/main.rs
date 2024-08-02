@@ -11,7 +11,7 @@ use std::{
 /// Put files/directories into drash
 #[derive(Debug, Parser)]
 #[command(version)]
-#[group(required = true, multiple = false)]
+#[group(required = true)]
 struct Args {
   /// Files to drash
   files: Vec<PathBuf>,

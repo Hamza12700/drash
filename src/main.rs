@@ -11,10 +11,10 @@ use std::{
 /// Put files/directories into drash
 #[derive(Debug, Parser)]
 #[command(version)]
+#[group(required = true, multiple = false)]
 struct Args {
-  /// File to drash
-  #[arg(required = true)]
-  file: Option<PathBuf>,
+  /// Files to drash
+  files: Vec<PathBuf>,
 
   /// List files/directories in the drash
   #[arg(short, long)]
@@ -55,18 +55,21 @@ fn main() -> anyhow::Result<()> {
   }
   let args = Args::parse();
 
-  if let Some(file) = args.file.as_ref() {
-    let current_file = env::current_dir()?.join(file);
-    let mut buffer = fs::OpenOptions::new()
-      .write(true)
-      .append(true)
-      .create(true)
-      .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file.display())))?;
+  if args.files.len() >= 1 {
+    let files: &Vec<PathBuf> = args.files.as_ref();
+    for file in files {
+      let current_file = env::current_dir()?.join(file);
+      let mut buffer = fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file.display())))?;
 
-    buffer.write_all(b"[Drash Info]\n")?;
-    let formatted_string = format!("Path={}\n", current_file.display());
-    buffer.write_all(formatted_string.as_bytes())?;
-    fs::rename(file, Path::new(&drash_files).join(file))?;
+      buffer.write_all(b"[Drash Info]\n")?;
+      let formatted_string = format!("Path={}\n", current_file.display());
+      buffer.write_all(formatted_string.as_bytes())?;
+      fs::rename(file, Path::new(&drash_files).join(file))?;
+    }
   }
 
   if args.empty {

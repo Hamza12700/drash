@@ -93,6 +93,7 @@ fn main() -> anyhow::Result<()> {
 
   if args.list {
     let mut idx = 0;
+    let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
     for path in paths {
       let path = path?;
@@ -100,11 +101,15 @@ fn main() -> anyhow::Result<()> {
 
       for line in file_info.lines() {
         if line.starts_with("Path=") {
+          empty = false;
           let path_value = line.trim_start_matches("Path=");
           println!("{idx} {path_value}");
           idx += 1;
         }
       }
+    }
+    if empty {
+      println!("Nothing is the drashcan");
     }
   }
 

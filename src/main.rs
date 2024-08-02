@@ -58,16 +58,20 @@ fn main() -> anyhow::Result<()> {
   if args.files.len() >= 1 {
     let files: &Vec<PathBuf> = args.files.as_ref();
     for file in files {
-      if !Path::new(file).exists() {
-        eprintln!("file not found: {:?}", file.file_name().unwrap());
+      let mut file_name = file.display().to_string();
+      if !file.exists() {
+        eprintln!("file not found: '{}'", file_name);
         exit(1);
       }
-      let current_file = env::current_dir()?.join(file);
+      if file_name.ends_with("/") {
+        file_name.pop();
+      }
+      let current_file = env::current_dir()?.join(&file_name);
       let mut buffer = fs::OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
-        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file.display())))?;
+        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file_name)))?;
 
       buffer.write_all(b"[Drash Info]\n")?;
       let formatted_string = format!("Path={}\n", current_file.display());

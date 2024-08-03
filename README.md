@@ -26,9 +26,9 @@ List drashed files:
 
 ```
 drsah --list
-0 /home/hamza/proptotyping/drash/check
-1 /home/hamza/proptotyping/drash/foo
-2 /home/hamza/proptotyping/drash/junk
+0:F - /home/hamza/proptotyping/drash/check
+1:D - /home/hamza/proptotyping/drash/foo
+2:F - /home/hamza/proptotyping/drash/junk
 ```
 
 Restore a drashed file:

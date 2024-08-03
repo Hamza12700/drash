@@ -25,6 +25,8 @@ drash foo
 List drashed files:
 
 ```
+# F is file and D is directory
+
 drsah --list
 0:F - /home/hamza/proptotyping/drash/check
 1:D - /home/hamza/proptotyping/drash/foo

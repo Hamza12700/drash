@@ -76,6 +76,12 @@ fn main() -> anyhow::Result<()> {
       buffer.write_all(b"[Drash Info]\n")?;
       let formatted_string = format!("Path={}\n", current_file.display());
       buffer.write_all(formatted_string.as_bytes())?;
+      buffer.write_all(b"FileType=")?;
+      if file.is_dir() {
+        buffer.write_all(b"directory\n")?;
+      } else {
+        buffer.write_all(b"file\n")?;
+      }
       fs::rename(file, Path::new(&drash_files).join(file))?;
     }
   }
@@ -113,13 +119,21 @@ fn main() -> anyhow::Result<()> {
     for path in paths {
       let path = path?;
       let file_info = fs::read_to_string(&path.path())?;
+      let mut path_value = "";
 
       for line in file_info.lines() {
         if line.starts_with("Path=") {
           empty = false;
-          let path_value = line.trim_start_matches("Path=");
-          println!("{idx} {path_value}");
+          path_value = line.trim_start_matches("Path=");
           idx += 1;
+        } else if line.starts_with("FileType=") {
+          let mut file_type = line.trim_start_matches("FileType=");
+          if file_type == "file" {
+            file_type = "F"
+          } else {
+            file_type = "D"
+          }
+          println!("{idx}:{file_type} - {path_value}");
         }
       }
     }

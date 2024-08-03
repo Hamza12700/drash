@@ -82,12 +82,14 @@ fn main() -> anyhow::Result<()> {
 
   if args.empty {
     let files = fs::read_dir(&drash_files)?;
-    if files.count() == 0 {
+    let file_entries = files.count();
+    if file_entries == 0 {
       println!("Drashcan is alraedy empty");
       exit(0);
     }
     println!("Would empty the following drash directories:");
     println!("  - {}", &drash_dir.display());
+    println!("  - Entries {file_entries}");
     print!("Proceed? (Y/n): ");
     io::stdout().flush()?;
 

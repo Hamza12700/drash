@@ -66,6 +66,7 @@ fn main() -> anyhow::Result<()> {
       if file_name.ends_with("/") {
         file_name.pop();
       }
+      // TODO: fix bug when drashing same files
       let current_file = env::current_dir()?.join(&file_name);
       let mut buffer = fs::OpenOptions::new()
         .write(true)
@@ -125,7 +126,6 @@ fn main() -> anyhow::Result<()> {
         if line.starts_with("Path=") {
           empty = false;
           path_value = line.trim_start_matches("Path=");
-          idx += 1;
         } else if line.starts_with("FileType=") {
           let mut file_type = line.trim_start_matches("FileType=");
           if file_type == "file" {
@@ -134,6 +134,7 @@ fn main() -> anyhow::Result<()> {
             file_type = "D"
           }
           println!("{idx}:{file_type} - {path_value}");
+          idx += 1;
         }
       }
     }

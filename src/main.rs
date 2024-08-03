@@ -58,6 +58,10 @@ fn main() -> anyhow::Result<()> {
   if args.files.len() >= 1 {
     let files: &Vec<PathBuf> = args.files.as_ref();
     for file in files {
+      if file.is_symlink() {
+        fs::remove_file(&file)?;
+        exit(1);
+      }
       let mut file_name = file.display().to_string();
       if !file.exists() {
         eprintln!("file not found: '{}'", file_name);

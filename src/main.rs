@@ -154,20 +154,34 @@ fn main() -> anyhow::Result<()> {
   if args.restore {
     let mut len = 0;
     let mut files: HashMap<usize, PathBuf> = HashMap::new();
+    let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
 
     for (idx, path) in paths.enumerate() {
-      let path = path?;
-      let file_info = fs::read_to_string(&path.path())?;
+      let path = path?.path();
+      let file_info = fs::read_to_string(&path)?;
+      let mut path_value = "";
 
       for line in file_info.lines() {
         if line.starts_with("Path=") {
-          let path_value = line.trim_start_matches("Path=");
-          println!("  {idx} {path_value}");
+          path_value = line.trim_start_matches("Path=");
+        } else if line.starts_with("FileType=") {
+          empty = false;
+          let mut file_type = line.trim_start_matches("FileType=");
+          if file_type == "file" {
+            file_type = "F"
+          } else {
+            file_type = "D"
+          }
+          println!("  {idx}:{file_type} - {path_value}");
           files.insert(idx, Path::new(path_value).to_path_buf());
         }
       }
       len = idx;
+    }
+    if empty {
+      println!("Drashcan is empty");
+      exit(0);
     }
 
     print!("What file to restore [0..{len}]: ");

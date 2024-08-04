@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<()> {
     for file in files {
       if file.is_symlink() {
         fs::remove_file(&file)?;
-        exit(1);
+        exit(0);
       }
       let mut file_name = file.display().to_string();
       if !file.exists() {

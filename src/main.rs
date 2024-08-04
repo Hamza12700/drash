@@ -70,8 +70,12 @@ fn main() -> anyhow::Result<()> {
       if file_name.ends_with("/") {
         file_name.pop();
       }
+      if file_name.contains("/") {
+        let paths = file_name.split("/").last();
+        file_name = paths.unwrap().to_string();
+      }
       // TODO: fix bug when drashing same files
-      let current_file = env::current_dir()?.join(&file_name);
+      let current_file = env::current_dir()?.join(&file);
       let mut buffer = fs::OpenOptions::new()
         .write(true)
         .append(true)
@@ -87,7 +91,7 @@ fn main() -> anyhow::Result<()> {
       } else {
         buffer.write_all(b"file\n")?;
       }
-      fs::rename(file, Path::new(&drash_files).join(file))?;
+      fs::rename(file, Path::new(&drash_files).join(file_name))?;
     }
   }
 

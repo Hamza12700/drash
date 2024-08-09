@@ -7,6 +7,7 @@ use std::{
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
+  rc::Rc,
 };
 
 /// Put files into drash so you can restore them later
@@ -124,24 +125,31 @@ fn main() -> anyhow::Result<()> {
     let paths = fs::read_dir(&drash_info_dir)?;
     for path in paths {
       let path = path?;
-      let file_info = fs::read_to_string(&path.path())?;
-      let mut path_value = "";
+      let file_info: Rc<_> = fs::read_to_string(&path.path())?
+        .lines()
+        .map(|line| line.to_string())
+        .collect();
 
-      for line in file_info.lines() {
-        if line.starts_with("Path=") {
+      let file_path = match file_info.get(1) {
+        Some(path) => {
           empty = false;
-          path_value = line.trim_start_matches("Path=");
-        } else if line.starts_with("FileType=") {
-          let mut file_type = line.trim_start_matches("FileType=");
-          if file_type == "file" {
-            file_type = "F"
-          } else {
-            file_type = "D"
-          }
-          println!("{idx}:{file_type} - {path_value}");
-          idx += 1;
+          path.trim_start_matches("Path=")
         }
+        None => {
+          eprintln!("{}", "Fialed to get file path by index".red().bold());
+          continue;
+        }
+      };
+
+      let mut file_type = file_info[2].trim_start_matches("FileType=").to_string();
+      if file_type == "file" {
+        file_type = "F".to_string()
+      } else {
+        file_type = "D".to_string()
       }
+
+      println!("{idx}:{file_type} - {file_path}");
+      idx += 1;
     }
     if empty {
       println!("Nothing is the drashcan");

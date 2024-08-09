@@ -1,5 +1,6 @@
 use anyhow::Ok;
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use colored::Colorize;
 use std::{
   collections::HashMap,
   env, fs,
@@ -8,25 +9,47 @@ use std::{
   process::exit,
 };
 
-/// Put files/directories into drash
+/// Put files into drash so you can restore them later
 #[derive(Debug, Parser)]
 #[command(version)]
-#[group(required = true)]
 struct Args {
   /// Files to drash
-  files: Vec<PathBuf>,
+  files: Option<Vec<PathBuf>>,
 
-  /// List files/directories in the drash
-  #[arg(short, long)]
-  list: bool,
+  #[command(subcommand)]
+  commands: Option<Commands>,
+}
 
-  /// Empty drash
-  #[arg(short, long)]
-  empty: bool,
+#[derive(Subcommand, Debug)]
+enum Commands {
+  /// List files in the drashcan
+  List,
 
-  /// Restore from drash chosen files
-  #[arg(short, long)]
-  restore: bool,
+  /// Empty drashcan
+  Empty,
+
+  /// Restore drashed files
+  Restore,
+}
+
+impl Args {
+  fn validate(&self) {
+    if self.files.is_none() && self.commands.is_none() {
+      eprintln!(
+        "{}: one argument is required: {} or {}",
+        "error".red().bold(),
+        "<FILES>".bold(),
+        "<COMMANDS>".bold()
+      );
+      eprintln!(
+        "\n{}: {} <FILES> | <COMMANDS>\n",
+        "Usage".bold().underline(),
+        "drash".bold()
+      );
+      eprintln!("For more information, try '{}'", "--help".bold());
+      exit(1);
+    }
+  }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -54,9 +77,9 @@ fn main() -> anyhow::Result<()> {
     }
   }
   let args = Args::parse();
+  args.validate();
 
-  if args.files.len() >= 1 {
-    let files: &Vec<PathBuf> = args.files.as_ref();
+  if let Some(files) = &args.files {
     for file in files {
       if file.is_symlink() {
         fs::remove_file(&file)?;
@@ -64,8 +87,8 @@ fn main() -> anyhow::Result<()> {
       }
       let mut file_name = file.display().to_string();
       if !file.exists() {
-        eprintln!("file not found: '{}'", file_name);
-        exit(1);
+        eprintln!("file not found: '{}'", file_name.bold());
+        continue;
       }
       if file_name.ends_with("/") {
         file_name.pop();
@@ -95,33 +118,7 @@ fn main() -> anyhow::Result<()> {
     }
   }
 
-  if args.empty {
-    let files = fs::read_dir(&drash_files)?;
-    let file_entries = files.count();
-    if file_entries == 0 {
-      println!("Drashcan is alraedy empty");
-      exit(0);
-    }
-    println!("Would empty the following drash directories:");
-    println!("  - {}", &drash_dir.display());
-    println!("  - Entries {file_entries}");
-    print!("Proceed? (Y/n): ");
-    io::stdout().flush()?;
-
-    let mut user_input = String::new();
-    io::stdin().read_line(&mut user_input)?;
-    if user_input.trim() == "n" {
-      exit(0);
-    }
-
-    fs::remove_dir_all(&drash_files)?;
-    fs::remove_dir_all(&drash_info_dir)?;
-
-    fs::create_dir(&drash_files)?;
-    fs::create_dir(&drash_info_dir)?;
-  }
-
-  if args.list {
+  if let Some(Commands::List) = &args.commands {
     let mut idx = 0;
     let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
@@ -151,7 +148,33 @@ fn main() -> anyhow::Result<()> {
     }
   }
 
-  if args.restore {
+  if let Some(Commands::Empty) = &args.commands {
+    let files = fs::read_dir(&drash_files)?;
+    let file_entries = files.count();
+    if file_entries == 0 {
+      println!("Drashcan is alraedy empty");
+      exit(0);
+    }
+    println!("Would empty the following drash directories:");
+    println!("  - {}", &drash_dir.display());
+    println!("  - Entries {file_entries}");
+    print!("Proceed? (Y/n): ");
+    io::stdout().flush()?;
+
+    let mut user_input = String::new();
+    io::stdin().read_line(&mut user_input)?;
+    if user_input.trim() == "n" {
+      exit(0);
+    }
+
+    fs::remove_dir_all(&drash_files)?;
+    fs::remove_dir_all(&drash_info_dir)?;
+
+    fs::create_dir(&drash_files)?;
+    fs::create_dir(&drash_info_dir)?;
+  }
+
+  if let Some(Commands::Restore) = &args.commands {
     let mut len = 0;
     let mut files: HashMap<usize, PathBuf> = HashMap::new();
     let mut empty = true;

@@ -38,7 +38,7 @@ drsah list
 2:F - /home/hamza/proptotyping/drash/junk
 ```
 
-Restore a drashed file:
+Restore a single drashed file:
 
 ```
 drash restore
@@ -48,24 +48,14 @@ drash restore
 What file to restore [0..2]: 2
 ```
 
-Restore multiple drashed files separated by ",":
+Restore multiple drashed files separated by ",", also support range:
 
 ```
 drash restore
   0 /home/hamza/proptotyping/drash/check
   1 /home/hamza/proptotyping/drash/foo
   2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 0,2
-```
-
-Restore multiple drashed files using range:
-
-```
-drash restore
-  0 /home/hamza/proptotyping/drash/check
-  1 /home/hamza/proptotyping/drash/foo
-  2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 0-2
+What file to restore [0..2]: 0-1, 2
 ```
 
 Remove all files from the drash directory:

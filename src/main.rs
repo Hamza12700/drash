@@ -243,7 +243,7 @@ fn main() -> anyhow::Result<()> {
 
       for idx in start_idx..=end_idx {
         if idx > len {
-          eprintln!("Out of range: 0-{}", len);
+          eprintln!("Out of range: 0-{len}");
           continue;
         }
 
@@ -276,7 +276,7 @@ fn main() -> anyhow::Result<()> {
       for index in multi_index {
         let index: usize = index.parse()?;
         if index > len {
-          eprintln!("Out of range {}", "0-{len}".bold());
+          eprintln!("Out of range 0-{len}");
           continue;
         }
 
@@ -291,7 +291,7 @@ fn main() -> anyhow::Result<()> {
       let range: Rc<_> = user_input.split("-").collect();
       if range.len() != 2 {
         eprintln!("{}", "Malformed input".bold().red());
-        eprintln!("{}", "Sytax to use range: 0-{len}".bold());
+        eprintln!("Sytax to use range: 0-{len}");
         exit(1);
       }
       let start_idx: usize = range[0].parse()?;
@@ -299,7 +299,7 @@ fn main() -> anyhow::Result<()> {
 
       for idx in start_idx..=end_idx {
         if idx > len {
-          eprintln!("Out of range {}", "0-{len}".bold());
+          eprintln!("Out of range 0-{len}");
           continue;
         }
 

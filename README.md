@@ -6,13 +6,18 @@ Drash is a CLI app that trashes files and directories and stores the path of tha
 Command line arguments:
 
 ```
+Commands:
+  list     List files in the drashcan
+  empty    Empty drashcan
+  restore  Restore drashed files
+  help     Print this message or the help of the given subcommand(s)
+
 Arguments:
-  [FILES]...  File to drash
+  [FILES]...  Files to drash
 
 Options:
-  -l, --list     List files/directories in the drash
-  -e, --empty    Empty drash
-  -r, --restore  Restore from drash chosen files
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 ## Usage
@@ -25,9 +30,9 @@ drash foo
 List drashed files:
 
 ```
-# F is file and D is directory
+# F means file and D means directory
 
-drsah --list
+drsah list
 0:F - /home/hamza/proptotyping/drash/check
 1:D - /home/hamza/proptotyping/drash/foo
 2:F - /home/hamza/proptotyping/drash/junk
@@ -36,18 +41,39 @@ drsah --list
 Restore a drashed file:
 
 ```
-drash --restore
+drash restore
   0 /home/hamza/proptotyping/drash/check
   1 /home/hamza/proptotyping/drash/foo
   2 /home/hamza/proptotyping/drash/junk
 What file to restore [0..2]: 2
 ```
 
+Restore multiple drashed files separated by ",":
+
+```
+drash restore
+  0 /home/hamza/proptotyping/drash/check
+  1 /home/hamza/proptotyping/drash/foo
+  2 /home/hamza/proptotyping/drash/junk
+What file to restore [0..2]: 0,2
+```
+
+Restore multiple drashed files using range:
+
+```
+drash restore
+  0 /home/hamza/proptotyping/drash/check
+  1 /home/hamza/proptotyping/drash/foo
+  2 /home/hamza/proptotyping/drash/junk
+What file to restore [0..2]: 0-2
+```
+
 Remove all files from the drash directory:
 
 ```
-drash --empty
+drash empty
 Would empty the following drash directories:
   - /home/hamza/.local/share/Drash
+  - Entries 3
 Proceed? (Y/n): y
 ```

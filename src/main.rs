@@ -223,7 +223,6 @@ fn main() -> anyhow::Result<()> {
     let user_input = user_input.trim();
     if user_input.contains(",") && user_input.contains("-") {
       let user_input: Rc<_> = user_input.split(",").collect();
-      println!("{user_input:?}");
       if user_input[1].is_empty() {
         eprintln!("{}", "Malformed input".bold().red());
         eprintln!("example usage: {}", "0-range, X...".bold());
@@ -256,6 +255,7 @@ fn main() -> anyhow::Result<()> {
       }
 
       for idx in user_input.iter().skip(1) {
+        let idx = idx.replace(" ", "");
         let idx: usize = idx.parse()?;
         if idx > len {
           eprintln!("Out of range 0-{len}");
@@ -272,6 +272,7 @@ fn main() -> anyhow::Result<()> {
 
       exit(0);
     } else if user_input.contains(",") {
+      let user_input = user_input.replace(" ", "");
       let multi_index = user_input.split(",");
       for index in multi_index {
         let index: usize = index.parse()?;

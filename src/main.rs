@@ -221,7 +221,57 @@ fn main() -> anyhow::Result<()> {
     io::stdin().read_line(&mut user_input)?;
 
     let user_input = user_input.trim();
-    if user_input.contains(",") {
+    if user_input.contains(",") && user_input.contains("-") {
+      let user_input: Rc<_> = user_input.split(",").collect();
+      println!("{user_input:?}");
+      if user_input[1].is_empty() {
+        eprintln!("{}", "Malformed input".bold().red());
+        eprintln!("example usage: {}", "0-range, X...".bold());
+        exit(1);
+      }
+
+      let range = user_input[0];
+      let range: Rc<_> = range.split("-").collect();
+      if range[1].is_empty() {
+        eprintln!("{}", "Malformed range sytax".bold().red());
+        eprintln!("example range usage: {}", "0-range".bold());
+        exit(1);
+      }
+
+      let start_idx: usize = range[0].parse()?;
+      let end_idx: usize = range[1].parse()?;
+
+      for idx in start_idx..=end_idx {
+        if idx > len {
+          eprintln!("Out of range: 0-{}", len);
+          continue;
+        }
+
+        let path = files.get(&idx).unwrap();
+        let file_name = path.file_name().unwrap();
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(
+          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+        )?;
+      }
+
+      for idx in user_input.iter().skip(1) {
+        let idx: usize = idx.parse()?;
+        if idx > len {
+          eprintln!("Out of range 0-{len}");
+          continue;
+        }
+
+        let path = files.get(&idx).unwrap();
+        let file_name = path.file_name().unwrap();
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(
+          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+        )?;
+      }
+
+      exit(0);
+    } else if user_input.contains(",") {
       let multi_index = user_input.split(",");
       for index in multi_index {
         let index: usize = index.parse()?;

@@ -220,15 +220,47 @@ fn main() -> anyhow::Result<()> {
     let mut user_input = String::new();
     io::stdin().read_line(&mut user_input)?;
 
-    let user_input: usize = user_input.trim().parse()?;
-    if user_input > len {
-      eprintln!("Out of range 0..{len}");
-      exit(1);
+    let user_input = user_input.trim();
+    if user_input.contains(",") {
+      let multi_index = user_input.split(",");
+      for index in multi_index {
+        let index: usize = index.parse()?;
+        if index > len {
+          eprintln!("Out of range {}", "0-{len}".bold());
+          continue;
+        }
+
+        let path = files.get(&index).unwrap();
+        let file_name = path.file_name().unwrap();
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(
+          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+        )?;
+      }
+    } else if user_input.contains("-") {
+      let range: Rc<_> = user_input.split("-").collect();
+      if range.len() != 2 {
+        eprintln!("{}", "Malformed input".bold().red());
+        eprintln!("{}", "Sytax to use range: 0-{len}".bold());
+        exit(1);
+      }
+      let start_idx: usize = range[0].parse()?;
+      let end_idx: usize = range[1].parse()?;
+
+      for idx in start_idx..=end_idx {
+        if idx > len {
+          eprintln!("Out of range {}", "0-{len}".bold());
+          continue;
+        }
+
+        let path = files.get(&idx).unwrap();
+        let file_name = path.file_name().unwrap();
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(
+          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+        )?;
+      }
     }
-    let file = files.get(&user_input).unwrap();
-    let file_name = file.file_name().unwrap();
-    fs::rename(&drash_files.join(file_name), file)?;
-    fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())))?;
   }
 
   Ok(())

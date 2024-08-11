@@ -71,6 +71,16 @@ File already exists: "check"
 Do you want overwrite it? (Y/n): n
 ```
 
+Or pass `--overwrite` or `-o` flag to not prompt you:
+
+```
+drash restore --overwrite
+  0 /home/hamza/proptotyping/drash/check
+  1 /home/hamza/proptotyping/drash/foo
+  2 /home/hamza/proptotyping/drash/junk
+What file to restore [0..2]: 0-2
+```
+
 Remove all files from the drash directory:
 
 ```
@@ -79,4 +89,11 @@ Would empty the following drash directories:
   - /home/hamza/.local/share/Drash
   - Entries 3
 Proceed? (Y/n): y
+```
+
+Use `--yes` or `-y` flag to remove all files in the drashcan directory without asking for confirmation:
+
+```
+drash empty -y
+Removed: 3 files
 ```

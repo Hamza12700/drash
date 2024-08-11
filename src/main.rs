@@ -8,6 +8,7 @@ use std::{
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
+  usize,
 };
 
 /// Put files into drash so you can restore them later
@@ -221,7 +222,14 @@ fn main() -> anyhow::Result<()> {
     io::stdin().read_line(&mut user_input)?;
 
     let user_input = user_input.trim();
-    if user_input.contains(",") && user_input.contains("-") {
+    if !user_input.contains(",") && !user_input.contains("-") {
+      let idx: usize = user_input.parse()?;
+
+      let path = files.get(&idx).unwrap();
+      let file_name = path.file_name().unwrap().to_str().unwrap();
+      fs::rename(&drash_files.join(file_name), path)?;
+      fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+    } else if user_input.contains(",") && user_input.contains("-") {
       let user_input: Rc<_> = user_input.split(",").collect();
       if user_input[1].is_empty() {
         eprintln!("{}", "Invalid input".bold().red());

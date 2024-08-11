@@ -30,7 +30,11 @@ enum Commands {
   List,
 
   /// Empty drashcan
-  Empty,
+  Empty {
+    /// remove all files without giving a warning
+    #[arg(short, long)]
+    yes: bool,
+  },
 
   /// Restore drashed files
   Restore,
@@ -159,13 +163,28 @@ fn main() -> anyhow::Result<()> {
     }
   }
 
-  if let Some(Commands::Empty) = &args.commands {
+  if let Some(Commands::Empty { yes }) = &args.commands {
     let files = fs::read_dir(&drash_files)?;
     let file_entries = files.count();
     if file_entries == 0 {
       println!("Drashcan is alraedy empty");
       exit(0);
     }
+
+    if *yes {
+      fs::remove_dir_all(&drash_files)?;
+      fs::remove_dir_all(&drash_info_dir)?;
+
+      fs::create_dir(&drash_files)?;
+      fs::create_dir(&drash_info_dir)?;
+
+      match file_entries {
+        n if n > 1 => println!("Removed: {file_entries} files"),
+        _ => println!("Removed: {file_entries} file")
+      }
+      exit(0);
+    }
+
     println!("Would empty the following drash directories:");
     println!("  - {}", &drash_dir.display());
     println!("  - Entries {file_entries}");

@@ -37,7 +37,11 @@ enum Commands {
   },
 
   /// Restore drashed files
-  Restore,
+  Restore {
+    /// restore file without asking to replace it with an existing one
+    #[arg(short, long)]
+    overwrite: bool,
+  },
 }
 
 impl Args {
@@ -180,7 +184,7 @@ fn main() -> anyhow::Result<()> {
 
       match file_entries {
         n if n > 1 => println!("Removed: {file_entries} files"),
-        _ => println!("Removed: {file_entries} file")
+        _ => println!("Removed: {file_entries} file"),
       }
       exit(0);
     }
@@ -204,7 +208,7 @@ fn main() -> anyhow::Result<()> {
     fs::create_dir(&drash_info_dir)?;
   }
 
-  if let Some(Commands::Restore) = &args.commands {
+  if let Some(Commands::Restore { overwrite }) = &args.commands {
     let mut len = 0;
     let mut files: HashMap<usize, PathBuf> = HashMap::new();
     let mut empty = true;
@@ -245,9 +249,18 @@ fn main() -> anyhow::Result<()> {
     let user_input = user_input.trim();
     if !user_input.contains(",") && !user_input.contains("-") {
       let idx: usize = user_input.parse()?;
-
       let path = files.get(&idx).unwrap();
-      check_path(path, &drash_files, &drash_info_dir);
+
+      match *overwrite {
+        true => {
+          let file_name = path.file_name().unwrap().to_str().unwrap();
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        }
+        false => {
+          let _ = check_path(path, &drash_files, &drash_info_dir);
+        }
+      }
     } else if user_input.contains(",") && user_input.contains("-") {
       let user_input: Rc<_> = user_input.split(",").collect();
       if user_input[1].is_empty() {
@@ -274,9 +287,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let skip = check_path(path, &drash_files, &drash_info_dir);
-        if skip {
-          continue;
+        if *overwrite {
+          let file_name = path.file_name().unwrap().to_str().unwrap();
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        } else {
+          let skip = check_path(path, &drash_files, &drash_info_dir);
+          if skip {
+            continue;
+          }
         }
       }
 
@@ -289,9 +308,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let skip = check_path(path, &drash_files, &drash_info_dir);
-        if skip {
-          continue;
+        if *overwrite {
+          let file_name = path.file_name().unwrap().to_str().unwrap();
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        } else {
+          let skip = check_path(path, &drash_files, &drash_info_dir);
+          if skip {
+            continue;
+          }
         }
       }
     } else if user_input.contains(",") {
@@ -305,9 +330,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&index).unwrap();
-        let skip = check_path(path, &drash_files, &drash_info_dir);
-        if skip {
-          continue;
+        if *overwrite {
+          let file_name = path.file_name().unwrap().to_str().unwrap();
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        } else {
+          let skip = check_path(path, &drash_files, &drash_info_dir);
+          if skip {
+            continue;
+          }
         }
       }
     } else if user_input.contains("-") {
@@ -327,9 +358,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let skip = check_path(path, &drash_files, &drash_info_dir);
-        if skip {
-          continue;
+        if *overwrite {
+          let file_name = path.file_name().unwrap().to_str().unwrap();
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        } else {
+          let skip = check_path(path, &drash_files, &drash_info_dir);
+          if skip {
+            continue;
+          }
         }
       }
     }

@@ -97,3 +97,10 @@ Use `--yes` or `-y` flag to remove all files in the drashcan directory without a
 drash empty -y
 Removed: 3 files
 ```
+
+# Why?
+In Linux, deleting file or a directory using `rm -r` is irreversible. Now, I
+don't know about you but I make a lot of typos when I'm typing (skill issue, I
+know). **Drash** cli app written in RUST (BTW) solves this issue, by storing
+files in user's `.local/share` directory and keeping track of the original path
+where the file was removed.

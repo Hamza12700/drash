@@ -48,7 +48,7 @@ drash restore
 What file to restore [0..2]: 2
 ```
 
-Restore multiple drashed files separated by ",", also support range:
+Restore multiple drashed files separated by `,`, also support range:
 
 ```
 drash restore
@@ -56,6 +56,19 @@ drash restore
   1 /home/hamza/proptotyping/drash/foo
   2 /home/hamza/proptotyping/drash/junk
 What file to restore [0..2]: 0-1, 2
+```
+
+Restore multiple drashed files overwriting the existing files:
+
+```
+drash restore
+  0 /home/hamza/proptotyping/drash/check
+  1 /home/hamza/proptotyping/drash/foo
+  2 /home/hamza/proptotyping/drash/junk
+What file to restore [0..2]: 0-1, 2
+
+File already exists: "check"
+Do you want overwrite it? (Y/n): n
 ```
 
 Remove all files from the drash directory:

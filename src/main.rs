@@ -277,8 +277,6 @@ fn main() -> anyhow::Result<()> {
           &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
         )?;
       }
-
-      exit(0);
     } else if user_input.contains(",") {
       let user_input = user_input.replace(" ", "");
       let multi_index = user_input.split(",");

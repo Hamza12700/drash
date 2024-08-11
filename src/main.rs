@@ -1,6 +1,8 @@
 use anyhow::Ok;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use utils::check_path;
+mod utils;
 use std::{
   collections::HashMap,
   env, fs,
@@ -226,9 +228,7 @@ fn main() -> anyhow::Result<()> {
       let idx: usize = user_input.parse()?;
 
       let path = files.get(&idx).unwrap();
-      let file_name = path.file_name().unwrap().to_str().unwrap();
-      fs::rename(&drash_files.join(file_name), path)?;
-      fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+      check_path(path, &drash_files, &drash_info_dir);
     } else if user_input.contains(",") && user_input.contains("-") {
       let user_input: Rc<_> = user_input.split(",").collect();
       if user_input[1].is_empty() {
@@ -255,11 +255,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let file_name = path.file_name().unwrap();
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(
-          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-        )?;
+        let skip = check_path(path, &drash_files, &drash_info_dir);
+        if skip {
+          continue;
+        }
       }
 
       for idx in user_input.iter().skip(1) {
@@ -271,11 +270,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let file_name = path.file_name().unwrap();
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(
-          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-        )?;
+        let skip = check_path(path, &drash_files, &drash_info_dir);
+        if skip {
+          continue;
+        }
       }
     } else if user_input.contains(",") {
       let user_input = user_input.replace(" ", "");
@@ -288,11 +286,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&index).unwrap();
-        let file_name = path.file_name().unwrap();
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(
-          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-        )?;
+        let skip = check_path(path, &drash_files, &drash_info_dir);
+        if skip {
+          continue;
+        }
       }
     } else if user_input.contains("-") {
       let range: Rc<_> = user_input.split("-").collect();
@@ -311,11 +308,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         let path = files.get(&idx).unwrap();
-        let file_name = path.file_name().unwrap();
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(
-          &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-        )?;
+        let skip = check_path(path, &drash_files, &drash_info_dir);
+        if skip {
+          continue;
+        }
       }
     }
   }

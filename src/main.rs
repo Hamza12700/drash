@@ -224,7 +224,7 @@ fn main() -> anyhow::Result<()> {
     if user_input.contains(",") && user_input.contains("-") {
       let user_input: Rc<_> = user_input.split(",").collect();
       if user_input[1].is_empty() {
-        eprintln!("{}", "Malformed input".bold().red());
+        eprintln!("{}", "Invalid input".bold().red());
         eprintln!("example usage: {}", "0-range, X...".bold());
         exit(1);
       }
@@ -232,7 +232,7 @@ fn main() -> anyhow::Result<()> {
       let range = user_input[0];
       let range: Rc<_> = range.split("-").collect();
       if range[1].is_empty() {
-        eprintln!("{}", "Malformed range sytax".bold().red());
+        eprintln!("{}", "Invalid range sytax".bold().red());
         eprintln!("example range usage: {}", "0-range".bold());
         exit(1);
       }
@@ -291,7 +291,7 @@ fn main() -> anyhow::Result<()> {
     } else if user_input.contains("-") {
       let range: Rc<_> = user_input.split("-").collect();
       if range.len() != 2 {
-        eprintln!("{}", "Malformed input".bold().red());
+        eprintln!("{}", "Invalid input".bold().red());
         eprintln!("Sytax to use range: 0-{len}");
         exit(1);
       }

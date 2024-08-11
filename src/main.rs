@@ -10,7 +10,6 @@ use std::{
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
-  usize,
 };
 
 /// Put files into drash so you can restore them later

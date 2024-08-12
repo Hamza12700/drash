@@ -8,6 +8,7 @@ Command line arguments:
 ```
 Commands:
   list     List files in the drashcan
+  remove   Remove selected files in the drashcan
   empty    Empty drashcan
   restore  Restore drashed files
   help     Print this message or the help of the given subcommand(s)
@@ -98,6 +99,17 @@ Use `--yes` or `-y` flag to remove all files in the drashcan directory without a
 ```
 drash empty -y
 Removed: 3 files
+```
+
+Remove individual files in the drashcan, by searching for them:
+
+```
+drash remove
+? Select files to remove:
+> [ ] /home/hamza/personal/drash/main/baz
+  [ ] /home/hamza/personal/drash/main/bar
+  [ ] /home/hamza/personal/drash/main/foo
+[↑↓ to move, space to select one, → to all, ← to none, type to filter]
 ```
 
 # Why?

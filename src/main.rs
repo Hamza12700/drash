@@ -1,6 +1,7 @@
 use anyhow::Ok;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use inquire::Confirm;
 use utils::check_path;
 mod utils;
 use std::{
@@ -188,15 +189,11 @@ fn main() -> anyhow::Result<()> {
       exit(0);
     }
 
-    println!("Would empty the following drash directories:");
-    println!("  - {}", &drash_dir.display());
-    println!("  - Entries {file_entries}");
-    print!("Proceed? (Y/n): ");
-    io::stdout().flush()?;
+    let user_input = Confirm::new("Empty the drash directory?")
+      .with_default(true)
+      .prompt()?;
 
-    let mut user_input = String::new();
-    io::stdin().read_line(&mut user_input)?;
-    if user_input.trim() == "n" {
+    if !user_input {
       exit(0);
     }
 

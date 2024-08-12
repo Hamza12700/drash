@@ -2,6 +2,7 @@ use anyhow::Ok;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::Confirm;
+use tabled::{settings::Style, Table, Tabled};
 use utils::check_path;
 mod utils;
 use std::{
@@ -42,6 +43,13 @@ enum Commands {
     #[arg(short, long)]
     overwrite: bool,
   },
+}
+
+#[derive(Tabled)]
+struct FileList {
+  id: usize,
+  file_type: String,
+  path: String,
 }
 
 impl Args {
@@ -134,6 +142,8 @@ fn main() -> anyhow::Result<()> {
     let mut idx = 0;
     let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
+    let mut real_path: Vec<FileList> = Vec::new();
+
     for path in paths {
       let path = path?;
       let file_info: Rc<_> = fs::read_to_string(&path.path())?
@@ -144,7 +154,7 @@ fn main() -> anyhow::Result<()> {
       let file_path = match file_info.get(1) {
         Some(path) => {
           empty = false;
-          path.trim_start_matches("Path=")
+          path.trim_start_matches("Path=").to_string()
         }
         None => {
           eprintln!("{}", "Fialed to get file path by index".red().bold());
@@ -152,19 +162,22 @@ fn main() -> anyhow::Result<()> {
         }
       };
 
-      let mut file_type = file_info[2].trim_start_matches("FileType=").to_string();
-      if file_type == "file" {
-        file_type = "F".to_string()
-      } else {
-        file_type = "D".to_string()
-      }
-
-      println!("{idx}:{file_type} - {file_path}");
+      let file_type = file_info[2].trim_start_matches("FileType=").to_string();
+      real_path.push(FileList {
+        id: idx,
+        file_type,
+        path: file_path,
+      });
       idx += 1;
     }
     if empty {
       println!("Nothing is the drashcan");
+      exit(0);
     }
+
+    let table_style = Style::sharp();
+    let table = Table::new(real_path).with(table_style).to_string();
+    println!("{table}");
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {

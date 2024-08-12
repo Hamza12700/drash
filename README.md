@@ -30,12 +30,14 @@ drash foo
 List drashed files:
 
 ```
-# F means file and D means directory
-
 drsah list
-0:F - /home/hamza/proptotyping/drash/check
-1:D - /home/hamza/proptotyping/drash/foo
-2:F - /home/hamza/proptotyping/drash/junk
+┌────┬───────────┬─────────────────────────────────────┐
+│ id │ file_type │ path                                │
+├────┼───────────┼─────────────────────────────────────┤
+│ 0  │ file      │ /home/hamza/personal/drash/main/baz │
+│ 1  │ file      │ /home/hamza/personal/drash/main/for │
+│ 2  │ file      │ /home/hamza/personal/drash/main/bar │
+└────┴───────────┴─────────────────────────────────────┘
 ```
 
 Restore a single drashed file:

@@ -1,13 +1,19 @@
-use anyhow::Ok;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use inquire::Confirm;
+use inquire::{
+  formatter::MultiOptionFormatter,
+  list_option::ListOption,
+  validator::{self, Validation},
+  Confirm, MultiSelect,
+};
 use tabled::{settings::Style, Table, Tabled};
 use utils::check_path;
 mod utils;
 use std::{
   collections::HashMap,
-  env, fs,
+  env,
+  error::Error,
+  fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
@@ -29,6 +35,9 @@ struct Args {
 enum Commands {
   /// List files in the drashcan
   List,
+
+  /// Remove selected files in the drashcan
+  Remove,
 
   /// Empty drashcan
   Empty {
@@ -178,6 +187,60 @@ fn main() -> anyhow::Result<()> {
     let table_style = Style::sharp();
     let table = Table::new(real_path).with(table_style).to_string();
     println!("{table}");
+  }
+
+  if let Some(Commands::Remove) = &args.commands {
+    let mut empty = true;
+    let entries = fs::read_dir(&drash_info_dir)?;
+    let mut real_path: Vec<String> = Vec::new();
+
+    for path in entries {
+      let path = path?;
+      let file_info: Rc<_> = fs::read_to_string(&path.path())?
+        .lines()
+        .map(|line| line.to_string())
+        .collect();
+
+      let file_path = match file_info.get(1) {
+        Some(path) => {
+          empty = false;
+          path.trim_start_matches("Path=")
+        }
+        None => continue,
+      };
+
+      real_path.push(file_path.to_string());
+    }
+    if empty {
+      println!("Nothing is the drashcan");
+      exit(0);
+    }
+
+    let list_formatter: MultiOptionFormatter<'_, String> = &|a| {
+      if a.len() == 1 {
+        return format!("{} file removed", a.len())
+      }
+      format!("{} files removed", a.len())
+    };
+
+    let validate = |a: &[ListOption<&String>]| -> Result<Validation, Box<dyn Error + Send + Sync>> {
+      if a.len() < 1 {
+        return Ok(Validation::Invalid("At select one file to remove".into()));
+      }
+      Ok(Validation::Valid)
+    };
+
+    let file_paths = MultiSelect::new("Select files to remove:", real_path)
+      .with_formatter(list_formatter)
+      .with_validator(validate)
+      .prompt()?;
+
+    for path in file_paths {
+      let path = Path::new(&path);
+      let file_name = path.file_name().unwrap().to_str().unwrap();
+      fs::remove_file(&drash_files.join(file_name))?;
+      fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+    }
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {

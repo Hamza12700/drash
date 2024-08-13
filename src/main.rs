@@ -1,10 +1,8 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::{
-  formatter::MultiOptionFormatter,
-  list_option::ListOption,
-  validator::{self, Validation},
-  Confirm, MultiSelect,
+  formatter::MultiOptionFormatter, list_option::ListOption, validator::Validation, Confirm,
+  MultiSelect,
 };
 use tabled::{settings::Style, Table, Tabled};
 use utils::check_path;
@@ -56,7 +54,6 @@ enum Commands {
 
 #[derive(Tabled)]
 struct FileList {
-  id: usize,
   file_type: String,
   path: String,
 }
@@ -148,7 +145,6 @@ fn main() -> anyhow::Result<()> {
   }
 
   if let Some(Commands::List) = &args.commands {
-    let mut idx = 0;
     let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
     let mut real_path: Vec<FileList> = Vec::new();
@@ -173,18 +169,16 @@ fn main() -> anyhow::Result<()> {
 
       let file_type = file_info[2].trim_start_matches("FileType=").to_string();
       real_path.push(FileList {
-        id: idx,
         file_type,
         path: file_path,
       });
-      idx += 1;
     }
     if empty {
       println!("Nothing is the drashcan");
       exit(0);
     }
 
-    let table_style = Style::sharp();
+    let table_style = Style::psql();
     let table = Table::new(real_path).with(table_style).to_string();
     println!("{table}");
   }
@@ -218,7 +212,7 @@ fn main() -> anyhow::Result<()> {
 
     let list_formatter: MultiOptionFormatter<'_, String> = &|a| {
       if a.len() == 1 {
-        return format!("{} file removed", a.len())
+        return format!("{} file removed", a.len());
       }
       format!("{} files removed", a.len())
     };

@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::{
-  formatter::MultiOptionFormatter, list_option::ListOption, validator::Validation, Confirm,
-  MultiSelect,
+  formatter::MultiOptionFormatter, list_option::ListOption, min_length, validator::Validation,
+  Confirm, MultiSelect,
 };
 use tabled::{settings::Style, Table, Tabled};
 use utils::check_path;
@@ -49,6 +49,10 @@ enum Commands {
     /// restore file without asking to replace it with an existing one
     #[arg(short, long)]
     overwrite: bool,
+
+    /// restore files interactively
+    #[arg(short, long)]
+    interactive: bool,
   },
 }
 
@@ -87,19 +91,19 @@ fn main() -> anyhow::Result<()> {
     if let Err(err) = fs::create_dir(&drash_dir) {
       eprintln!("Failed to create directory at {:?}", drash_dir);
       eprintln!("Error message: {err}");
-      exit(1);
+      return Ok(());
     }
 
     if let Err(err) = fs::create_dir(Path::new(&drash_dir).join("info")) {
       eprintln!("Failed to create directory at {:?}", drash_info_dir);
       eprintln!("Error message: {err}");
-      exit(1);
+      return Ok(());
     }
 
     if let Err(err) = fs::create_dir(&drash_files) {
       eprintln!("Failed to create directory at {:?}", drash_files);
       eprintln!("Error message: {err}");
-      exit(1);
+      return Ok(());
     }
   }
   let args = Args::parse();
@@ -109,7 +113,7 @@ fn main() -> anyhow::Result<()> {
     for file in files {
       if file.is_symlink() {
         fs::remove_file(&file)?;
-        exit(0);
+        return Ok(());
       }
       let mut file_name = file.display().to_string();
       if !file.exists() {
@@ -175,7 +179,7 @@ fn main() -> anyhow::Result<()> {
     }
     if empty {
       println!("Nothing is the drashcan");
-      exit(0);
+      return Ok(());
     }
 
     let table_style = Style::psql();
@@ -207,7 +211,7 @@ fn main() -> anyhow::Result<()> {
     }
     if empty {
       println!("Nothing is the drashcan");
-      exit(0);
+      return Ok(());
     }
 
     let list_formatter: MultiOptionFormatter<'_, String> = &|a| {
@@ -242,7 +246,7 @@ fn main() -> anyhow::Result<()> {
     let file_entries = files.count();
     if file_entries == 0 {
       println!("Drashcan is alraedy empty");
-      exit(0);
+      return Ok(());
     }
 
     if *yes {
@@ -256,7 +260,7 @@ fn main() -> anyhow::Result<()> {
         n if n > 1 => println!("Removed: {file_entries} files"),
         _ => println!("Removed: {file_entries} file"),
       }
-      exit(0);
+      return Ok(());
     }
 
     let user_input = Confirm::new("Empty the drash directory?")
@@ -264,7 +268,7 @@ fn main() -> anyhow::Result<()> {
       .prompt()?;
 
     if !user_input {
-      exit(0);
+      return Ok(());
     }
 
     fs::remove_dir_all(&drash_files)?;
@@ -274,10 +278,15 @@ fn main() -> anyhow::Result<()> {
     fs::create_dir(&drash_info_dir)?;
   }
 
-  if let Some(Commands::Restore { overwrite }) = &args.commands {
+  if let Some(Commands::Restore {
+    overwrite,
+    interactive,
+  }) = &args.commands
+  {
     let mut len = 0;
     let mut files: HashMap<usize, PathBuf> = HashMap::new();
     let mut empty = true;
+    let mut path_entries: Vec<String> = Vec::new();
     let paths = fs::read_dir(&drash_info_dir)?;
 
     for (idx, path) in paths.enumerate() {
@@ -290,21 +299,48 @@ fn main() -> anyhow::Result<()> {
           path_value = line.trim_start_matches("Path=");
         } else if line.starts_with("FileType=") {
           empty = false;
-          let mut file_type = line.trim_start_matches("FileType=");
-          if file_type == "file" {
-            file_type = "F"
-          } else {
-            file_type = "D"
+          if !*interactive {
+            let mut file_type = line.trim_start_matches("FileType=");
+            if file_type == "file" {
+              file_type = "F"
+            } else {
+              file_type = "D"
+            }
+            println!("  {idx}:{file_type} - {path_value}");
+            files.insert(idx, Path::new(&path_value).to_path_buf());
           }
-          println!("  {idx}:{file_type} - {path_value}");
-          files.insert(idx, Path::new(path_value).to_path_buf());
+          path_entries.push(path_value.to_string());
         }
       }
       len = idx;
     }
     if empty {
       println!("Drashcan is empty");
-      exit(0);
+      return Ok(());
+    }
+
+    if *interactive {
+      let formatter: MultiOptionFormatter<'_, String> = &|a| {
+        if a.len() <= 1 {
+          return format!("{} file restored", a.len());
+        }
+        format!("{} files restored", a.len())
+      };
+
+      let restore_paths = MultiSelect::new("Select files to restore", path_entries)
+        .with_validator(min_length!(1, "At least choose one file to restore"))
+        .with_formatter(formatter)
+        .prompt()?;
+
+      for entry in restore_paths {
+        let path = Path::new(&entry);
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+      }
+
+      return Ok(());
     }
 
     print!("What file to restore [0..{len}]: ");
@@ -332,7 +368,7 @@ fn main() -> anyhow::Result<()> {
       if user_input[1].is_empty() {
         eprintln!("{}", "Invalid input".bold().red());
         eprintln!("example usage: {}", "0-range, X...".bold());
-        exit(1);
+        return Ok(());
       }
 
       let range = user_input[0];
@@ -340,7 +376,7 @@ fn main() -> anyhow::Result<()> {
       if range[1].is_empty() {
         eprintln!("{}", "Invalid range sytax".bold().red());
         eprintln!("example range usage: {}", "0-range".bold());
-        exit(1);
+        return Ok(());
       }
 
       let start_idx: usize = range[0].parse()?;
@@ -412,7 +448,7 @@ fn main() -> anyhow::Result<()> {
       if range.len() != 2 {
         eprintln!("{}", "Invalid input".bold().red());
         eprintln!("Sytax to use range: 0-{len}");
-        exit(1);
+        return Ok(());
       }
       let start_idx: usize = range[0].parse()?;
       let end_idx: usize = range[1].parse()?;

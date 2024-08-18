@@ -91,19 +91,19 @@ fn main() -> anyhow::Result<()> {
     if let Err(err) = fs::create_dir(&drash_dir) {
       eprintln!("Failed to create directory at {:?}", drash_dir);
       eprintln!("Error message: {err}");
-      return Ok(());
+      exit(1);
     }
 
     if let Err(err) = fs::create_dir(Path::new(&drash_dir).join("info")) {
       eprintln!("Failed to create directory at {:?}", drash_info_dir);
       eprintln!("Error message: {err}");
-      return Ok(());
+      exit(1);
     }
 
     if let Err(err) = fs::create_dir(&drash_files) {
       eprintln!("Failed to create directory at {:?}", drash_files);
       eprintln!("Error message: {err}");
-      return Ok(());
+      exit(1);
     }
   }
   let args = Args::parse();
@@ -368,7 +368,7 @@ fn main() -> anyhow::Result<()> {
       if user_input[1].is_empty() {
         eprintln!("{}", "Invalid input".bold().red());
         eprintln!("example usage: {}", "0-range, X...".bold());
-        return Ok(());
+        exit(1);
       }
 
       let range = user_input[0];
@@ -376,7 +376,7 @@ fn main() -> anyhow::Result<()> {
       if range[1].is_empty() {
         eprintln!("{}", "Invalid range sytax".bold().red());
         eprintln!("example range usage: {}", "0-range".bold());
-        return Ok(());
+        exit(1);
       }
 
       let start_idx: usize = range[0].parse()?;
@@ -448,7 +448,7 @@ fn main() -> anyhow::Result<()> {
       if range.len() != 2 {
         eprintln!("{}", "Invalid input".bold().red());
         eprintln!("Sytax to use range: 0-{len}");
-        return Ok(());
+        exit(1);
       }
       let start_idx: usize = range[0].parse()?;
       let end_idx: usize = range[1].parse()?;

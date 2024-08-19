@@ -35,7 +35,10 @@ enum Commands {
   List,
 
   /// Remove selected files in the drashcan
-  Remove,
+  Remove {
+    /// Remove the last drashed file. Use `-` to delete it
+    last: Option<String>,
+  },
 
   /// Empty drashcan
   Empty {
@@ -129,6 +132,7 @@ fn main() -> anyhow::Result<()> {
       }
       // TODO: fix bug when drashing same files
       let current_file = env::current_dir()?.join(&file);
+
       let mut buffer = fs::OpenOptions::new()
         .write(true)
         .append(true)
@@ -187,7 +191,41 @@ fn main() -> anyhow::Result<()> {
     println!("{table}");
   }
 
-  if let Some(Commands::Remove) = &args.commands {
+  if let Some(Commands::Remove { last }) = &args.commands {
+    if let Some(_) = last {
+      let last_file = fs::read_dir(&drash_files)?
+        .flatten()
+        .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
+
+      match last_file {
+        Some(file) => {
+          let path = file.path();
+          let file_name = file.file_name();
+          let file_name = Path::new(&file_name);
+
+          let file_info =
+            fs::read_to_string(&drash_info_dir.join(format!("{}.drashinfo", file_name.display())))?;
+
+          if path.is_dir() {
+            fs::remove_dir(&drash_files.join(&file_name))?;
+          } else {
+            fs::remove_file(&drash_files.join(&file_name))?;
+          }
+          fs::remove_file(
+            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+          )?;
+
+          let file_path: Rc<_> = file_info.split("\n").collect();
+          let file_path = file_path[1].trim_start_matches("Path=");
+
+          println!("Remvoed: {}", file_path)
+        }
+        None => eprintln!("Drashcan is empty"),
+      }
+
+      return Ok(());
+    }
+
     let mut empty = true;
     let entries = fs::read_dir(&drash_info_dir)?;
     let mut real_path: Vec<String> = Vec::new();
@@ -236,9 +274,15 @@ fn main() -> anyhow::Result<()> {
     for path in file_paths {
       let path = Path::new(&path);
       let file_name = path.file_name().unwrap().to_str().unwrap();
-      fs::remove_file(&drash_files.join(file_name))?;
+      if drash_files.join(file_name).is_dir() {
+        fs::remove_dir(&drash_files.join(file_name))?;
+      } else {
+        fs::remove_file(&drash_files.join(file_name))?;
+      }
       fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
     }
+
+    return Ok(());
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {

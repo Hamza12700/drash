@@ -60,6 +60,9 @@ enum Commands {
     /// restore files interactively
     #[arg(short, long)]
     interactive: bool,
+
+    /// restore last drashed file
+    last: Option<String>,
   },
 }
 
@@ -390,8 +393,37 @@ fn main() -> anyhow::Result<()> {
   if let Some(Commands::Restore {
     overwrite,
     interactive,
+    last,
   }) = &args.commands
   {
+    if let Some(_) = last {
+      let last_file = fs::read_dir(&drash_files)?
+        .flatten()
+        .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
+
+      match last_file {
+        Some(file) => {
+          let file_name = file.file_name();
+          let file_name = Path::new(&file_name);
+
+          let file_info =
+            fs::read_to_string(&drash_info_dir.join(format!("{}.drashinfo", file_name.display())))?;
+
+          let file_path: Rc<_> = file_info.split("\n").collect();
+          let file_path = file_path[1].trim_start_matches("Path=");
+
+          fs::rename(&drash_files.join(&file_name), file_path)?;
+          fs::remove_file(
+            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+          )?;
+          println!("Restored: {}", file_name.display());
+        }
+        None => eprintln!("Drashcan is empty"),
+      }
+
+      return Ok(());
+    }
+
     let mut len = 0;
     let mut files: HashMap<usize, PathBuf> = HashMap::new();
     let mut empty = true;

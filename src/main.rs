@@ -417,8 +417,9 @@ fn main() -> anyhow::Result<()> {
             }
             println!("  {idx}:{file_type} - {path_value}");
             files.insert(idx, Path::new(&path_value).to_path_buf());
+          } else {
+            path_entries.push(path_value.to_string());
           }
-          path_entries.push(path_value.to_string());
         }
       }
       len = idx;
@@ -461,15 +462,17 @@ fn main() -> anyhow::Result<()> {
     if !user_input.contains(",") && !user_input.contains("-") {
       let idx: usize = user_input.parse()?;
       let path = files.get(&idx).unwrap();
+      let file_name = path.file_name().unwrap().to_str().unwrap();
 
       match *overwrite {
         true => {
-          let file_name = path.file_name().unwrap().to_str().unwrap();
           fs::rename(&drash_files.join(file_name), path)?;
           fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
         }
         false => {
-          let _ = check_path(path, &drash_files, &drash_info_dir);
+          check_path(path, &drash_files, &drash_info_dir);
+          fs::rename(&drash_files.join(file_name), path)?;
+          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
         }
       }
     } else if user_input.contains(",") && user_input.contains("-") {

@@ -125,11 +125,14 @@ fn main() -> anyhow::Result<()> {
 
     let skim_item_reader = SkimItemReader::default();
     let items = skim_item_reader.of_bufread(Cursor::new(files));
-    let selected_files = Skim::run_with(&options, Some(items))
-      .map(|out| out.selected_items)
-      .unwrap_or_else(|| Vec::new());
+    let selected_files = Skim::run_with(&options, Some(items)).unwrap();
 
-    for item in selected_files.iter() {
+    if selected_files.is_abort {
+      println!("\n{}", "No files selected".bold());
+      return Ok(());
+    }
+
+    for item in selected_files.selected_items.iter() {
       let selected_file_name = item.output().to_string();
       let file = Path::new(&selected_file_name);
 
@@ -171,10 +174,10 @@ fn main() -> anyhow::Result<()> {
       fs::rename(file, Path::new(&drash_files).join(file_name))?;
     }
 
-    if selected_files.len() > 1 {
-      println!("Removed {} files", selected_files.len());
+    if selected_files.selected_items.len() > 1 {
+      println!("Removed {} files", selected_files.selected_items.len());
     } else {
-      println!("\nRemoved {} file", selected_files.len());
+      println!("\nRemoved 1 file");
     }
 
     return Ok(());

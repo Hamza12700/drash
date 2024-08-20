@@ -4,6 +4,10 @@ use inquire::{
   formatter::MultiOptionFormatter, list_option::ListOption, min_length, validator::Validation,
   Confirm, MultiSelect,
 };
+use skim::{
+  prelude::{SkimItemReader, SkimOptionsBuilder},
+  Skim,
+};
 use tabled::{settings::Style, Table, Tabled};
 use utils::check_path;
 mod utils;
@@ -12,7 +16,7 @@ use std::{
   env,
   error::Error,
   fs,
-  io::{self, Write},
+  io::{self, Cursor, Write},
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
@@ -36,7 +40,7 @@ enum Commands {
 
   /// Remove selected files in the drashcan
   Remove {
-    /// Remove the last drashed file. Use `-` to delete it
+    /// remove the last drashed file. Use `-` to delete it
     last: Option<String>,
   },
 
@@ -66,22 +70,11 @@ struct FileList {
 }
 
 impl Args {
-  fn validate(&self) {
+  fn is_none(&self) -> bool {
     if self.files.is_none() && self.commands.is_none() {
-      eprintln!(
-        "{}: one argument is required: {} or {}",
-        "error".red().bold(),
-        "<FILES>".bold(),
-        "<COMMANDS>".bold()
-      );
-      eprintln!(
-        "\n{}: {} <FILES> | <COMMANDS>\n",
-        "Usage".bold().underline(),
-        "drash".bold()
-      );
-      eprintln!("For more information, try '{}'", "--help".bold());
-      exit(1);
+      return true;
     }
+    return false;
   }
 }
 
@@ -110,7 +103,79 @@ fn main() -> anyhow::Result<()> {
     }
   }
   let args = Args::parse();
-  args.validate();
+  if args.is_none() {
+    let mut files = String::new();
+    let options = SkimOptionsBuilder::default()
+      .height(Some("50%"))
+      .multi(true)
+      .build()?;
+
+    let entries = fs::read_dir(".")?;
+    for entry in entries {
+      let entry = entry?;
+      let path = entry.path();
+      if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
+        files.push_str(file_name);
+        files.push('\n');
+      }
+    }
+
+    let skim_item_reader = SkimItemReader::default();
+    let items = skim_item_reader.of_bufread(Cursor::new(files));
+    let selected_files = Skim::run_with(&options, Some(items))
+      .map(|out| out.selected_items)
+      .unwrap_or_else(|| Vec::new());
+
+    for item in selected_files.iter() {
+      let selected_file_name = item.output().to_string();
+      let file = Path::new(&selected_file_name);
+
+      if file.is_symlink() {
+        fs::remove_file(&file)?;
+        return Ok(());
+      }
+
+      let mut file_name = file.display().to_string();
+      if !file.exists() {
+        eprintln!("file not found: '{}'", file_name.bold());
+        continue;
+      }
+
+      if file_name.ends_with("/") {
+        file_name.pop();
+      }
+      if file_name.contains("/") {
+        let paths = file_name.split("/").last();
+        file_name = paths.unwrap().to_string();
+      }
+      let current_file = env::current_dir()?.join(&file);
+
+      let mut buffer = fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file_name)))?;
+
+      buffer.write_all(b"[Drash Info]\n")?;
+      let formatted_string = format!("Path={}\n", current_file.display());
+      buffer.write_all(formatted_string.as_bytes())?;
+      buffer.write_all(b"FileType=")?;
+      if file.is_dir() {
+        buffer.write_all(b"directory\n")?;
+      } else {
+        buffer.write_all(b"file\n")?;
+      }
+      fs::rename(file, Path::new(&drash_files).join(file_name))?;
+    }
+
+    if selected_files.len() > 1 {
+      println!("Removed {} files", selected_files.len());
+    } else {
+      println!("\nRemoved {} file", selected_files.len());
+    }
+
+    return Ok(());
+  }
 
   if let Some(files) = &args.files {
     for file in files {

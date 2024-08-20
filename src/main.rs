@@ -4,19 +4,15 @@ use inquire::{
   formatter::MultiOptionFormatter, list_option::ListOption, min_length, validator::Validation,
   Confirm, MultiSelect,
 };
-use skim::{
-  prelude::{SkimItemReader, SkimOptionsBuilder},
-  Skim,
-};
 use tabled::{settings::Style, Table, Tabled};
-use utils::check_path;
+use utils::{check_path, fuzzy_find_files};
 mod utils;
 use std::{
   collections::HashMap,
   env,
   error::Error,
   fs,
-  io::{self, Cursor, Write},
+  io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
@@ -40,8 +36,8 @@ enum Commands {
 
   /// Remove selected files in the drashcan
   Remove {
-    /// remove the last drashed file. Use `-` to delete it
-    last: Option<String>,
+    /// remove searched file or use `-` to remove the last drashed file
+    search_file: Option<String>,
   },
 
   /// Empty drashcan
@@ -61,8 +57,8 @@ enum Commands {
     #[arg(short, long)]
     interactive: bool,
 
-    /// restore last drashed file
-    last: Option<String>,
+    /// restore searched file or use `-` to restore the last drashed file
+    search_file: Option<String>,
   },
 }
 
@@ -107,30 +103,7 @@ fn main() -> anyhow::Result<()> {
   }
   let args = Args::parse();
   if args.is_none() {
-    let mut files = String::new();
-    let options = SkimOptionsBuilder::default()
-      .height(Some("50%"))
-      .multi(true)
-      .build()?;
-
-    let entries = fs::read_dir(".")?;
-    for entry in entries {
-      let entry = entry?;
-      let path = entry.path();
-      if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-        files.push_str(file_name);
-        files.push('\n');
-      }
-    }
-
-    let skim_item_reader = SkimItemReader::default();
-    let items = skim_item_reader.of_bufread(Cursor::new(files));
-    let selected_files = Skim::run_with(&options, Some(items)).unwrap();
-
-    if selected_files.is_abort {
-      println!("\n{}", "No files selected".bold());
-      return Ok(());
-    }
+    let selected_files = fuzzy_find_files(".", None)?;
 
     for item in selected_files.selected_items.iter() {
       let selected_file_name = item.output().to_string();
@@ -262,8 +235,32 @@ fn main() -> anyhow::Result<()> {
     println!("{table}");
   }
 
-  if let Some(Commands::Remove { last }) = &args.commands {
-    if let Some(_) = last {
+  if let Some(Commands::Remove { search_file }) = &args.commands {
+    if let Some(search) = search_file {
+      if search != "-" {
+        let mut total_files = 0;
+        let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
+        total_files = selected_files.selected_items.len();
+
+        for file_skim in selected_files.selected_items.iter() {
+          let file = file_skim.output().to_string();
+          let file_path = Path::new(&file);
+          let file_name = file_path.file_name().unwrap();
+
+          fs::remove_file(&drash_files.join(file_name))?;
+          fs::remove_file(
+            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+          )?;
+        }
+
+        if total_files > 1 {
+          println!("\nRemoved: {total_files} files");
+        } else {
+          println!("\nRemoved: 1 file");
+        }
+        return Ok(());
+      }
+
       let last_file = fs::read_dir(&drash_files)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
@@ -396,10 +393,34 @@ fn main() -> anyhow::Result<()> {
   if let Some(Commands::Restore {
     overwrite,
     interactive,
-    last,
+    search_file,
   }) = &args.commands
   {
-    if let Some(_) = last {
+    if let Some(search) = search_file {
+      if search != "-" {
+        let mut total_files = 0;
+        let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
+        total_files = selected_files.selected_items.len();
+
+        for file_skim in selected_files.selected_items.iter() {
+          let file = file_skim.output().to_string();
+          let file_path = Path::new(&file);
+          let file_name = file_path.file_name().unwrap();
+
+          fs::rename(&drash_files.join(file_name), file_path)?;
+          fs::remove_file(
+            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+          )?;
+        }
+
+        if total_files > 1 {
+          println!("\nRestored: {total_files} files");
+        } else {
+          println!("\nRestored: 1 file");
+        }
+        return Ok(());
+      }
+
       let last_file = fs::read_dir(&drash_files)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());

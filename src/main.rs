@@ -238,9 +238,7 @@ fn main() -> anyhow::Result<()> {
   if let Some(Commands::Remove { search_file }) = &args.commands {
     if let Some(search) = search_file {
       if search != "-" {
-        let mut total_files = 0;
         let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
-        total_files = selected_files.selected_items.len();
 
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
@@ -252,6 +250,7 @@ fn main() -> anyhow::Result<()> {
             &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
         }
+        let total_files = selected_files.selected_items.len();
 
         if total_files > 1 {
           println!("\nRemoved: {total_files} files");
@@ -398,9 +397,7 @@ fn main() -> anyhow::Result<()> {
   {
     if let Some(search) = search_file {
       if search != "-" {
-        let mut total_files = 0;
         let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
-        total_files = selected_files.selected_items.len();
 
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
@@ -412,6 +409,7 @@ fn main() -> anyhow::Result<()> {
             &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
         }
+        let total_files = selected_files.selected_items.len();
 
         if total_files > 1 {
           println!("\nRestored: {total_files} files");

@@ -25,6 +25,10 @@ struct Args {
   /// Files to drash
   files: Option<Vec<PathBuf>>,
 
+  /// Force remove file
+  #[arg(short, long)]
+  force: bool,
+
   #[command(subcommand)]
   commands: Option<Commands>,
 }
@@ -157,16 +161,42 @@ fn main() -> anyhow::Result<()> {
   }
 
   if let Some(files) = &args.files {
+    if args.force {
+      for file in files {
+        if file.is_symlink() {
+          fs::remove_file(&file)?;
+          return Ok(());
+        }
+
+        let file_name = file.display().to_string();
+        if !file.exists() {
+          eprintln!("file not found: '{}'", file_name.bold());
+          continue;
+        }
+
+        match file.is_dir() {
+          true => fs::remove_dir_all(file)?,
+          false => fs::remove_file(file)?,
+        };
+        continue;
+      }
+
+      println!("Removed: {} files", files.len());
+      return Ok(());
+    }
+
     for file in files {
       if file.is_symlink() {
         fs::remove_file(&file)?;
         return Ok(());
       }
+
       let mut file_name = file.display().to_string();
       if !file.exists() {
         eprintln!("file not found: '{}'", file_name.bold());
         continue;
       }
+
       if file_name.ends_with("/") {
         file_name.pop();
       }
@@ -274,7 +304,7 @@ fn main() -> anyhow::Result<()> {
             fs::read_to_string(&drash_info_dir.join(format!("{}.drashinfo", file_name.display())))?;
 
           if path.is_dir() {
-            fs::remove_dir(&drash_files.join(&file_name))?;
+            fs::remove_dir_all(&drash_files.join(&file_name))?;
           } else {
             fs::remove_file(&drash_files.join(&file_name))?;
           }
@@ -342,7 +372,7 @@ fn main() -> anyhow::Result<()> {
       let path = Path::new(&path);
       let file_name = path.file_name().unwrap().to_str().unwrap();
       if drash_files.join(file_name).is_dir() {
-        fs::remove_dir(&drash_files.join(file_name))?;
+        fs::remove_dir_all(&drash_files.join(file_name))?;
       } else {
         fs::remove_file(&drash_files.join(file_name))?;
       }

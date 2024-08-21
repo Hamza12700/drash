@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "drash"
-version = "1.9.9"
+version = "1.9.10"
 dependencies = [
  "anyhow",
  "clap 4.5.16",

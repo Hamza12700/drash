@@ -1,120 +1,93 @@
 # Drash
-Put files/directories to drash.
 
-Drash is a CLI app that trashes files and directories and stores the path of that file where it was removed from.
+Drash is a Command Line Interface (CLI) application that serves as a better alternative to the Linux `rm` command. It records the original path of the file which was removed. It puts the deleted file into a temp directory (`~/.local/share/Drash`), making it easy to recovery them later if you accidentally deleted the wrong file.
 
-Command line arguments:
+This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](https://www.freedesktop.org/wiki/Specifications/trash-spec/).
 
+## Installation:
+
+Clone the repo into your local machine:
+```bash
+git clone https://github.com/hamza12700/drash
 ```
-Commands:
-  list     List files in the drashcan
-  remove   Remove selected files in the drashcan
-  empty    Empty drashcan
-  restore  Restore drashed files
-  help     Print this message or the help of the given subcommand(s)
 
-Arguments:
-  [FILES]...  Files to drash
-
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
+Use [cargo](https://doc.rust-lang.org/cargo/) to  build and install the binary into your `$PATH`.
+```bsah
+cd drash
+cargo install --path .
 ```
 
 ## Usage
-Drash a file or directory:
 
+### Drash files
+
+Put a file intot the drashcan:
 ```
 drash foo
 ```
 
-List drashed files:
-
+Delete a file without storing it in the drashcan:
 ```
-drsah list
-┌────┬───────────┬─────────────────────────────────────┐
-│ id │ file_type │ path                                │
-├────┼───────────┼─────────────────────────────────────┤
-│ 0  │ file      │ /home/hamza/personal/drash/main/baz │
-│ 1  │ file      │ /home/hamza/personal/drash/main/for │
-│ 2  │ file      │ /home/hamza/personal/drash/main/bar │
-└────┴───────────┴─────────────────────────────────────┘
+# Pass --force or -f
+drash foo -f
 ```
 
-Restore a single drashed file:
-
+Pass no arguments and options to put files into drashcan in fuzzy find mode:
 ```
-drash restore
-  0 /home/hamza/proptotyping/drash/check
-  1 /home/hamza/proptotyping/drash/foo
-  2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 2
+# Will open fuzzy search menu
+drash
 ```
 
-Restore multiple drashed files separated by `,`, also support range:
+### SubCommands
 
+#### List
+
+List files in the drashcan:
 ```
-drash restore
-  0 /home/hamza/proptotyping/drash/check
-  1 /home/hamza/proptotyping/drash/foo
-  2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 0-1, 2
+drash list
 ```
 
-Restore multiple drashed files overwriting the existing files:
+#### Restore
 
+Restore a file from drashcan using indices, also supports range and comma separated values:
 ```
 drash restore
-  0 /home/hamza/proptotyping/drash/check
-  1 /home/hamza/proptotyping/drash/foo
-  2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 0-1, 2
-
-File already exists: "check"
-Do you want overwrite it? (Y/n): n
 ```
 
-Or pass `--overwrite` or `-o` flag to not prompt you:
-
+Restore the last drashed file:
 ```
-drash restore --overwrite
-  0 /home/hamza/proptotyping/drash/check
-  1 /home/hamza/proptotyping/drash/foo
-  2 /home/hamza/proptotyping/drash/junk
-What file to restore [0..2]: 0-2
+drash restore -
 ```
 
-Remove all files from the drash directory:
+Restore a file using fuzzy searching:
+```
+drash restore <FILE_NAME>
+```
 
+Restore a file by overwriting the existing file:
+```
+# Or use any other method shown above
+drash restore <FILE_NAME> --overwrite
+```
+
+#### Empty
+
+Empty the drashcan:
 ```
 drash empty
-Would empty the following drash directories:
-  - /home/hamza/.local/share/Drash
-  - Entries 3
-Proceed? (Y/n): y
 ```
 
-Use `--yes` or `-y` flag to remove all files in the drashcan directory without asking for confirmation:
-
+Pass `--yes or -y` pass to not show the confirm prompt:
 ```
 drash empty -y
-Removed: 3 files
 ```
 
-Remove individual files in the drashcan, by searching for them:
+## Bugs
 
-```
-drash remove
-? Select files to remove:
-> [ ] /home/hamza/personal/drash/main/baz
-  [ ] /home/hamza/personal/drash/main/bar
-  [ ] /home/hamza/personal/drash/main/foo
-[↑↓ to move, space to select one, → to all, ← to none, type to filter]
-```
+If you discover a bug please report them [here](https://github.com/Hamza12700/drash/issues/).
 
-# Why?
-In Linux, deleting file or a directory using `rm -r` is irreversible. Now, I
-don't know about you but I make a lot of typos when I'm typing (skill issue, I
-know). **Drash** cli app written in RUST (BTW) solves this issue, by storing
-files in user's `.local/share` directory and keeping track of the original path
-where the file was removed.
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+All pull requests should be submitted to the "main" branch.

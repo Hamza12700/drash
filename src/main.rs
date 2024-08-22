@@ -5,14 +5,13 @@ use inquire::{
   Confirm, MultiSelect,
 };
 use tabled::{settings::Style, Table, Tabled};
-use utils::{check_path, fuzzy_find_files};
+use utils::{check_overwrite, fuzzy_find_files};
 mod utils;
 use std::{
-  collections::HashMap,
   env,
   error::Error,
   fs,
-  io::{self, Write},
+  io::Write,
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
@@ -56,10 +55,6 @@ enum Commands {
     /// restore file without asking to replace it with an existing one
     #[arg(short, long)]
     overwrite: bool,
-
-    /// restore files interactively
-    #[arg(short, long)]
-    interactive: bool,
 
     /// restore searched file or use `-` to restore the last drashed file
     search_file: Option<String>,
@@ -421,30 +416,32 @@ fn main() -> anyhow::Result<()> {
 
   if let Some(Commands::Restore {
     overwrite,
-    interactive,
     search_file,
   }) = &args.commands
   {
     if let Some(search) = search_file {
       if search != "-" {
         let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
+        let mut total_files = 0;
 
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
           let file_path = Path::new(&file);
-          let file_name = file_path.file_name().unwrap();
+          let file_name = file_path.file_name().unwrap().to_str().unwrap();
 
-          fs::rename(&drash_files.join(file_name), file_path)?;
-          fs::remove_file(
-            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-          )?;
+          let check = check_overwrite(file_path, *overwrite);
+          if check {
+            fs::rename(&drash_files.join(file_name), file_path)?;
+            fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+            total_files += 1;
+          } else {
+            println!("Skipped {file_name}");
+            continue;
+          }
         }
-        let total_files = selected_files.selected_items.len();
 
-        if total_files > 1 {
-          println!("\nRestored: {total_files} files");
-        } else {
-          println!("\nRestored: 1 file");
+        if total_files == 0 {
+          println!("\nDidn't restore any file");
         }
         return Ok(());
       }
@@ -464,11 +461,16 @@ fn main() -> anyhow::Result<()> {
           let file_path: Rc<_> = file_info.split("\n").collect();
           let file_path = file_path[1].trim_start_matches("Path=");
 
-          fs::rename(&drash_files.join(&file_name), file_path)?;
-          fs::remove_file(
-            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-          )?;
-          println!("Restored: {}", file_name.display());
+          let check = check_overwrite(file_path, *overwrite);
+          if check {
+            fs::rename(&drash_files.join(&file_name), file_path)?;
+            fs::remove_file(
+              &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+            )?;
+            println!("Restored: {}", file_name.display());
+          } else {
+            println!("Did not restored: {}", file_name.display());
+          }
         }
         None => eprintln!("Drashcan is empty"),
       }
@@ -476,198 +478,44 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    let mut len = 0;
-    let mut files: HashMap<usize, PathBuf> = HashMap::new();
-    let mut empty = true;
     let mut path_entries: Vec<String> = Vec::new();
+    let mut empty = true;
     let paths = fs::read_dir(&drash_info_dir)?;
 
-    for (idx, path) in paths.enumerate() {
+    for path in paths {
       let path = path?.path();
       let file_info = fs::read_to_string(&path)?;
-      let mut path_value = "";
-
-      for line in file_info.lines() {
-        if line.starts_with("Path=") {
-          path_value = line.trim_start_matches("Path=");
-        } else if line.starts_with("FileType=") {
-          empty = false;
-          if !*interactive {
-            let mut file_type = line.trim_start_matches("FileType=");
-            if file_type == "file" {
-              file_type = "F"
-            } else {
-              file_type = "D"
-            }
-            println!("  {idx}:{file_type} - {path_value}");
-            files.insert(idx, Path::new(&path_value).to_path_buf());
-          } else {
-            path_entries.push(path_value.to_string());
-          }
-        }
+      let file_info: Rc<_> = file_info.split("\n").collect();
+      let file_path = file_info[1].trim_start_matches("Path=").to_string();
+      if !file_path.is_empty() {
+        empty = false;
       }
-      len = idx;
+      path_entries.push(file_path);
     }
     if empty {
       println!("Drashcan is empty");
       return Ok(());
     }
 
-    if *interactive {
-      let formatter: MultiOptionFormatter<'_, String> = &|a| {
-        if a.len() <= 1 {
-          return format!("{} file restored", a.len());
-        }
-        format!("{} files restored", a.len())
-      };
+    let restore_paths = MultiSelect::new("Select files to restore", path_entries)
+      .with_validator(min_length!(1, "At least choose one file to restore"))
+      .prompt()?;
 
-      let restore_paths = MultiSelect::new("Select files to restore", path_entries)
-        .with_validator(min_length!(1, "At least choose one file to restore"))
-        .with_formatter(formatter)
-        .prompt()?;
-
-      for entry in restore_paths {
-        let path = Path::new(&entry);
-        let file_name = path.file_name().unwrap().to_str().unwrap();
-
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-      }
-
-      return Ok(());
-    }
-
-    print!("What file to restore [0..{len}]: ");
-    io::stdout().flush()?;
-    let mut user_input = String::new();
-    io::stdin().read_line(&mut user_input)?;
-
-    let user_input = user_input.trim();
-    if !user_input.contains(",") && !user_input.contains("-") {
-      let idx: usize = user_input.parse()?;
-      let path = files.get(&idx).unwrap();
+    for entry in restore_paths {
+      let path = Path::new(&entry);
       let file_name = path.file_name().unwrap().to_str().unwrap();
 
-      match *overwrite {
-        true => {
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        }
-        false => {
-          check_path(path, &drash_files, &drash_info_dir);
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        }
-      }
-    } else if user_input.contains(",") && user_input.contains("-") {
-      let user_input: Rc<_> = user_input.split(",").collect();
-      if user_input[1].is_empty() {
-        eprintln!("{}", "Invalid input".bold().red());
-        eprintln!("example usage: {}", "0-range, X...".bold());
-        exit(1);
-      }
-
-      let range = user_input[0];
-      let range: Rc<_> = range.split("-").collect();
-      if range[1].is_empty() {
-        eprintln!("{}", "Invalid range sytax".bold().red());
-        eprintln!("example range usage: {}", "0-range".bold());
-        exit(1);
-      }
-
-      let start_idx: usize = range[0].parse()?;
-      let end_idx: usize = range[1].parse()?;
-
-      for idx in start_idx..=end_idx {
-        if idx > len {
-          eprintln!("Out of range: 0-{len}");
-          continue;
-        }
-
-        let path = files.get(&idx).unwrap();
-        if *overwrite {
-          let file_name = path.file_name().unwrap().to_str().unwrap();
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        } else {
-          let skip = check_path(path, &drash_files, &drash_info_dir);
-          if skip {
-            continue;
-          }
-        }
-      }
-
-      for idx in user_input.iter().skip(1) {
-        let idx = idx.replace(" ", "");
-        let idx: usize = idx.parse()?;
-        if idx > len {
-          eprintln!("Out of range 0-{len}");
-          continue;
-        }
-
-        let path = files.get(&idx).unwrap();
-        if *overwrite {
-          let file_name = path.file_name().unwrap().to_str().unwrap();
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        } else {
-          let skip = check_path(path, &drash_files, &drash_info_dir);
-          if skip {
-            continue;
-          }
-        }
-      }
-    } else if user_input.contains(",") {
-      let user_input = user_input.replace(" ", "");
-      let multi_index = user_input.split(",");
-      for index in multi_index {
-        let index: usize = index.parse()?;
-        if index > len {
-          eprintln!("Out of range 0-{len}");
-          continue;
-        }
-
-        let path = files.get(&index).unwrap();
-        if *overwrite {
-          let file_name = path.file_name().unwrap().to_str().unwrap();
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        } else {
-          let skip = check_path(path, &drash_files, &drash_info_dir);
-          if skip {
-            continue;
-          }
-        }
-      }
-    } else if user_input.contains("-") {
-      let range: Rc<_> = user_input.split("-").collect();
-      if range.len() != 2 {
-        eprintln!("{}", "Invalid input".bold().red());
-        eprintln!("Sytax to use range: 0-{len}");
-        exit(1);
-      }
-      let start_idx: usize = range[0].parse()?;
-      let end_idx: usize = range[1].parse()?;
-
-      for idx in start_idx..=end_idx {
-        if idx > len {
-          eprintln!("Out of range 0-{len}");
-          continue;
-        }
-
-        let path = files.get(&idx).unwrap();
-        if *overwrite {
-          let file_name = path.file_name().unwrap().to_str().unwrap();
-          fs::rename(&drash_files.join(file_name), path)?;
-          fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
-        } else {
-          let skip = check_path(path, &drash_files, &drash_info_dir);
-          if skip {
-            continue;
-          }
-        }
+      let check = check_overwrite(path, *overwrite);
+      if check {
+        fs::rename(&drash_files.join(file_name), path)?;
+        fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        println!("Restored: {file_name}");
+      } else {
+        println!("Skipped {}", file_name);
+        continue;
       }
     }
+    return Ok(());
   }
 
   Ok(())

@@ -10,7 +10,7 @@ mod utils;
 use std::{
   env,
   error::Error,
-  fs,
+  fs::{self},
   io::Write,
   path::{Path, PathBuf},
   process::exit,
@@ -223,12 +223,12 @@ fn main() -> anyhow::Result<()> {
 
   if let Some(Commands::List) = &args.commands {
     let mut empty = true;
-    let paths = fs::read_dir(&drash_info_dir)?;
+    let entries = fs::read_dir(&drash_info_dir)?;
     let mut real_path: Vec<FileList> = Vec::new();
 
-    for path in paths {
-      let path = path?;
-      let file_info: Rc<_> = fs::read_to_string(&path.path())?
+    for entry in entries {
+      let entry = entry?;
+      let file_info: Rc<_> = fs::read_to_string(&entry.path())?
         .lines()
         .map(|line| line.to_string())
         .collect();
@@ -255,9 +255,16 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
+    real_path.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
+      ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
+      ("directory", "file") => std::cmp::Ordering::Less,
+      ("file", "directory") => std::cmp::Ordering::Greater,
+      _ => std::cmp::Ordering::Equal,
+    });
+
     let table_style = Style::psql();
-    let table = Table::new(real_path).with(table_style).to_string();
-    println!("{table}");
+    println!("{}", Table::new(&real_path).with(table_style).to_string());
+    println!("\nTotal entries: {}", real_path.len());
   }
 
   if let Some(Commands::Remove { search_file }) = &args.commands {

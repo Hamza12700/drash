@@ -11,7 +11,7 @@ use std::{
   env,
   error::Error,
   fs::{self},
-  io::Write,
+  io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
@@ -76,30 +76,55 @@ impl Args {
   }
 }
 
-fn main() -> anyhow::Result<()> {
-  let drash_dir = Path::new(&env::var("HOME")?).join(".local/share/Drash");
-  let drash_files = Path::new(&drash_dir).join("files");
-  let drash_info_dir = Path::new(&drash_dir).join("info");
+struct Drash {
+  dir: PathBuf,
+  files: PathBuf,
+  info: PathBuf,
+}
 
-  if !drash_dir.exists() {
-    if let Err(err) = fs::create_dir(&drash_dir) {
-      eprintln!("Failed to create directory at {:?}", drash_dir);
-      eprintln!("Error message: {err}");
-      exit(1);
-    }
+impl Drash {
+  /// Create new **Drash** struct containing path to:
+  /// - Dirash directory
+  /// - Drash files
+  /// - Drash files info
+  fn new() -> Self {
+    let home = match env::var("HOME") {
+      Ok(path) => path,
+      Err(err) => {
+        eprintln!("Failed to get HOME environment variable: {}", err);
+        exit(1);
+      },
+    };
+    let drash_dir = Path::new(&home).join(".local/share/Drash");
+    let drash_files = Path::new(&drash_dir).join("files");
+    let drash_info_dir = Path::new(&drash_dir).join("info");
 
-    if let Err(err) = fs::create_dir(Path::new(&drash_dir).join("info")) {
-      eprintln!("Failed to create directory at {:?}", drash_info_dir);
-      eprintln!("Error message: {err}");
-      exit(1);
-    }
-
-    if let Err(err) = fs::create_dir(&drash_files) {
-      eprintln!("Failed to create directory at {:?}", drash_files);
-      eprintln!("Error message: {err}");
-      exit(1);
+    Self {
+      dir: drash_dir,
+      files: drash_files,
+      info: drash_info_dir,
     }
   }
+
+  /// Create directories for **Drash** to store removed files
+  fn create_directories(&self) -> io::Result<()> {
+    if !self.dir.exists() {
+      fs::create_dir(&self.dir)?;
+      fs::create_dir(&self.files)?;
+      fs::create_dir(&self.info)?;
+    }
+
+    Ok(())
+  }
+}
+
+fn main() -> anyhow::Result<()> {
+  let drash = Drash::new();
+  if let Err(err) = drash.create_directories() {
+    eprintln!("Failed to create directory: {}", err);
+    return Ok(());
+  }
+
   let args = Args::parse();
   if args.is_none() {
     let selected_files = fuzzy_find_files(".", None)?;
@@ -132,7 +157,7 @@ fn main() -> anyhow::Result<()> {
         .write(true)
         .append(true)
         .create(true)
-        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file_name)))?;
+        .open(Path::new(&drash.info).join(format!("{}.drashinfo", file_name)))?;
 
       buffer.write_all(b"[Drash Info]\n")?;
       let formatted_string = format!("Path={}\n", current_file.display());
@@ -143,7 +168,7 @@ fn main() -> anyhow::Result<()> {
       } else {
         buffer.write_all(b"file\n")?;
       }
-      fs::rename(file, Path::new(&drash_files).join(file_name))?;
+      fs::rename(file, Path::new(&drash.files).join(file_name))?;
     }
 
     if selected_files.selected_items.len() > 1 {
@@ -206,7 +231,7 @@ fn main() -> anyhow::Result<()> {
         .write(true)
         .append(true)
         .create(true)
-        .open(Path::new(&drash_info_dir).join(format!("{}.drashinfo", file_name)))?;
+        .open(Path::new(&drash.info).join(format!("{}.drashinfo", file_name)))?;
 
       buffer.write_all(b"[Drash Info]\n")?;
       let formatted_string = format!("Path={}\n", current_file.display());
@@ -217,13 +242,13 @@ fn main() -> anyhow::Result<()> {
       } else {
         buffer.write_all(b"file\n")?;
       }
-      fs::rename(file, Path::new(&drash_files).join(file_name))?;
+      fs::rename(file, Path::new(&drash.files).join(file_name))?;
     }
   }
 
   if let Some(Commands::List) = &args.commands {
     let mut empty = true;
-    let entries = fs::read_dir(&drash_info_dir)?;
+    let entries = fs::read_dir(&drash.info)?;
     let mut real_path: Vec<FileList> = Vec::new();
 
     for entry in entries {
@@ -270,16 +295,16 @@ fn main() -> anyhow::Result<()> {
   if let Some(Commands::Remove { search_file }) = &args.commands {
     if let Some(search) = search_file {
       if search != "-" {
-        let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
+        let selected_files = fuzzy_find_files(&drash.info, Some(search))?;
 
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
           let file_path = Path::new(&file);
           let file_name = file_path.file_name().unwrap();
 
-          fs::remove_file(&drash_files.join(file_name))?;
+          fs::remove_file(&drash.info.join(file_name))?;
           fs::remove_file(
-            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+            &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
         }
         let total_files = selected_files.selected_items.len();
@@ -292,7 +317,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash_files)?
+      let last_file = fs::read_dir(&drash.files)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 
@@ -303,15 +328,15 @@ fn main() -> anyhow::Result<()> {
           let file_name = Path::new(&file_name);
 
           let file_info =
-            fs::read_to_string(&drash_info_dir.join(format!("{}.drashinfo", file_name.display())))?;
+            fs::read_to_string(&drash.info.join(format!("{}.drashinfo", file_name.display())))?;
 
           if path.is_dir() {
-            fs::remove_dir_all(&drash_files.join(&file_name))?;
+            fs::remove_dir_all(&drash.files.join(&file_name))?;
           } else {
-            fs::remove_file(&drash_files.join(&file_name))?;
+            fs::remove_file(&drash.files.join(&file_name))?;
           }
           fs::remove_file(
-            &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+            &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
 
           let file_path: Rc<_> = file_info.split("\n").collect();
@@ -326,7 +351,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mut empty = true;
-    let entries = fs::read_dir(&drash_info_dir)?;
+    let entries = fs::read_dir(&drash.info)?;
     let mut real_path: Vec<String> = Vec::new();
 
     for path in entries {
@@ -373,19 +398,19 @@ fn main() -> anyhow::Result<()> {
     for path in file_paths {
       let path = Path::new(&path);
       let file_name = path.file_name().unwrap().to_str().unwrap();
-      if drash_files.join(file_name).is_dir() {
-        fs::remove_dir_all(&drash_files.join(file_name))?;
+      if drash.files.join(file_name).is_dir() {
+        fs::remove_dir_all(&drash.files.join(file_name))?;
       } else {
-        fs::remove_file(&drash_files.join(file_name))?;
+        fs::remove_file(&drash.files.join(file_name))?;
       }
-      fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+      fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
     }
 
     return Ok(());
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {
-    let files = fs::read_dir(&drash_files)?;
+    let files = fs::read_dir(&drash.files)?;
     let file_entries = files.count();
     if file_entries == 0 {
       println!("Drashcan is alraedy empty");
@@ -393,11 +418,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     if *yes {
-      fs::remove_dir_all(&drash_files)?;
-      fs::remove_dir_all(&drash_info_dir)?;
+      fs::remove_dir_all(&drash.files)?;
+      fs::remove_dir_all(&drash.info)?;
 
-      fs::create_dir(&drash_files)?;
-      fs::create_dir(&drash_info_dir)?;
+      fs::create_dir(&drash.files)?;
+      fs::create_dir(&drash.info)?;
 
       match file_entries {
         n if n > 1 => println!("Removed: {file_entries} files"),
@@ -414,11 +439,11 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    fs::remove_dir_all(&drash_files)?;
-    fs::remove_dir_all(&drash_info_dir)?;
+    fs::remove_dir_all(&drash.files)?;
+    fs::remove_dir_all(&drash.info)?;
 
-    fs::create_dir(&drash_files)?;
-    fs::create_dir(&drash_info_dir)?;
+    fs::create_dir(&drash.files)?;
+    fs::create_dir(&drash.info)?;
   }
 
   if let Some(Commands::Restore {
@@ -428,7 +453,7 @@ fn main() -> anyhow::Result<()> {
   {
     if let Some(search) = search_file {
       if search != "-" {
-        let selected_files = fuzzy_find_files(&drash_info_dir, Some(search))?;
+        let selected_files = fuzzy_find_files(&drash.info, Some(search))?;
         let mut total_files = 0;
 
         for file_skim in selected_files.selected_items.iter() {
@@ -438,8 +463,8 @@ fn main() -> anyhow::Result<()> {
 
           let check = check_overwrite(file_path, *overwrite);
           if check {
-            fs::rename(&drash_files.join(file_name), file_path)?;
-            fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+            fs::rename(&drash.files.join(file_name), file_path)?;
+            fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
             total_files += 1;
           } else {
             println!("Skipped {file_name}");
@@ -453,7 +478,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash_files)?
+      let last_file = fs::read_dir(&drash.files)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 
@@ -463,16 +488,16 @@ fn main() -> anyhow::Result<()> {
           let file_name = Path::new(&file_name);
 
           let file_info =
-            fs::read_to_string(&drash_info_dir.join(format!("{}.drashinfo", file_name.display())))?;
+            fs::read_to_string(&drash.info.join(format!("{}.drashinfo", file_name.display())))?;
 
           let file_path: Rc<_> = file_info.split("\n").collect();
           let file_path = file_path[1].trim_start_matches("Path=");
 
           let check = check_overwrite(file_path, *overwrite);
           if check {
-            fs::rename(&drash_files.join(&file_name), file_path)?;
+            fs::rename(&drash.files.join(&file_name), file_path)?;
             fs::remove_file(
-              &drash_info_dir.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+              &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
             )?;
             println!("Restored: {}", file_name.display());
           } else {
@@ -487,7 +512,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut path_entries: Vec<String> = Vec::new();
     let mut empty = true;
-    let paths = fs::read_dir(&drash_info_dir)?;
+    let paths = fs::read_dir(&drash.info)?;
 
     for path in paths {
       let path = path?.path();
@@ -514,8 +539,8 @@ fn main() -> anyhow::Result<()> {
 
       let check = check_overwrite(path, *overwrite);
       if check {
-        fs::rename(&drash_files.join(file_name), path)?;
-        fs::remove_file(&drash_info_dir.join(format!("{}.drashinfo", file_name)))?;
+        fs::rename(&drash.files.join(file_name), path)?;
+        fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
         println!("Restored: {file_name}");
       } else {
         println!("Skipped {}", file_name);

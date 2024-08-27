@@ -1,15 +1,13 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::{
-  formatter::MultiOptionFormatter, list_option::ListOption, min_length, validator::Validation,
-  Confirm, MultiSelect,
+  formatter::MultiOptionFormatter, min_length, Confirm, MultiSelect,
 };
 use tabled::{settings::Style, Table, Tabled};
 use utils::{check_overwrite, fuzzy_find_files};
 mod utils;
 use std::{
   env,
-  error::Error,
   fs::{self},
   io::{self, Write},
   path::{Path, PathBuf},
@@ -183,6 +181,26 @@ impl Drash {
 
     Ok(())
   }
+
+  /// Remove file in the `drashcan`
+  fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+    let path = path.as_ref();
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let file_info = format!("{file_name}.drashinfo");
+
+    match path.is_dir() {
+      true => {
+        fs::remove_dir_all(&self.files.join(file_name))?;
+        fs::remove_file(&self.info.join(file_info))?;
+      }
+      false => {
+        fs::remove_file(&self.files.join(file_name))?;
+        fs::remove_file(&self.info.join(file_info))?;
+      }
+    }
+
+    Ok(())
+  }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -310,21 +328,13 @@ fn main() -> anyhow::Result<()> {
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
           let file_path = Path::new(&file);
-          let file_name = file_path.file_name().unwrap();
-
-          fs::remove_file(&drash.files.join(file_name))?;
-          fs::remove_file(
-            &drash
-              .info
-              .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-          )?;
-        }
-        let total_files = selected_files.selected_items.len();
-
-        if total_files > 1 {
-          println!("\nRemoved: {total_files} files");
-        } else {
-          println!("\nRemoved: 1 file");
+          match drash.remove_file(file_path) {
+            Ok(_) => (),
+            Err(err) => {
+              eprintln!("Error: {}", err);
+              continue;
+            }
+          };
         }
         return Ok(());
       }
@@ -335,31 +345,10 @@ fn main() -> anyhow::Result<()> {
 
       match last_file {
         Some(file) => {
-          let path = file.path();
-          let file_name = file.file_name();
-          let file_name = Path::new(&file_name);
-
-          let file_info = fs::read_to_string(
-            &drash
-              .info
-              .join(format!("{}.drashinfo", file_name.display())),
-          )?;
-
-          if path.is_dir() {
-            fs::remove_dir_all(&drash.files.join(&file_name))?;
-          } else {
-            fs::remove_file(&drash.files.join(&file_name))?;
+          if let Err(err) = drash.remove_file(file.path()) {
+            eprintln!("Error: {}", err);
+            exit(1);
           }
-          fs::remove_file(
-            &drash
-              .info
-              .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-          )?;
-
-          let file_path: Rc<_> = file_info.split("\n").collect();
-          let file_path = file_path[1].trim_start_matches("Path=");
-
-          println!("Remvoed: {}", file_path)
         }
         None => eprintln!("Drashcan is empty"),
       }
@@ -400,27 +389,20 @@ fn main() -> anyhow::Result<()> {
       format!("{} files removed", a.len())
     };
 
-    let validate = |a: &[ListOption<&String>]| -> Result<Validation, Box<dyn Error + Send + Sync>> {
-      if a.len() < 1 {
-        return Ok(Validation::Invalid("At select one file to remove".into()));
-      }
-      Ok(Validation::Valid)
-    };
-
     let file_paths = MultiSelect::new("Select files to remove:", real_path)
       .with_formatter(list_formatter)
-      .with_validator(validate)
+      .with_validator(min_length!(1, "At least choose one file to remove"))
       .prompt()?;
 
     for path in file_paths {
       let path = Path::new(&path);
-      let file_name = path.file_name().unwrap().to_str().unwrap();
-      if drash.files.join(file_name).is_dir() {
-        fs::remove_dir_all(&drash.files.join(file_name))?;
-      } else {
-        fs::remove_file(&drash.files.join(file_name))?;
-      }
-      fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
+      match drash.remove_file(path) {
+        Ok(_) => (),
+        Err(err) => {
+          eprintln!("Error: {}", err);
+          continue;
+        }
+      };
     }
 
     return Ok(());

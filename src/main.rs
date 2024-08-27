@@ -1,8 +1,6 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use inquire::{
-  formatter::MultiOptionFormatter, min_length, Confirm, MultiSelect,
-};
+use inquire::{formatter::MultiOptionFormatter, min_length, Confirm, MultiSelect};
 use tabled::{settings::Style, Table, Tabled};
 use utils::{check_overwrite, fuzzy_find_files};
 mod utils;
@@ -200,6 +198,24 @@ impl Drash {
     }
 
     Ok(())
+  }
+
+  /// Restore a file to its original path
+  fn restore_file<P: AsRef<Path>>(&self, path: P, overwrite: bool) -> io::Result<bool> {
+    let path = path.as_ref();
+    let file_name = path.file_name().unwrap();
+    let file_info = format!("{}.drashinfo", file_name.to_str().unwrap());
+
+    // Check if the same file exists in path
+    let check = check_overwrite(path, overwrite);
+    match check {
+      true => {
+        fs::rename(&self.files.join(file_name), path)?;
+        fs::remove_file(&self.info.join(file_info))?;
+        Ok(true)
+      }
+      false => Ok(false),
+    }
   }
 }
 
@@ -453,27 +469,16 @@ fn main() -> anyhow::Result<()> {
     if let Some(search) = search_file {
       if search != "-" {
         let selected_files = fuzzy_find_files(&drash.info, Some(search))?;
-        let mut total_files = 0;
 
         for file_skim in selected_files.selected_items.iter() {
           let file = file_skim.output().to_string();
           let file_path = Path::new(&file);
-          let file_name = file_path.file_name().unwrap().to_str().unwrap();
-
-          let check = check_overwrite(file_path, *overwrite);
-          if check {
-            fs::rename(&drash.files.join(file_name), file_path)?;
-            fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
-            total_files += 1;
-          } else {
-            println!("Skipped {file_name}");
+          if !drash.restore_file(file_path, *overwrite)? {
+            println!("Skipped {:?}", file_path.file_name().unwrap());
             continue;
           }
         }
 
-        if total_files == 0 {
-          println!("\nDidn't restore any file");
-        }
         return Ok(());
       }
 
@@ -483,33 +488,14 @@ fn main() -> anyhow::Result<()> {
 
       match last_file {
         Some(file) => {
-          let file_name = file.file_name();
-          let file_name = Path::new(&file_name);
-
-          let file_info = fs::read_to_string(
-            &drash
-              .info
-              .join(format!("{}.drashinfo", file_name.display())),
-          )?;
-
-          let file_path: Rc<_> = file_info.split("\n").collect();
-          let file_path = file_path[1].trim_start_matches("Path=");
-
-          let check = check_overwrite(file_path, *overwrite);
-          if check {
-            fs::rename(&drash.files.join(&file_name), file_path)?;
-            fs::remove_file(
-              &drash
-                .info
-                .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
-            )?;
-            println!("Restored: {}", file_name.display());
+          if !drash.restore_file(file.path(), *overwrite)? {
+            println!("Skipped {}", file.path().display())
           } else {
-            println!("Did not restored: {}", file_name.display());
+            println!("Restored {:?}", file.file_name())
           }
         }
         None => eprintln!("Drashcan is empty"),
-      }
+      };
 
       return Ok(());
     }
@@ -537,19 +523,20 @@ fn main() -> anyhow::Result<()> {
       .with_validator(min_length!(1, "At least choose one file to restore"))
       .prompt()?;
 
-    for entry in restore_paths {
+    for entry in restore_paths.iter() {
       let path = Path::new(&entry);
       let file_name = path.file_name().unwrap().to_str().unwrap();
 
-      let check = check_overwrite(path, *overwrite);
-      if check {
-        fs::rename(&drash.files.join(file_name), path)?;
-        fs::remove_file(&drash.info.join(format!("{}.drashinfo", file_name)))?;
-        println!("Restored: {file_name}");
-      } else {
+      if !drash.restore_file(path, *overwrite)? {
         println!("Skipped {}", file_name);
         continue;
       }
+    }
+
+    if restore_paths.len() > 1 {
+      println!("Restored {} files", restore_paths.len())
+    } else {
+      println!("Restored 1 file")
     }
     return Ok(());
   }

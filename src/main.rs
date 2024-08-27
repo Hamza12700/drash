@@ -68,6 +68,7 @@ struct FileList {
 }
 
 impl Args {
+  /// Check if files or subcommands are empty
   fn is_none(&self) -> bool {
     if self.files.is_none() && self.commands.is_none() {
       return true;
@@ -77,8 +78,13 @@ impl Args {
 }
 
 struct Drash {
+  /// Drash home directory
   dir: PathBuf,
+
+  //// Drashed files directory
   files: PathBuf,
+
+  /// Drashed files info directory
   info: PathBuf,
 }
 
@@ -93,7 +99,7 @@ impl Drash {
       Err(err) => {
         eprintln!("Failed to get HOME environment variable: {}", err);
         exit(1);
-      },
+      }
     };
     let drash_dir = Path::new(&home).join(".local/share/Drash");
     let drash_files = Path::new(&drash_dir).join("files");
@@ -116,13 +122,74 @@ impl Drash {
 
     Ok(())
   }
+
+  /// Put file into drashcan
+  fn put_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+    let path = path.as_ref();
+
+    // Do not store the symlink, instead delete it and return
+    if path.is_symlink() {
+      fs::remove_file(path)?;
+      return Ok(());
+    }
+    let mut file_name = path.display().to_string();
+
+    // Reture an error if file not found
+    if !path.exists() {
+      return Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("file not found: '{}'", file_name),
+      ));
+    }
+
+    // Remove trailing forward slash
+    if file_name.ends_with("/") {
+      file_name.pop();
+    }
+    // If contains a forward slash, extract the part of the string containing the file name
+    if file_name.contains("/") {
+      let path = file_name.split("/").last();
+      file_name = path.unwrap().to_string();
+    }
+
+    // Get the file in current working directory
+    let current_file = env::current_dir()?.join(path);
+
+    // Create file in append mode for storing info about the file and it original path
+    let mut buffer = fs::OpenOptions::new()
+      .write(true)
+      .append(true)
+      .create(true)
+      .open(Path::new(&self.info).join(format!("{}.drashinfo", file_name)))?;
+
+    buffer.write_all(b"[Drash Info]\n")?;
+
+    // Write the original `Path` value
+    let formatted_string = format!("Path={}\n", current_file.display());
+    buffer.write_all(formatted_string.as_bytes())?;
+
+    // Write what file type it is:
+    // - File
+    // - Directory
+    buffer.write_all(b"FileType=")?;
+    if path.is_dir() {
+      buffer.write_all(b"directory\n")?;
+    } else {
+      buffer.write_all(b"file\n")?;
+    }
+
+    // Move the file to drashed files directory
+    fs::rename(path, Path::new(&self.files).join(file_name))?;
+
+    Ok(())
+  }
 }
 
 fn main() -> anyhow::Result<()> {
   let drash = Drash::new();
   if let Err(err) = drash.create_directories() {
     eprintln!("Failed to create directory: {}", err);
-    return Ok(());
+    exit(1);
   }
 
   let args = Args::parse();
@@ -133,42 +200,13 @@ fn main() -> anyhow::Result<()> {
       let selected_file_name = item.output().to_string();
       let file = Path::new(&selected_file_name);
 
-      if file.is_symlink() {
-        fs::remove_file(&file)?;
-        return Ok(());
-      }
-
-      let mut file_name = file.display().to_string();
-      if !file.exists() {
-        eprintln!("file not found: '{}'", file_name.bold());
-        continue;
-      }
-
-      if file_name.ends_with("/") {
-        file_name.pop();
-      }
-      if file_name.contains("/") {
-        let paths = file_name.split("/").last();
-        file_name = paths.unwrap().to_string();
-      }
-      let current_file = env::current_dir()?.join(&file);
-
-      let mut buffer = fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(Path::new(&drash.info).join(format!("{}.drashinfo", file_name)))?;
-
-      buffer.write_all(b"[Drash Info]\n")?;
-      let formatted_string = format!("Path={}\n", current_file.display());
-      buffer.write_all(formatted_string.as_bytes())?;
-      buffer.write_all(b"FileType=")?;
-      if file.is_dir() {
-        buffer.write_all(b"directory\n")?;
-      } else {
-        buffer.write_all(b"file\n")?;
-      }
-      fs::rename(file, Path::new(&drash.files).join(file_name))?;
+      match drash.put_file(file) {
+        Ok(_) => (),
+        Err(err) => {
+          eprintln!("Error: {}", err);
+          continue;
+        }
+      };
     }
 
     if selected_files.selected_items.len() > 1 {
@@ -206,44 +244,16 @@ fn main() -> anyhow::Result<()> {
     }
 
     for file in files {
-      if file.is_symlink() {
-        fs::remove_file(&file)?;
-        return Ok(());
-      }
-
-      let mut file_name = file.display().to_string();
-      if !file.exists() {
-        eprintln!("file not found: '{}'", file_name.bold());
-        continue;
-      }
-
-      if file_name.ends_with("/") {
-        file_name.pop();
-      }
-      if file_name.contains("/") {
-        let paths = file_name.split("/").last();
-        file_name = paths.unwrap().to_string();
-      }
-      // TODO: fix bug when drashing same files
-      let current_file = env::current_dir()?.join(&file);
-
-      let mut buffer = fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(Path::new(&drash.info).join(format!("{}.drashinfo", file_name)))?;
-
-      buffer.write_all(b"[Drash Info]\n")?;
-      let formatted_string = format!("Path={}\n", current_file.display());
-      buffer.write_all(formatted_string.as_bytes())?;
-      buffer.write_all(b"FileType=")?;
-      if file.is_dir() {
-        buffer.write_all(b"directory\n")?;
-      } else {
-        buffer.write_all(b"file\n")?;
-      }
-      fs::rename(file, Path::new(&drash.files).join(file_name))?;
+      match drash.put_file(file) {
+        Ok(_) => (),
+        Err(err) => {
+          eprintln!("Error: {}", err);
+          continue;
+        }
+      };
     }
+
+    return Ok(());
   }
 
   if let Some(Commands::List) = &args.commands {

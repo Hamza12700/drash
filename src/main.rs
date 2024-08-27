@@ -312,7 +312,7 @@ fn main() -> anyhow::Result<()> {
           let file_path = Path::new(&file);
           let file_name = file_path.file_name().unwrap();
 
-          fs::remove_file(&drash.info.join(file_name))?;
+          fs::remove_file(&drash.files.join(file_name))?;
           fs::remove_file(
             &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;

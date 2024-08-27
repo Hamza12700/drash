@@ -314,7 +314,9 @@ fn main() -> anyhow::Result<()> {
 
           fs::remove_file(&drash.files.join(file_name))?;
           fs::remove_file(
-            &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+            &drash
+              .info
+              .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
         }
         let total_files = selected_files.selected_items.len();
@@ -337,8 +339,11 @@ fn main() -> anyhow::Result<()> {
           let file_name = file.file_name();
           let file_name = Path::new(&file_name);
 
-          let file_info =
-            fs::read_to_string(&drash.info.join(format!("{}.drashinfo", file_name.display())))?;
+          let file_info = fs::read_to_string(
+            &drash
+              .info
+              .join(format!("{}.drashinfo", file_name.display())),
+          )?;
 
           if path.is_dir() {
             fs::remove_dir_all(&drash.files.join(&file_name))?;
@@ -346,7 +351,9 @@ fn main() -> anyhow::Result<()> {
             fs::remove_file(&drash.files.join(&file_name))?;
           }
           fs::remove_file(
-            &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+            &drash
+              .info
+              .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
           )?;
 
           let file_path: Rc<_> = file_info.split("\n").collect();
@@ -497,8 +504,11 @@ fn main() -> anyhow::Result<()> {
           let file_name = file.file_name();
           let file_name = Path::new(&file_name);
 
-          let file_info =
-            fs::read_to_string(&drash.info.join(format!("{}.drashinfo", file_name.display())))?;
+          let file_info = fs::read_to_string(
+            &drash
+              .info
+              .join(format!("{}.drashinfo", file_name.display())),
+          )?;
 
           let file_path: Rc<_> = file_info.split("\n").collect();
           let file_path = file_path[1].trim_start_matches("Path=");
@@ -507,7 +517,9 @@ fn main() -> anyhow::Result<()> {
           if check {
             fs::rename(&drash.files.join(&file_name), file_path)?;
             fs::remove_file(
-              &drash.info.join(format!("{}.drashinfo", file_name.to_str().unwrap())),
+              &drash
+                .info
+                .join(format!("{}.drashinfo", file_name.to_str().unwrap())),
             )?;
             println!("Restored: {}", file_name.display());
           } else {

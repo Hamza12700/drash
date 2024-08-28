@@ -11,7 +11,7 @@ Clone the repo into your local machine:
 git clone https://github.com/hamza12700/drash
 ```
 
-Use [cargo](https://doc.rust-lang.org/cargo/) to  build and install the binary into your `$PATH`.
+Use [Cargo](https://doc.rust-lang.org/cargo/) to  build and install the binary into your `$PATH`.
 ```bsah
 cd drash
 cargo install --path .
@@ -26,15 +26,13 @@ Put a file intot the drashcan:
 drash foo
 ```
 
-Delete a file without storing it in the drashcan:
+Pass `--force/-f` flag to delete a file without storing it in the drashcan:
 ```
-# Pass --force or -f
 drash foo -f
 ```
 
-Pass no arguments and options to put files into drashcan in fuzzy find mode:
+Pass no arguments and options to put files into drashcan by search for them:
 ```
-# Will open fuzzy search menu
 drash
 ```
 
@@ -64,9 +62,8 @@ Restore a file using fuzzy searching:
 drash restore <FILE_NAME>
 ```
 
-Restore a file by overwriting the existing file:
+Pass `--overwrite/-o` flag to overwrite the existing file that same path:
 ```
-# Or use any other method shown above
 drash restore <FILE_NAME> --overwrite
 ```
 
@@ -77,7 +74,7 @@ Empty the drashcan:
 drash empty
 ```
 
-Pass `--yes or -y` pass to not show the confirm prompt:
+Pass `--yes/-y` pass to not show the confirm prompt:
 ```
 drash empty -y
 ```
@@ -87,10 +84,8 @@ drash empty -y
 If you discover a bug please report them [here](https://github.com/Hamza12700/drash/issues/).
 
 > [!NOTE]
-> Please note that this application is still in early stage. If you encounter any bugs the chances are I've are already fixed them in the `main` branch because I'm actively working on this. I would recommend trying out this CLI application by cloning it from the `main` branch and building it from source.
+> Please note that this application is still in early stage. If you encounter any bugs the chances are I've are already fixed them in the `main` branch because I'm actively working on this.
 
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-All pull requests should be submitted to the "main" branch.

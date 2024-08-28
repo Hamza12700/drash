@@ -83,9 +83,6 @@ drash empty -y
 
 If you discover a bug please report them [here](https://github.com/Hamza12700/drash/issues/).
 
-> [!NOTE]
-> Please note that this application is still in early stage. If you encounter any bugs the chances are I've are already fixed them in the `main` branch because I'm actively working on this.
-
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

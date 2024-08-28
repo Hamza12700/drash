@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use inquire::{formatter::MultiOptionFormatter, min_length, Confirm, MultiSelect};
+use inquire::{min_length, Confirm, MultiSelect};
 use tabled::{settings::Style, Table, Tabled};
-use utils::{check_overwrite, fuzzy_find_files};
+use utils::check_overwrite;
 mod utils;
 use std::{
   env,
@@ -217,6 +217,28 @@ impl Drash {
       false => Ok(false),
     }
   }
+
+  /// Search for files for their original file path stored in the drashcan
+  fn search_file_path(&self, msg: &str) -> anyhow::Result<Vec<String>> {
+    let file_info = fs::read_dir(&self.info)?;
+    let mut path_vec: Vec<String> = Vec::new();
+    for file in file_info {
+      let file = file?;
+      let file_info = fs::read_to_string(file.path())?;
+      let file_info: Rc<[&str]> = file_info.split("\n").collect();
+      let file_path = file_info[1].trim_start_matches("Path=");
+      if file_path.is_empty() {
+        continue;
+      }
+      path_vec.push(file_path.to_string())
+    }
+
+    let ans = MultiSelect::new(msg, path_vec)
+      .with_validator(min_length!(1, "At least choose one file"))
+      .prompt()?;
+
+    Ok(ans)
+  }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -228,12 +250,29 @@ fn main() -> anyhow::Result<()> {
 
   let args = Args::parse();
   if args.is_none() {
-    let selected_files = fuzzy_find_files(".", None)?;
+    let entries = fs::read_dir(".")?;
+    let mut path_vec: Vec<String> = Vec::new();
+    for path in entries {
+      let path = path?;
+      let path = path.path();
+      path_vec.push(
+        path
+          .display()
+          .to_string()
+          .trim_start_matches("./")
+          .to_string(),
+      )
+    }
+    if path_vec.is_empty() {
+      println!("Nothing in the current directory to drash");
+      return Ok(());
+    }
 
-    for item in selected_files.selected_items.iter() {
-      let selected_file_name = item.output().to_string();
-      let file = Path::new(&selected_file_name);
+    let ans = MultiSelect::new("Select files to drash", path_vec)
+      .with_validator(min_length!(1, "At least choose one file"))
+      .prompt()?;
 
+    for file in ans {
       match drash.put_file(file) {
         Ok(_) => (),
         Err(err) => {
@@ -241,12 +280,6 @@ fn main() -> anyhow::Result<()> {
           continue;
         }
       };
-    }
-
-    if selected_files.selected_items.len() > 1 {
-      println!("Removed {} files", selected_files.selected_items.len());
-    } else {
-      println!("\nRemoved 1 file");
     }
 
     return Ok(());
@@ -339,10 +372,9 @@ fn main() -> anyhow::Result<()> {
   if let Some(Commands::Remove { search_file }) = &args.commands {
     if let Some(search) = search_file {
       if search != "-" {
-        let selected_files = fuzzy_find_files(&drash.info, Some(search))?;
+        let files = drash.search_file_path("Select files to remove:")?;
 
-        for file_skim in selected_files.selected_items.iter() {
-          let file = file_skim.output().to_string();
+        for file in files {
           let file_path = Path::new(&file);
           match drash.remove_file(file_path) {
             Ok(_) => (),
@@ -398,19 +430,9 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    let list_formatter: MultiOptionFormatter<'_, String> = &|a| {
-      if a.len() == 1 {
-        return format!("{} file removed", a.len());
-      }
-      format!("{} files removed", a.len())
-    };
+    let files = drash.search_file_path("Select files to remove:")?;
 
-    let file_paths = MultiSelect::new("Select files to remove:", real_path)
-      .with_formatter(list_formatter)
-      .with_validator(min_length!(1, "At least choose one file to remove"))
-      .prompt()?;
-
-    for path in file_paths {
+    for path in files {
       let path = Path::new(&path);
       match drash.remove_file(path) {
         Ok(_) => (),
@@ -468,10 +490,9 @@ fn main() -> anyhow::Result<()> {
   {
     if let Some(search) = search_file {
       if search != "-" {
-        let selected_files = fuzzy_find_files(&drash.info, Some(search))?;
+        let files = drash.search_file_path("Select files restore:")?;
 
-        for file_skim in selected_files.selected_items.iter() {
-          let file = file_skim.output().to_string();
+        for file in files {
           let file_path = Path::new(&file);
           if !drash.restore_file(file_path, *overwrite)? {
             println!("Skipped {:?}", file_path.file_name().unwrap());

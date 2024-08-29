@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 use inquire::{min_length, Confirm, MultiSelect};
 use tabled::{settings::Style, Table, Tabled};
-use utils::check_overwrite;
+mod colors;
 mod utils;
+use colors::Colorize;
 use std::{
   env,
   fs::{self},
@@ -134,7 +134,7 @@ impl Drash {
     if !path.exists() {
       return Err(io::Error::new(
         io::ErrorKind::NotFound,
-        format!("file not found: '{}'", file_name),
+        format!("file not found: '{}'", file_name.bold()),
       ));
     }
 
@@ -186,6 +186,7 @@ impl Drash {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let file_info = format!("{file_name}.drashinfo");
 
+    // Check if path is a directory or a file
     match path.is_dir() {
       true => {
         fs::remove_dir_all(&self.files.join(file_name))?;
@@ -207,7 +208,7 @@ impl Drash {
     let file_info = format!("{}.drashinfo", file_name.to_str().unwrap());
 
     // Check if the same file exists in path
-    let check = check_overwrite(path, overwrite);
+    let check = utils::check_overwrite(path, overwrite);
     match check {
       true => {
         fs::rename(&self.files.join(file_name), path)?;
@@ -222,6 +223,8 @@ impl Drash {
   fn search_file_path(&self, msg: &str) -> anyhow::Result<Vec<String>> {
     let file_info = fs::read_dir(&self.info)?;
     let mut path_vec: Vec<String> = Vec::new();
+
+    // Push the original path value in `path_vec`
     for file in file_info {
       let file = file?;
       let file_info = fs::read_to_string(file.path())?;
@@ -233,6 +236,7 @@ impl Drash {
       path_vec.push(file_path.to_string())
     }
 
+    // Prompt the user to choose files
     let ans = MultiSelect::new(msg, path_vec)
       .with_validator(min_length!(1, "At least choose one file"))
       .prompt()?;
@@ -244,7 +248,7 @@ impl Drash {
 fn main() -> anyhow::Result<()> {
   let drash = Drash::new();
   if let Err(err) = drash.create_directories() {
-    eprintln!("Failed to create directory: {}", err);
+    eprintln!("{}: {err}", "Failed to create directory".bold());
     exit(1);
   }
 
@@ -256,6 +260,7 @@ fn main() -> anyhow::Result<()> {
       let path = path?;
       let path = path.path();
       path_vec.push(
+        // Remove `./` from the start of the string
         path
           .display()
           .to_string()
@@ -276,7 +281,7 @@ fn main() -> anyhow::Result<()> {
       match drash.put_file(file) {
         Ok(_) => (),
         Err(err) => {
-          eprintln!("Error: {}", err);
+          eprintln!("{}: {err}", "Error".red().bold());
           continue;
         }
       };
@@ -314,7 +319,7 @@ fn main() -> anyhow::Result<()> {
       match drash.put_file(file) {
         Ok(_) => (),
         Err(err) => {
-          eprintln!("Error: {}", err);
+          eprintln!("{}: {err}", "Error".red().bold());
           continue;
         }
       };
@@ -379,7 +384,7 @@ fn main() -> anyhow::Result<()> {
           match drash.remove_file(file_path) {
             Ok(_) => (),
             Err(err) => {
-              eprintln!("Error: {}", err);
+              eprintln!("{}: {err}", "Error".bold().red());
               continue;
             }
           };
@@ -437,7 +442,7 @@ fn main() -> anyhow::Result<()> {
       match drash.remove_file(path) {
         Ok(_) => (),
         Err(err) => {
-          eprintln!("Error: {}", err);
+          eprintln!("{}: {err}", "Error".red().bold());
           continue;
         }
       };

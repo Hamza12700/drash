@@ -6,6 +6,5 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.86", features = ["backtrace"] }
 clap = { version = "4.5.13", features = ["derive"] }
-colored = "2.1.0"
 inquire = "0.7.5"
 tabled = "0.16.0"

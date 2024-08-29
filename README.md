@@ -4,6 +4,14 @@ Drash is a Command Line Interface (CLI) application that serves as a better alte
 
 This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](https://www.freedesktop.org/wiki/Specifications/trash-spec/).
 
+## Why?
+
+I wanted the experience using
+[trash-cli](https://github.com/andreafrancia/trash-cli), but with more
+features. Like being able to search files in the drashcan and recovering them.
+Put files into the drashcan by searching for them in the current working
+directory.
+
 ## Installation:
 
 Clone the repo into your local machine:

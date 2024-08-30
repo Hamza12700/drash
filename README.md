@@ -89,7 +89,7 @@ drash empty -y
 
 ## Bugs
 
-If you discover a bug please report them [here](https://github.com/Hamza12700/drash/issues/).
+If you discover a bugs please report them [here](https://github.com/Hamza12700/drash/issues/).
 
 ## Contributing
 

@@ -10,7 +10,6 @@ use std::{
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
-  rc::Rc,
 };
 
 /// Put files into drash so you can restore them later
@@ -228,7 +227,7 @@ impl Drash {
     for file in file_info {
       let file = file?;
       let file_info = fs::read_to_string(file.path())?;
-      let file_info: Rc<[&str]> = file_info.split("\n").collect();
+      let file_info: Box<[&str]> = file_info.split("\n").collect();
       let file_path = file_info[1].trim_start_matches("Path=");
       if file_path.is_empty() {
         continue;
@@ -335,10 +334,8 @@ fn main() -> anyhow::Result<()> {
 
     for entry in entries {
       let entry = entry?;
-      let file_info: Rc<_> = fs::read_to_string(&entry.path())?
-        .lines()
-        .map(|line| line.to_string())
-        .collect();
+      let content = fs::read_to_string(&entry.path())?;
+      let file_info: Box<[&str]> = content.lines().collect();
 
       let file_path = match file_info.get(1) {
         Some(path) => {
@@ -362,11 +359,13 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    real_path.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
-      ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
-      ("directory", "file") => std::cmp::Ordering::Less,
-      ("file", "directory") => std::cmp::Ordering::Greater,
-      _ => std::cmp::Ordering::Equal,
+    real_path.sort_unstable_by(|a, b| {
+      match (a.file_type.as_str(), b.file_type.as_str()) {
+        ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
+        ("directory", "file") => std::cmp::Ordering::Less,
+        ("file", "directory") => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
+      }
     });
 
     let table_style = Style::psql();
@@ -413,12 +412,10 @@ fn main() -> anyhow::Result<()> {
     let entries = fs::read_dir(&drash.info)?;
     let mut real_path: Vec<String> = Vec::new();
 
-    for path in entries {
-      let path = path?;
-      let file_info: Rc<_> = fs::read_to_string(&path.path())?
-        .lines()
-        .map(|line| line.to_string())
-        .collect();
+    for entry in entries {
+      let path = entry?;
+      let content = fs::read_to_string(&path.path())?;
+      let file_info: Box<[&str]> = content.lines().collect();
 
       let file_path = match file_info.get(1) {
         Some(path) => {
@@ -533,7 +530,7 @@ fn main() -> anyhow::Result<()> {
     for path in paths {
       let path = path?.path();
       let file_info = fs::read_to_string(&path)?;
-      let file_info: Rc<_> = file_info.split("\n").collect();
+      let file_info: Box<[&str]> = file_info.split("\n").collect();
       let file_path = file_info[1].trim_start_matches("Path=").to_string();
       if !file_path.is_empty() {
         empty = false;

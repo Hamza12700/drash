@@ -2,7 +2,8 @@ use clap::{Parser, Subcommand};
 use drash::{colors::Colorize, utils};
 use inquire::{min_length, Confirm, MultiSelect};
 use std::{
-  env, fs,
+  env,
+  fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
@@ -85,23 +86,17 @@ impl Drash {
   /// - Dirash directory
   /// - Drash files
   /// - Drash files info
-  fn new() -> Self {
-    let home = match env::var("HOME") {
-      Ok(path) => path,
-      Err(err) => {
-        eprintln!("Failed to get HOME environment variable: {}", err);
-        exit(1);
-      }
-    };
+  fn new() -> Result<Self, env::VarError> {
+    let home = env::var("HOME")?;
     let drash_dir = Path::new(&home).join(".local/share/Drash");
     let drash_files = Path::new(&drash_dir).join("files");
     let drash_info_dir = Path::new(&drash_dir).join("info");
 
-    Self {
+    Ok(Self {
       dir: drash_dir,
       files: drash_files,
       info: drash_info_dir,
-    }
+    })
   }
 
   /// Create directories for **Drash** to store removed files
@@ -242,7 +237,14 @@ impl Drash {
 }
 
 fn main() -> anyhow::Result<()> {
-  let drash = Drash::new();
+  let drash = match Drash::new() {
+    Ok(val) => val,
+    Err(err) => {
+      eprintln!("Failed to read env variable: {err}");
+      exit(1);
+    },
+  };
+
   if let Err(err) = drash.create_directories() {
     eprintln!("{}: {err}", "Failed to create directory".bold());
     exit(1);

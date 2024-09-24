@@ -140,14 +140,9 @@ impl Drash {
     if file_name.ends_with("/") {
       file_name.pop();
     }
-    // If contains a forward slash, extract the part of the string containing the file name
-    if file_name.contains("/") {
-      let path = file_name.split("/").last();
-      file_name = path.unwrap().to_string();
-    }
 
     // Get the file in current working directory
-    let current_file = env::current_dir()?.join(path);
+    let current_file = env::current_dir()?.join(&file_name);
 
     // Create file in append mode for storing info about the file and it original path
     let mut buffer = fs::OpenOptions::new()

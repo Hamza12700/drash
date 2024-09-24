@@ -123,6 +123,7 @@ impl Drash {
     // Do not store the symlink, instead delete it and return
     if path.is_symlink() {
       fs::remove_file(path)?;
+      println!("{}", "Removed symlink".bold());
       return Ok(());
     }
     let mut file_name = path.display().to_string();

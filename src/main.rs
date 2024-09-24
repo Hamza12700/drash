@@ -70,11 +70,11 @@ impl Args {
 }
 
 struct Drash {
-  //// Drashed files directory
-  files: PathBuf,
+  //// Path to the *drashed* files
+  files_path: PathBuf,
 
-  /// Drashed files info directory
-  info: PathBuf,
+  /// Path to the *drashed* info files
+  info_path: PathBuf,
 }
 
 enum ConfigError {
@@ -111,8 +111,8 @@ impl Drash {
     }
 
     Ok(Self {
-      files: drash_files,
-      info: drash_info_dir,
+      files_path: drash_files,
+      info_path: drash_info_dir,
     })
   }
 
@@ -149,7 +149,7 @@ impl Drash {
       .write(true)
       .append(true)
       .create(true)
-      .open(Path::new(&self.info).join(format!("{}.drashinfo", file_name)))?;
+      .open(Path::new(&self.info_path).join(format!("{}.drashinfo", file_name)))?;
 
     buffer.write_all(b"[Drash Info]\n")?;
 
@@ -168,7 +168,7 @@ impl Drash {
     }
 
     // Move the file to drashed files directory
-    fs::rename(path, Path::new(&self.files).join(file_name))?;
+    fs::rename(path, Path::new(&self.files_path).join(file_name))?;
 
     Ok(())
   }
@@ -180,14 +180,14 @@ impl Drash {
     let file_info = format!("{file_name}.drashinfo");
 
     // Check if path is a directory or a file
-    match &self.files.join(file_name).is_dir() {
+    match &self.files_path.join(file_name).is_dir() {
       true => {
-        fs::remove_dir_all(&self.files.join(file_name))?;
-        fs::remove_file(&self.info.join(file_info))?;
+        fs::remove_dir_all(&self.files_path.join(file_name))?;
+        fs::remove_file(&self.info_path.join(file_info))?;
       }
       false => {
-        fs::remove_file(&self.files.join(file_name))?;
-        fs::remove_file(&self.info.join(file_info))?;
+        fs::remove_file(&self.files_path.join(file_name))?;
+        fs::remove_file(&self.info_path.join(file_info))?;
       }
     }
 
@@ -204,8 +204,8 @@ impl Drash {
     let check = utils::check_overwrite(path, overwrite);
     match check {
       true => {
-        fs::rename(&self.files.join(file_name), path)?;
-        fs::remove_file(&self.info.join(file_info))?;
+        fs::rename(&self.files_path.join(file_name), path)?;
+        fs::remove_file(&self.info_path.join(file_info))?;
         Ok(true)
       }
       false => Ok(false),
@@ -214,7 +214,7 @@ impl Drash {
 
   /// Search for files for their original file path stored in the drashcan
   fn search_file_path(&self, msg: &str) -> anyhow::Result<Vec<String>> {
-    let file_info = fs::read_dir(&self.info)?;
+    let file_info = fs::read_dir(&self.info_path)?;
     let mut path_vec: Vec<String> = Vec::new();
 
     // Push the original path value in `path_vec`
@@ -333,7 +333,7 @@ fn main() -> anyhow::Result<()> {
 
   if let Some(Commands::List) = &args.commands {
     let mut empty = true;
-    let entries = fs::read_dir(&drash.info)?;
+    let entries = fs::read_dir(&drash.info_path)?;
     let mut real_path: Vec<FileList> = Vec::new();
 
     for entry in entries {
@@ -393,7 +393,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash.files)?
+      let last_file = fs::read_dir(&drash.files_path)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 
@@ -411,7 +411,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mut empty = true;
-    let entries = fs::read_dir(&drash.info)?;
+    let entries = fs::read_dir(&drash.info_path)?;
     let mut real_path: Vec<String> = Vec::new();
 
     for entry in entries {
@@ -451,7 +451,7 @@ fn main() -> anyhow::Result<()> {
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {
-    let files = fs::read_dir(&drash.files)?;
+    let files = fs::read_dir(&drash.files_path)?;
     let file_entries = files.count();
     if file_entries == 0 {
       println!("Drashcan is alraedy empty");
@@ -459,11 +459,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     if *yes {
-      fs::remove_dir_all(&drash.files)?;
-      fs::remove_dir_all(&drash.info)?;
+      fs::remove_dir_all(&drash.files_path)?;
+      fs::remove_dir_all(&drash.info_path)?;
 
-      fs::create_dir(&drash.files)?;
-      fs::create_dir(&drash.info)?;
+      fs::create_dir(&drash.files_path)?;
+      fs::create_dir(&drash.info_path)?;
 
       match file_entries {
         n if n > 1 => println!("Removed: {file_entries} files"),
@@ -480,11 +480,11 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    fs::remove_dir_all(&drash.files)?;
-    fs::remove_dir_all(&drash.info)?;
+    fs::remove_dir_all(&drash.files_path)?;
+    fs::remove_dir_all(&drash.info_path)?;
 
-    fs::create_dir(&drash.files)?;
-    fs::create_dir(&drash.info)?;
+    fs::create_dir(&drash.files_path)?;
+    fs::create_dir(&drash.info_path)?;
   }
 
   if let Some(Commands::Restore {
@@ -507,7 +507,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash.files)?
+      let last_file = fs::read_dir(&drash.files_path)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 
@@ -527,7 +527,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut path_entries: Vec<String> = Vec::new();
     let mut empty = true;
-    let paths = fs::read_dir(&drash.info)?;
+    let paths = fs::read_dir(&drash.info_path)?;
 
     for path in paths {
       let path = path?.path();

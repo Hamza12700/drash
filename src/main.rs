@@ -2,8 +2,7 @@ use clap::{Parser, Subcommand};
 use drash::{colors::Colorize, utils};
 use inquire::{min_length, Confirm, MultiSelect};
 use std::{
-  env,
-  fs,
+  env, fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
@@ -71,9 +70,6 @@ impl Args {
 }
 
 struct Drash {
-  /// Drash home directory
-  dir: PathBuf,
-
   //// Drashed files directory
   files: PathBuf,
 
@@ -81,33 +77,43 @@ struct Drash {
   info: PathBuf,
 }
 
+enum ConfigError {
+  EnvError(env::VarError),
+  IoError(io::Error),
+}
+
+impl From<env::VarError> for ConfigError {
+  fn from(err: env::VarError) -> Self {
+    ConfigError::EnvError(err)
+  }
+}
+
+impl From<io::Error> for ConfigError {
+  fn from(err: io::Error) -> Self {
+    ConfigError::IoError(err)
+  }
+}
+
 impl Drash {
   /// Create new **Drash** struct containing path to:
-  /// - Dirash directory
   /// - Drash files
   /// - Drash files info
-  fn new() -> Result<Self, env::VarError> {
+  fn new() -> Result<Self, ConfigError> {
     let home = env::var("HOME")?;
     let drash_dir = Path::new(&home).join(".local/share/Drash");
     let drash_files = Path::new(&drash_dir).join("files");
     let drash_info_dir = Path::new(&drash_dir).join("info");
 
+    if !drash_dir.exists() {
+      fs::create_dir(&drash_dir)?;
+      fs::create_dir(&drash_files)?;
+      fs::create_dir(&drash_info_dir)?;
+    }
+
     Ok(Self {
-      dir: drash_dir,
       files: drash_files,
       info: drash_info_dir,
     })
-  }
-
-  /// Create directories for **Drash** to store removed files
-  fn create_directories(&self) -> io::Result<()> {
-    if !self.dir.exists() {
-      fs::create_dir(&self.dir)?;
-      fs::create_dir(&self.files)?;
-      fs::create_dir(&self.info)?;
-    }
-
-    Ok(())
   }
 
   /// Put file into drashcan
@@ -239,16 +245,19 @@ impl Drash {
 fn main() -> anyhow::Result<()> {
   let drash = match Drash::new() {
     Ok(val) => val,
-    Err(err) => {
-      eprintln!("Failed to read env variable: {err}");
-      exit(1);
+    Err(err) => match err {
+      ConfigError::EnvError(var_error) => {
+        eprintln!("{}", "Failed to read env variable".bold());
+        eprintln!("{}: {var_error}", "Error".bold().red());
+        exit(1);
+      }
+      ConfigError::IoError(io_error) => {
+        eprintln!("{}", "Failed to create directories".bold());
+        eprintln!("{}: {io_error}", "Error".bold().red());
+        exit(1);
+      }
     },
   };
-
-  if let Err(err) = drash.create_directories() {
-    eprintln!("{}: {err}", "Failed to create directory".bold());
-    exit(1);
-  }
 
   let args = Args::parse();
   if args.is_none() {

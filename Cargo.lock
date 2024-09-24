@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "drash"
-version = "1.9.12"
+version = "1.9.15"
 dependencies = [
  "anyhow",
  "clap",

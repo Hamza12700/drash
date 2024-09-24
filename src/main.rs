@@ -1,16 +1,13 @@
 use clap::{Parser, Subcommand};
+use drash::{colors::Colorize, utils};
 use inquire::{min_length, Confirm, MultiSelect};
-use tabled::{settings::Style, Table, Tabled};
-mod colors;
-mod utils;
-use colors::Colorize;
 use std::{
-  env,
-  fs::{self},
+  env, fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
 };
+use tabled::{settings::Style, Table, Tabled};
 
 /// Put files into drash so you can restore them later
 #[derive(Debug, Parser)]
@@ -359,13 +356,11 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    real_path.sort_unstable_by(|a, b| {
-      match (a.file_type.as_str(), b.file_type.as_str()) {
-        ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
-        ("directory", "file") => std::cmp::Ordering::Less,
-        ("file", "directory") => std::cmp::Ordering::Greater,
-        _ => std::cmp::Ordering::Equal,
-      }
+    real_path.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
+      ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
+      ("directory", "file") => std::cmp::Ordering::Less,
+      ("file", "directory") => std::cmp::Ordering::Greater,
+      _ => std::cmp::Ordering::Equal,
     });
 
     let table_style = Style::psql();

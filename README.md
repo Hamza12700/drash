@@ -1,16 +1,22 @@
 # Drash
 
-Drash is a Command Line Interface (CLI) application that serves as a better alternative to the Linux `rm` command. It records the original path of the file which was removed. It puts the deleted file into a temp directory (`~/.local/share/Drash`), making it easy to recovery them later if you accidentally deleted the wrong file.
+Drash is a nifty Command-Line Interface application which is a better
+alternative to the Linux `rm` command. It records the original path of the
+removed file, and puts it into a temp directory, making it easy to recovery
+them later if you accidentally deleted the wrong file.
 
 This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](https://www.freedesktop.org/wiki/Specifications/trash-spec/).
 
 ## Why?
 
-I wanted the experience using
-[trash-cli](https://github.com/andreafrancia/trash-cli), but with more
-features. Like being able to search files in the drashcan and recovering them.
-Put files into the drashcan by searching for them in the current working
-directory.
+I was inspired by [trash-cli](https://github.com/andreafrancia/trash-cli), but
+I wanted to create something with more bells
+and whistles. Drash aims to enhance the *trash-cli* experience with additional
+features like file searching and advance recovery capabilities.
+
+With Drash, you can easily put files into the 'drashcan' by simply searching
+for them in the current working directory. You can also search for and recover
+previously deleted files.
 
 ## Installation:
 
@@ -19,7 +25,7 @@ Clone the repo into your local machine:
 git clone https://github.com/hamza12700/drash
 ```
 
-Use [Cargo](https://doc.rust-lang.org/cargo/) to  build and install the binary into your `$PATH`.
+Use [Cargo](https://doc.rust-lang.org/cargo/) to build and install the binary into your `$PATH`.
 ```bsah
 cd drash
 cargo install --path .
@@ -29,7 +35,7 @@ cargo install --path .
 
 ### Drash files
 
-Put a file intot the drashcan:
+Put a file into the drashcan:
 ```
 drash foo
 ```
@@ -89,7 +95,7 @@ drash empty -y
 
 ## Bugs
 
-If you discover a bugs please report them [here](https://github.com/Hamza12700/drash/issues/).
+If you discover any bugs please report them [here](https://github.com/Hamza12700/drash/issues/).
 
 ## Contributing
 

@@ -25,7 +25,7 @@ Clone the repo into your local machine:
 git clone https://github.com/hamza12700/drash
 ```
 
-Use [Cargo](https://doc.rust-lang.org/cargo/) to build and install the binary into your `$PATH`.
+Use [Cargo](https://doc.rust-lang.org/cargo/) to build and install the binary.
 ```bsah
 cd drash
 cargo install --path .

@@ -175,12 +175,12 @@ impl Drash {
 
   /// Remove file in the `drashcan`
   fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
-    let path = path.as_ref();
-    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let original_file_path = path.as_ref();
+    let file_name = original_file_path.file_name().unwrap().to_str().unwrap();
     let file_info = format!("{file_name}.drashinfo");
 
     // Check if path is a directory or a file
-    match path.is_dir() {
+    match &self.files.join(file_name).is_dir() {
       true => {
         fs::remove_dir_all(&self.files.join(file_name))?;
         fs::remove_file(&self.info.join(file_info))?;

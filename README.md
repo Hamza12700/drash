@@ -76,7 +76,7 @@ Restore a file matching the file name:
 drash restore <FILE_NAME>
 ```
 
-Pass `--overwrite/-o` flag to overwrite the existing file that same path:
+Pass `--overwrite/-o` flag to overwrite the existing file:
 ```
 drash restore <FILE_NAME> --overwrite
 ```

@@ -122,6 +122,28 @@ impl Drash {
     })
   }
 
+  /// List original file paths in the 'drashcan' and returning `FileList` struct containing the
+  /// original file path and file-type
+  fn list_file_paths(&self) -> io::Result<Box<[FileList]>> {
+    let info_files = fs::read_dir(&self.info_path)?;
+    let mut file_paths: Vec<FileList> = Vec::with_capacity(1);
+
+    for file in info_files {
+      let file = file?;
+      let file_content = fs::read_to_string(file.path())?;
+      let file_content: Box<[&str]> = file_content.lines().collect();
+
+      let original_path = file_content[1].trim_start_matches("Path=");
+      let file_type = file_content[2].trim_start_matches("FileType=");
+      file_paths.push(FileList {
+        path: original_path.to_string(),
+        file_type: file_type.to_string(),
+      });
+    }
+
+    Ok(file_paths.into_boxed_slice())
+  }
+
   /// Put file into drashcan
   fn put_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
     let path = path.as_ref();
@@ -268,8 +290,8 @@ fn main() -> anyhow::Result<()> {
     for path in entries {
       let path = path?;
       let path = path.path();
+      // Remove `./` from the start of the string
       path_vec.push(
-        // Remove `./` from the start of the string
         path
           .display()
           .to_string()

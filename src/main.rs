@@ -240,8 +240,8 @@ impl Drash {
     }
   }
 
-  /// Search for files for their original file path stored in the drashcan
-  fn search_file_path(&self, msg: &str) -> anyhow::Result<Vec<String>> {
+  /// Search for files for their original file path
+  fn search_file_path(&self, msg: &str) -> anyhow::Result<Box<[String]>> {
     let file_info = fs::read_dir(&self.info_path)?;
     let mut path_vec: Vec<String> = Vec::new();
 
@@ -262,7 +262,7 @@ impl Drash {
       .with_validator(min_length!(1, "At least choose one file"))
       .prompt()?;
 
-    Ok(ans)
+    Ok(ans.into_boxed_slice())
   }
 }
 

@@ -360,38 +360,13 @@ fn main() -> anyhow::Result<()> {
   }
 
   if let Some(Commands::List) = &args.commands {
-    let mut empty = true;
-    let entries = fs::read_dir(&drash.info_path)?;
-    let mut real_path: Vec<FileList> = Vec::new();
-
-    for entry in entries {
-      let entry = entry?;
-      let content = fs::read_to_string(&entry.path())?;
-      let file_info: Box<[&str]> = content.lines().collect();
-
-      let file_path = match file_info.get(1) {
-        Some(path) => {
-          empty = false;
-          path.trim_start_matches("Path=").to_string()
-        }
-        None => {
-          eprintln!("{}", "Fialed to get file path by index".red().bold());
-          continue;
-        }
-      };
-
-      let file_type = file_info[2].trim_start_matches("FileType=").to_string();
-      real_path.push(FileList {
-        file_type,
-        path: file_path,
-      });
-    }
-    if empty {
+    let mut original_paths = drash.list_file_paths()?;
+    if original_paths.len() == 0 {
       println!("Nothing is the drashcan");
       return Ok(());
     }
 
-    real_path.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
+    original_paths.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
       ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
       ("directory", "file") => std::cmp::Ordering::Less,
       ("file", "directory") => std::cmp::Ordering::Greater,
@@ -399,8 +374,11 @@ fn main() -> anyhow::Result<()> {
     });
 
     let table_style = Style::psql();
-    println!("{}", Table::new(&real_path).with(table_style).to_string());
-    println!("\nTotal entries: {}", real_path.len());
+    println!(
+      "{}",
+      Table::new(&original_paths).with(table_style).to_string()
+    );
+    println!("\nTotal entries: {}", original_paths.len());
   }
 
   if let Some(Commands::Remove { search_file }) = &args.commands {
@@ -553,35 +531,21 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    let mut path_entries: Vec<String> = Vec::new();
-    let mut empty = true;
-    let paths = fs::read_dir(&drash.info_path)?;
-
-    for path in paths {
-      let path = path?.path();
-      let file_info = fs::read_to_string(&path)?;
-      let file_info: Box<[&str]> = file_info.split("\n").collect();
-      let file_path = file_info[1].trim_start_matches("Path=").to_string();
-      if !file_path.is_empty() {
-        empty = false;
-      }
-      path_entries.push(file_path);
-    }
-    if empty {
+    let original_paths = drash.list_file_paths()?;
+    if original_paths.len() == 0 {
       println!("Drashcan is empty");
       return Ok(());
     }
 
-    let restore_paths = MultiSelect::new("Select files to restore", path_entries)
+    let restore_paths = MultiSelect::new("Select files to restore", original_paths.into_vec())
       .with_validator(min_length!(1, "At least choose one file to restore"))
       .prompt()?;
 
     for entry in restore_paths.iter() {
-      let path = Path::new(&entry);
-      let file_name = path.file_name().unwrap().to_str().unwrap();
+      let path = Path::new(&entry.path);
 
       if !drash.restore_file(path, *overwrite)? {
-        println!("Skipped {}", file_name);
+        println!("Skipped {}", entry.path);
         continue;
       }
     }

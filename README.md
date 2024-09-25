@@ -35,17 +35,17 @@ cargo install --path .
 
 ### Drash files
 
-Put a file into the drashcan:
+Put file(s) into drashcan:
 ```
 drash foo
 ```
 
-Pass `--force/-f` flag to delete a file without storing it in the drashcan:
+Pass `--force/-f` flag to delete a file permanently:
 ```
 drash foo -f
 ```
 
-Pass no arguments and options to put files into drashcan by search for them:
+Pass no arguments and options to remove multiple files in current directory:
 ```
 drash
 ```
@@ -54,24 +54,24 @@ drash
 
 #### List
 
-List files in the drashcan:
+List all the removed files:
 ```
 drash list
 ```
 
 #### Restore
 
-Restore a file from drashcan using indices, also supports range and comma separated values:
+Restore files by searching for them:
 ```
 drash restore
 ```
 
-Restore the last drashed file:
+Restore the last removed file:
 ```
 drash restore -
 ```
 
-Restore a file using fuzzy searching:
+Restore a file matching the file name:
 ```
 drash restore <FILE_NAME>
 ```

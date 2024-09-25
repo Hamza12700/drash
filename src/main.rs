@@ -286,18 +286,15 @@ fn main() -> anyhow::Result<()> {
   let args = Args::parse();
   if args.is_none() {
     let entries = fs::read_dir(".")?;
-    let mut path_vec: Vec<String> = Vec::new();
+    let mut path_vec: Vec<String> = Vec::with_capacity(3);
+
     for path in entries {
       let path = path?;
       let path = path.path();
+
       // Remove `./` from the start of the string
-      path_vec.push(
-        path
-          .display()
-          .to_string()
-          .trim_start_matches("./")
-          .to_string(),
-      )
+      let striped_path = path.strip_prefix("./")?;
+      path_vec.push(striped_path.to_str().unwrap_or("None").to_string())
     }
     if path_vec.is_empty() {
       println!("Nothing in the current directory to drash");

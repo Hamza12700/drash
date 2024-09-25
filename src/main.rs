@@ -101,9 +101,9 @@ impl From<io::Error> for ConfigError {
 }
 
 impl Drash {
-  /// Create new **Drash** struct containing path to:
-  /// - Drash files
-  /// - Drash files info
+  /// Creates a new `Drash` struct containing path to:
+  /// - Removed files
+  /// - Metadata about the removed files
   fn new() -> Result<Self, ConfigError> {
     let home = env::var("HOME")?;
     let drash_dir = Path::new(&home).join(".local/share/Drash");

@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use drash::{colors::Colorize, utils};
 use inquire::{min_length, Confirm, MultiSelect};
 use std::{
-  env, fs,
+  env, fmt, fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
@@ -57,6 +57,12 @@ enum Commands {
 struct FileList {
   file_type: String,
   path: String,
+}
+
+impl fmt::Display for FileList {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.path)
+  }
 }
 
 impl Args {

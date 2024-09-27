@@ -177,7 +177,7 @@ impl Drash {
       .write(true)
       .append(true)
       .create(true)
-      .open(Path::new(&self.info_path).join(format!("{}.drashinfo", file_name)))?;
+      .open(format!("{}/{}.drashinfo", &self.info_path.display(), file_name))?;
 
     buffer.write_all(b"[Drash Info]\n")?;
 

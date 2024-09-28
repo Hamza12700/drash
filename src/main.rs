@@ -1,10 +1,11 @@
 use clap::{Parser, Subcommand};
-use drash::{asserts::ErrContext, colors::Colorize, utils};
+use drash::{colors::Colorize, utils};
 use inquire::{min_length, Confirm, MultiSelect};
 use std::{
   env, fmt, fs,
   io::{self, Write},
   path::{Path, PathBuf},
+  process::exit,
 };
 use tabled::{settings::Style, Table, Tabled};
 
@@ -82,43 +83,51 @@ struct Drash {
   info_path: PathBuf,
 }
 
+enum ConfigError {
+  EnvError(env::VarError),
+  IoError(io::Error),
+}
+
+impl From<env::VarError> for ConfigError {
+  fn from(err: env::VarError) -> Self {
+    ConfigError::EnvError(err)
+  }
+}
+
+impl From<io::Error> for ConfigError {
+  fn from(err: io::Error) -> Self {
+    ConfigError::IoError(err)
+  }
+}
+
 impl Drash {
   /// Creates a new `Drash` struct containing path to:
   /// - Removed files
   /// - Metadata about the removed files
-  fn new() -> Self {
-    let home = env::var("HOME").with_context(|_| {
-      eprintln!("Failed to get env variable: {}", "HOME".bold());
-    });
-
+  fn new() -> Result<Self, ConfigError> {
+    let home = env::var("HOME")?;
     let drash_dir = Path::new(&home).join(".local/share/Drash");
     let drash_files = Path::new(&drash_dir).join("files");
     let drash_info_dir = Path::new(&drash_dir).join("info");
 
     if !drash_dir.exists() {
-      fs::create_dir(&drash_dir)
-        .with_context(|_| eprintln!("Failed to create directory at {drash_dir:?}"));
-
-      fs::create_dir(&drash_files)
-        .with_context(|_| eprintln!("Failed to create directory at {drash_files:?}"));
-
-      fs::create_dir(&drash_info_dir)
-        .with_context(|_| eprintln!("Failed to create directory at {drash_info_dir:?}"));
+      fs::create_dir(&drash_dir)?;
+      fs::create_dir(&drash_files)?;
+      fs::create_dir(&drash_info_dir)?;
     }
 
-    Self {
+    Ok(Self {
       files_path: drash_files,
       info_path: drash_info_dir,
-    }
+    })
   }
 
   /// List original file paths in the 'drashcan' and returning `FileList` struct containing the
   /// original file path and file-type
   fn list_file_paths(&self) -> io::Result<Box<[FileList]>> {
-    let info_files = fs::read_dir(&self.info_path)
-      .with_context(|_| eprintln!("Failed to read directory {:?}", &self.info_path));
-
+    let info_files = fs::read_dir(&self.info_path)?;
     let mut file_paths: Vec<FileList> = Vec::with_capacity(1);
+
     for file in info_files {
       let file = file?;
       let file_content = fs::read_to_string(file.path())?;
@@ -141,7 +150,7 @@ impl Drash {
 
     // Do not store the symlink, instead delete it and return
     if path.is_symlink() {
-      fs::remove_file(path).with_context(|_| eprintln!("Failed to remove symlink: '{:?}'", path));
+      fs::remove_file(path)?;
       println!("{}", "Removed symlink".bold());
       return Ok(());
     }
@@ -168,11 +177,7 @@ impl Drash {
       .write(true)
       .append(true)
       .create(true)
-      .open(format!(
-        "{}/{}.drashinfo",
-        &self.info_path.display(),
-        file_name
-      ))?;
+      .open(format!("{}/{}.drashinfo", &self.info_path.display(), file_name))?;
 
     buffer.write_all(b"[Drash Info]\n")?;
 
@@ -191,8 +196,7 @@ impl Drash {
     }
 
     // Move the file to drashed files directory
-    fs::rename(path, Path::new(&self.files_path).join(&file_name))
-      .with_context(|_| eprintln!("Failed to move file: '{}'", file_name.bold()));
+    fs::rename(path, Path::new(&self.files_path).join(file_name))?;
 
     Ok(())
   }
@@ -238,8 +242,7 @@ impl Drash {
 
   /// Search for files for their original file path
   fn search_file_path(&self, msg: &str) -> anyhow::Result<Box<[String]>> {
-    let file_info = fs::read_dir(&self.info_path)
-      .with_context(|_| eprintln!("Failed to read directory: '{:?}'", &self.info_path));
+    let file_info = fs::read_dir(&self.info_path)?;
     let mut path_vec: Vec<String> = Vec::new();
 
     // Push the original path value in `path_vec`
@@ -264,13 +267,25 @@ impl Drash {
 }
 
 fn main() -> anyhow::Result<()> {
-  let drash = Drash::new();
+  let drash = match Drash::new() {
+    Ok(val) => val,
+    Err(err) => match err {
+      ConfigError::EnvError(var_error) => {
+        eprintln!("{}", "Failed to read env variable".bold());
+        eprintln!("{}: {var_error}", "Error".bold().red());
+        exit(1);
+      }
+      ConfigError::IoError(io_error) => {
+        eprintln!("{}", "Failed to create directories".bold());
+        eprintln!("{}: {io_error}", "Error".bold().red());
+        exit(1);
+      }
+    },
+  };
 
   let args = Args::parse();
   if args.is_none() {
-    let entries =
-      fs::read_dir(".").with_context(|_| eprintln!("Failed to read current working directory"));
-
+    let entries = fs::read_dir(".")?;
     let mut path_vec: Vec<String> = Vec::with_capacity(3);
 
     for path in entries {
@@ -360,7 +375,7 @@ fn main() -> anyhow::Result<()> {
       "{}",
       Table::new(&original_paths).with(table_style).to_string()
     );
-    println!("\nTotal files: {}", original_paths.len());
+    println!("\nTotal entries: {}", original_paths.len());
   }
 
   if let Some(Commands::Remove { search_file }) = &args.commands {
@@ -381,15 +396,17 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash.files_path)
-        .with_context(|_| eprintln!("Failed to read directory: {:?}", &drash.files_path))
+      let last_file = fs::read_dir(&drash.files_path)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 
       match last_file {
-        Some(file) => drash
-          .remove_file(file.path())
-          .with_context(|_| eprintln!("Failed to remove file in the drashcan: '{file:?}'")),
+        Some(file) => {
+          if let Err(err) = drash.remove_file(file.path()) {
+            eprintln!("Error: {}", err);
+            exit(1);
+          }
+        }
         None => eprintln!("Drashcan is empty"),
       }
 
@@ -437,9 +454,7 @@ fn main() -> anyhow::Result<()> {
   }
 
   if let Some(Commands::Empty { yes }) = &args.commands {
-    let files = fs::read_dir(&drash.files_path)
-      .with_context(|_| eprintln!("Failed to read directory: {:?}", &drash.files_path));
-
+    let files = fs::read_dir(&drash.files_path)?;
     let file_entries = files.count();
     if file_entries == 0 {
       println!("Drashcan is alraedy empty");
@@ -447,15 +462,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     if *yes {
-      fs::remove_dir_all(&drash.files_path)
-        .with_context(|_| eprintln!("Failed to remove: {:?}", &drash.files_path));
-      fs::remove_dir_all(&drash.info_path)
-        .with_context(|_| eprintln!("Failed to remove: {:?}", &drash.info_path));
+      fs::remove_dir_all(&drash.files_path)?;
+      fs::remove_dir_all(&drash.info_path)?;
 
-      fs::create_dir(&drash.files_path)
-        .with_context(|_| eprintln!("Failed to create: {:?}", &drash.files_path));
-      fs::create_dir(&drash.info_path)
-        .with_context(|_| eprintln!("Failed to create: {:?}", &drash.info_path));
+      fs::create_dir(&drash.files_path)?;
+      fs::create_dir(&drash.info_path)?;
 
       match file_entries {
         n if n > 1 => println!("Removed: {file_entries} files"),
@@ -472,17 +483,11 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    fs::remove_dir_all(&drash.files_path)
-      .with_context(|_| eprintln!("Failed to remove: {:?}", &drash.files_path));
-    fs::remove_dir_all(&drash.info_path)
-      .with_context(|_| eprintln!("Failed to remove: {:?}", &drash.info_path));
+    fs::remove_dir_all(&drash.files_path)?;
+    fs::remove_dir_all(&drash.info_path)?;
 
-    fs::create_dir(&drash.files_path)
-      .with_context(|_| eprintln!("Failed to create: {:?}", &drash.files_path));
-    fs::create_dir(&drash.info_path)
-      .with_context(|_| eprintln!("Failed to create: {:?}", &drash.info_path));
-
-    return Ok(());
+    fs::create_dir(&drash.files_path)?;
+    fs::create_dir(&drash.info_path)?;
   }
 
   if let Some(Commands::Restore {
@@ -505,8 +510,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
       }
 
-      let last_file = fs::read_dir(&drash.files_path)
-        .with_context(|_| eprintln!("Failed to read directory: '{:?}'", &drash.files_path))
+      let last_file = fs::read_dir(&drash.files_path)?
         .flatten()
         .max_by_key(|x| x.metadata().unwrap().modified().unwrap());
 

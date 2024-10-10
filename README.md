@@ -2,7 +2,7 @@
 
 Drash is a nifty Command-Line Interface application which is a better
 alternative to the Linux `rm` command. It records the original path of the
-removed file, and puts it into a temp directory, making it easy to recovery
+removed file, and puts it into a directory, making it easy to recovery
 them later if you accidentally deleted the wrong file.
 
 This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](https://www.freedesktop.org/wiki/Specifications/trash-spec/).

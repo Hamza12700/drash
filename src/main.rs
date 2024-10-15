@@ -1,12 +1,16 @@
-use clap::{Parser, Subcommand};
-use drash::{colors::Colorize, utils};
-use inquire::{min_length, Confirm, MultiSelect};
+mod utils;
+mod colors;
+use colors::Colorize;
+
 use std::{
   env, fmt, fs,
   io::{self, Write},
   path::{Path, PathBuf},
   process::exit,
 };
+
+use clap::{Parser, Subcommand};
+use inquire::{min_length, Confirm, MultiSelect};
 use tabled::{settings::Style, Table, Tabled};
 
 /// Put files into drash so you can restore them later
@@ -83,6 +87,7 @@ struct Drash {
   info_path: PathBuf,
 }
 
+#[derive(Debug)]
 enum ConfigError {
   EnvError(env::VarError),
   IoError(io::Error),
@@ -177,7 +182,11 @@ impl Drash {
       .write(true)
       .append(true)
       .create(true)
-      .open(format!("{}/{}.drashinfo", &self.info_path.display(), file_name))?;
+      .open(format!(
+        "{}/{}.drashinfo",
+        &self.info_path.display(),
+        file_name
+      ))?;
 
     buffer.write_all(b"[Drash Info]\n")?;
 
@@ -267,21 +276,18 @@ impl Drash {
 }
 
 fn main() -> anyhow::Result<()> {
-  let drash = match Drash::new() {
-    Ok(val) => val,
-    Err(err) => match err {
+  let drash = Drash::new().inspect_err(|err| {
+    match err {
       ConfigError::EnvError(var_error) => {
         eprintln!("{}", "Failed to read env variable".bold());
         eprintln!("{}: {var_error}", "Error".bold().red());
-        exit(1);
-      }
-      ConfigError::IoError(io_error) => {
-        eprintln!("{}", "Failed to create directories".bold());
-        eprintln!("{}: {io_error}", "Error".bold().red());
-        exit(1);
-      }
-    },
-  };
+      },
+      ConfigError::IoError(error) => {
+        eprintln!("{}", "Failed to create directory".bold());
+        eprintln!("{}: {error}", "Error".bold().red());
+      },
+    }
+  }).expect("Failed to initialize the `Drash` struct");
 
   let args = Args::parse();
   if args.is_none() {
@@ -363,11 +369,13 @@ fn main() -> anyhow::Result<()> {
       return Ok(());
     }
 
-    original_paths.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
-      ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
-      ("directory", "file") => std::cmp::Ordering::Less,
-      ("file", "directory") => std::cmp::Ordering::Greater,
-      _ => std::cmp::Ordering::Equal,
+    original_paths.sort_unstable_by(|a, b| {
+      match (a.file_type.as_str(), b.file_type.as_str()) {
+        ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
+        ("directory", "file") => std::cmp::Ordering::Less,
+        ("file", "directory") => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
+      }
     });
 
     let table_style = Style::psql();

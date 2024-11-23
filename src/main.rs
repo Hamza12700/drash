@@ -82,10 +82,13 @@ fn main() -> anyhow::Result<()> {
 
       // Remove `./` from the start of the string
       let striped_path = path.strip_prefix("./")?;
-      path_vec.push(striped_path.to_str().unwrap_or("None").to_string())
+      if let Some(str_path) = striped_path.to_str() {
+        path_vec.push(str_path.to_string());
+      }
     }
+
     if path_vec.is_empty() {
-      println!("Nothing in the current directory to drash");
+      println!("Nothing in the current working directory to drash");
       return Ok(());
     }
 

@@ -94,13 +94,10 @@ fn main() -> anyhow::Result<()> {
       .prompt()?;
 
     for file in ans {
-      match drash.put_file(file) {
-        Ok(_) => (),
-        Err(err) => {
-          eprintln!("{}: {err}", "Error".red().bold());
-          continue;
-        }
-      };
+      if let Err(err) = drash.put_file(file) {
+        eprintln!("{}: {err}", "Error".red().bold());
+        continue;
+      }
     }
 
     return Ok(());
@@ -132,13 +129,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     for file in files {
-      match drash.put_file(file) {
-        Ok(_) => (),
-        Err(err) => {
-          eprintln!("{}: {err}", "Error".red().bold());
-          continue;
-        }
-      };
+      if let Err(err) = drash.put_file(file) {
+        eprintln!("{}: {err}", "Error".red().bold());
+        continue;
+      }
     }
 
     return Ok(());
@@ -173,13 +167,10 @@ fn main() -> anyhow::Result<()> {
 
         for file in files {
           let file_path = Path::new(&file);
-          match drash.remove_file(file_path) {
-            Ok(_) => (),
-            Err(err) => {
-              eprintln!("{}: {err}", "Error".bold().red());
-              continue;
-            }
-          };
+          if let Err(err) = drash.remove_file(file_path) {
+            eprintln!("{}: {err}", "Error".bold().red());
+            continue;
+          }
         }
         return Ok(());
       }
@@ -229,13 +220,10 @@ fn main() -> anyhow::Result<()> {
 
     for path in files {
       let path = Path::new(&path);
-      match drash.remove_file(path) {
-        Ok(_) => (),
-        Err(err) => {
-          eprintln!("{}: {err}", "Error".red().bold());
-          continue;
-        }
-      };
+      if let Err(err) = drash.remove_file(path) {
+        eprintln!("{}: {err}", "Error".red().bold());
+        continue;
+      }
     }
 
     return Ok(());

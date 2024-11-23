@@ -50,15 +50,15 @@ impl Drash {
     }
   }
 
-  /// List original file paths in the 'drashcan' and returning `FileList` struct containing the
-  /// original file path and file-type
+  /// List files in the 'drashcan'
   pub fn list_file_paths(&self) -> io::Result<Box<[FileList]>> {
-    let info_files = fs::read_dir(&self.info_path)?;
-    let mut file_paths: Vec<FileList> = Vec::with_capacity(1);
+    let info_files = fs::read_dir(&self.info_path).expect("failed to read drash info directory");
+    let mut file_paths: Vec<FileList> = Vec::with_capacity(3);
 
     for file in info_files {
       let file = file?;
-      let file_content = fs::read_to_string(file.path())?;
+      let file_content = fs::read_to_string(file.path())
+        .expect("failed to read meta-data about the file into string");
       let file_content: Box<[&str]> = file_content.lines().collect();
 
       let original_path = file_content[1].trim_start_matches("Path=");
@@ -76,12 +76,17 @@ impl Drash {
   pub fn put_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
     let path = path.as_ref();
 
-    // Do not store the symlink, instead delete it and return
+    // Do not store the symlink, instead delete it and exit
     if path.is_symlink() {
       fs::remove_file(path)?;
-      println!("{}", "Removed symlink".bold());
+      let file_name = path.file_name().unwrap_or_default();
+      println!(
+        "Removed symlink: {}",
+        file_name.to_str().unwrap_or_default()
+      );
       return Ok(());
     }
+
     let mut file_name = path.display().to_string();
 
     // Reture an error if file not found

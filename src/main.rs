@@ -3,7 +3,7 @@ mod drash;
 mod utils;
 
 use colors::Colorize;
-use drash::{ConfigError, Drash};
+use drash::Drash;
 use std::{
   fs,
   path::{Path, PathBuf},
@@ -69,18 +69,7 @@ impl Args {
 }
 
 fn main() -> anyhow::Result<()> {
-  let drash = Drash::new()
-    .inspect_err(|err| match err {
-      ConfigError::EnvError(var_error) => {
-        eprintln!("{}", "Failed to read env variable".bold());
-        eprintln!("{}: {var_error}", "Error".bold().red());
-      }
-      ConfigError::IoError(error) => {
-        eprintln!("{}", "Failed to create directory".bold());
-        eprintln!("{}: {error}", "Error".bold().red());
-      }
-    })
-    .expect("Failed to initialize the `Drash` struct");
+  let drash = Drash::new();
 
   let args = Args::parse();
   if args.is_none() {

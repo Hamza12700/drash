@@ -28,44 +28,26 @@ impl fmt::Display for FileList {
   }
 }
 
-#[derive(Debug)]
-pub enum ConfigError {
-  EnvError(env::VarError),
-  IoError(io::Error),
-}
-
-impl From<env::VarError> for ConfigError {
-  fn from(err: env::VarError) -> Self {
-    ConfigError::EnvError(err)
-  }
-}
-
-impl From<io::Error> for ConfigError {
-  fn from(err: io::Error) -> Self {
-    ConfigError::IoError(err)
-  }
-}
-
 impl Drash {
   /// Creates a new `Drash` struct containing path to:
   /// - Removed files
   /// - Metadata about the removed files
-  pub fn new() -> Result<Self, ConfigError> {
-    let home = env::var("HOME")?;
+  pub fn new() -> Self {
+    let home = env::var("HOME").expect("failed to get the HOME environment variable");
     let drash_dir = Path::new(&home).join(".local/share/Drash");
     let drash_files = Path::new(&drash_dir).join("files");
     let drash_info_dir = Path::new(&drash_dir).join("info");
 
     if !drash_dir.exists() {
-      fs::create_dir(&drash_dir)?;
-      fs::create_dir(&drash_files)?;
-      fs::create_dir(&drash_info_dir)?;
+      fs::create_dir(&drash_dir).expect("failed to create the drash home directory");
+      fs::create_dir(&drash_files).expect("failed to create the drash files directory");
+      fs::create_dir(&drash_info_dir).expect("failed to create the drash info directory");
     }
 
-    Ok(Self {
+    Self {
       files_path: drash_files,
       info_path: drash_info_dir,
-    })
+    }
   }
 
   /// List original file paths in the 'drashcan' and returning `FileList` struct containing the

@@ -8,6 +8,7 @@ use std::{
 use inquire::{min_length, MultiSelect};
 use tabled::Tabled;
 
+/// Represents the paths for **Drashed** files and their **Info** files.
 pub struct Drash {
   //// Path to the *drashed* files
   pub files_path: PathBuf,
@@ -50,13 +51,41 @@ impl Drash {
     }
   }
 
+  /// Remove File without moving it into the *Drash* directory
+  pub fn force_remove_file(&self, files: &Vec<PathBuf>) {
+    for file in files {
+      if file.is_symlink() {
+        fs::remove_file(file).expect("failed to remove file");
+        return;
+      }
+
+      let file_name = file.display().to_string();
+      if !file.exists() {
+        eprintln!("file not found: '{}'", file_name.bold());
+        continue;
+      }
+
+      match file.is_dir() {
+        true => fs::remove_dir_all(file).expect("failed to remove directory"),
+        false => fs::remove_file(file).expect("failed to remove file"),
+      };
+    }
+
+    if files.len() == 1 {
+      println!("Removed file");
+      return;
+    }
+
+    println!("Removed: {} files", files.len());
+  }
+
   /// List files in the 'drashcan'
-  pub fn list_file_paths(&self) -> io::Result<Box<[FileList]>> {
+  pub fn list_file_paths(&self) -> Box<[FileList]> {
     let info_files = fs::read_dir(&self.info_path).expect("failed to read drash info directory");
     let mut file_paths: Vec<FileList> = Vec::with_capacity(3);
 
     for file in info_files {
-      let file = file?;
+      let file = file.expect("failed to get directory entry");
       let file_content = fs::read_to_string(file.path())
         .expect("failed to read meta-data about the file into string");
       let file_content: Box<[&str]> = file_content.lines().collect();
@@ -69,7 +98,7 @@ impl Drash {
       });
     }
 
-    Ok(file_paths.into_boxed_slice())
+    file_paths.into_boxed_slice()
   }
 
   /// Put file into drashcan
@@ -112,7 +141,7 @@ impl Drash {
       .create(true)
       .open(format!(
         "{}/{}.drashinfo",
-        &self.info_path.display(),
+        self.info_path.display(),
         file_name
       ))?;
 
@@ -139,7 +168,7 @@ impl Drash {
   }
 
   /// Remove file in the `drashcan`
-  pub fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+  pub fn remove_file_from_drash<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
     let original_file_path = path.as_ref();
     let file_name = original_file_path.file_name().unwrap().to_str().unwrap();
     let file_info = format!("{file_name}.drashinfo");
@@ -147,12 +176,12 @@ impl Drash {
     // Check if path is a directory or a file
     match &self.files_path.join(file_name).is_dir() {
       true => {
-        fs::remove_dir_all(&self.files_path.join(file_name))?;
-        fs::remove_file(&self.info_path.join(file_info))?;
+        fs::remove_dir_all(self.files_path.join(file_name))?;
+        fs::remove_file(self.info_path.join(file_info))?;
       }
       false => {
-        fs::remove_file(&self.files_path.join(file_name))?;
-        fs::remove_file(&self.info_path.join(file_info))?;
+        fs::remove_file(self.files_path.join(file_name))?;
+        fs::remove_file(self.info_path.join(file_info))?;
       }
     }
 
@@ -160,32 +189,31 @@ impl Drash {
   }
 
   /// Restore a file to its original path
-  pub fn restore_file<P: AsRef<Path>>(&self, path: P, overwrite: bool) -> io::Result<bool> {
+  pub fn restore_file<P: AsRef<Path>>(&self, path: P, overwrite: bool) -> bool {
     let path = path.as_ref();
     let file_name = path.file_name().unwrap();
     let file_info = format!("{}.drashinfo", file_name.to_str().unwrap());
 
     // Check if the same file exists in path
     let check = utils::check_overwrite(path, overwrite);
-    match check {
-      true => {
-        fs::rename(&self.files_path.join(file_name), path)?;
-        fs::remove_file(&self.info_path.join(file_info))?;
-        Ok(true)
-      }
-      false => Ok(false),
+    if check {
+      fs::rename(self.files_path.join(file_name), path).expect("failed to move file");
+      fs::remove_file(self.info_path.join(file_info)).expect("failed to remove file");
+      return true;
     }
+
+    false
   }
 
   /// Search for files for their original file path
-  pub fn search_file_path(&self, msg: &str) -> anyhow::Result<Box<[String]>> {
-    let file_info = fs::read_dir(&self.info_path)?;
+  pub fn search_file_path(&self, msg: &str) -> Box<[String]> {
+    let file_info = fs::read_dir(&self.info_path).expect("failed to read Info directory");
     let mut path_vec: Vec<String> = Vec::new();
 
     // Push the original path value in `path_vec`
     for file in file_info {
-      let file = file?;
-      let file_info = fs::read_to_string(file.path())?;
+      let file = file.expect("failed to get directory entry");
+      let file_info = fs::read_to_string(file.path()).expect("failed to read file into string");
       let file_info: Box<[&str]> = file_info.split("\n").collect();
       let file_path = file_info[1].trim_start_matches("Path=");
       if file_path.is_empty() {
@@ -197,8 +225,8 @@ impl Drash {
     // Prompt the user to choose files
     let ans = MultiSelect::new(msg, path_vec)
       .with_validator(min_length!(1, "At least choose one file"))
-      .prompt()?;
+      .prompt().unwrap();
 
-    Ok(ans.into_boxed_slice())
+    ans.into_boxed_slice()
   }
 }

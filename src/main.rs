@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 /// Put files into drash so you can restore them later
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[command(version)]
 struct Args {
   /// Files to drash
@@ -24,7 +24,7 @@ struct Args {
   commands: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum Commands {
   /// List files in the drashcan
   List,
@@ -87,13 +87,15 @@ fn main() {
     return;
   }
 
-  match args.commands.unwrap() {
-    Commands::List => cli::list_drash_files(&drash),
-    Commands::Remove { search_file } => cli::remove_files_from_drash(&drash, search_file),
-    Commands::Empty { yes } => cli::empty_drash(&drash, yes),
-    Commands::Restore {
-      overwrite,
-      search_file,
-    } => cli::restore_files(&drash, search_file, overwrite),
+  if let Some(cmds) = args.commands {
+    match cmds {
+      Commands::List => cli::list_drash_files(&drash),
+      Commands::Remove { search_file } => cli::remove_files_from_drash(&drash, search_file),
+      Commands::Empty { yes } => cli::empty_drash(&drash, yes),
+      Commands::Restore {
+        overwrite,
+        search_file,
+      } => cli::restore_files(&drash, search_file, overwrite),
+    }
   }
 }

@@ -25,6 +25,7 @@ pub fn list_drash_files(drash: &Drash) {
   println!("\nTotal entries: {}", original_paths.len());
 }
 
+/// Select files to **Drash** in current working directory
 pub fn drash_cwd(drash: &Drash) {
   let entries = fs::read_dir(".").expect("failed to read current working directory");
   let mut path_vec: Vec<String> = Vec::with_capacity(3);

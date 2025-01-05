@@ -116,7 +116,7 @@ impl Drash {
       return Ok(());
     }
 
-    let mut file_name = path.display().to_string();
+    let mut file_name = path.file_name().unwrap().to_str().unwrap().to_string();
 
     // Reture an error if file not found
     if !path.exists() {
@@ -225,7 +225,8 @@ impl Drash {
     // Prompt the user to choose files
     let ans = MultiSelect::new(msg, path_vec)
       .with_validator(min_length!(1, "At least choose one file"))
-      .prompt().unwrap();
+      .prompt()
+      .unwrap();
 
     ans.into_boxed_slice()
   }

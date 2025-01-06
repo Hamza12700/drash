@@ -5,6 +5,7 @@ use std::{
   path::{Path, PathBuf},
 };
 
+use chrono::Local;
 use inquire::{min_length, MultiSelect};
 use tabled::Tabled;
 
@@ -19,8 +20,15 @@ pub struct Drash {
 
 #[derive(Tabled)]
 pub struct FileList {
-  pub file_type: String,
+  pub time: String,
   pub path: String,
+  pub file_type: String,
+}
+
+pub struct FileInfo {
+  pub path: PathBuf,
+  pub filetype: String,
+  pub time: String,
 }
 
 impl fmt::Display for FileList {
@@ -49,6 +57,29 @@ impl Drash {
       files_path: drash_files,
       info_path: drash_info_dir,
     }
+  }
+
+  /// Parse Drashed files metadata
+  pub fn parse_file_info(&self) -> Box<[FileInfo]> {
+    let mut parsed_files: Vec<FileInfo> = Vec::new();
+    let dir_entries =
+      fs::read_dir(&self.info_path).expect("failed to read drashed files directory");
+
+    for entry in dir_entries {
+      let file = entry.expect("failed to read directory entry");
+      let file_content = fs::read_to_string(file.path()).expect("failed to read file into string");
+
+      let lines: Box<[&str]> = file_content.lines().collect();
+
+      // Skip the first line
+      parsed_files.push(FileInfo {
+        path: lines[1].trim_start_matches("Path=").into(),
+        filetype: lines[2].trim_start_matches("FileType=").to_string(),
+        time: lines[3].trim_start_matches("Time=").to_string(),
+      });
+    }
+
+    parsed_files.into_boxed_slice()
   }
 
   /// Remove File without moving it into the *Drash* directory
@@ -81,24 +112,18 @@ impl Drash {
 
   /// List files in the 'drashcan'
   pub fn list_file_paths(&self) -> Box<[FileList]> {
-    let info_files = fs::read_dir(&self.info_path).expect("failed to read drash info directory");
-    let mut file_paths: Vec<FileList> = Vec::with_capacity(3);
+    let parsed_info = self.parse_file_info();
+    let mut files = Vec::new();
 
-    for file in info_files {
-      let file = file.expect("failed to get directory entry");
-      let file_content = fs::read_to_string(file.path())
-        .expect("failed to read meta-data about the file into string");
-      let file_content: Box<[&str]> = file_content.lines().collect();
-
-      let original_path = file_content[1].trim_start_matches("Path=");
-      let file_type = file_content[2].trim_start_matches("FileType=");
-      file_paths.push(FileList {
-        path: original_path.to_string(),
-        file_type: file_type.to_string(),
+    for file in parsed_info {
+      files.push(FileList {
+        path: file.path.display().to_string(),
+        file_type: file.filetype,
+        time: file.time,
       });
     }
 
-    file_paths.into_boxed_slice()
+    files.into_boxed_slice()
   }
 
   /// Put file into drashcan
@@ -145,21 +170,23 @@ impl Drash {
         file_name
       ))?;
 
-    buffer.write_all(b"[Drash Info]\n")?;
+    buffer.write_all(b"[Drash-Info]\n")?;
 
     // Write the original `Path` value
     let formatted_string = format!("Path={}\n", current_file.display());
     buffer.write_all(formatted_string.as_bytes())?;
 
     // Write what file type it is:
-    // - File
-    // - Directory
     buffer.write_all(b"FileType=")?;
     if path.is_dir() {
       buffer.write_all(b"directory\n")?;
     } else {
       buffer.write_all(b"file\n")?;
     }
+
+    buffer.write_all(b"Time=")?;
+    let local_time = Local::now().format("%-d %b, %a %Y %H:%M").to_string();
+    buffer.write_all(local_time.as_bytes())?;
 
     // Move the file to drashed files directory
     fs::rename(path, Path::new(&self.files_path).join(file_name))?;
@@ -229,5 +256,31 @@ impl Drash {
       .unwrap();
 
     ans.into_boxed_slice()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use fs::File;
+
+  use super::*;
+
+  #[test]
+  fn test_parse_file_info() {
+    let drash = Drash::new();
+    File::create_new("tmp").unwrap();
+
+    drash.put_file("tmp").unwrap();
+    let parsed_info = drash.parse_file_info();
+    let cwd = env::current_dir().unwrap();
+
+    fs::remove_file(&format!("{}/tmp", drash.files_path.display())).unwrap();
+    fs::remove_file(&format!("{}/tmp.drashinfo", drash.info_path.display())).unwrap();
+
+    assert_eq!(parsed_info[0].filetype, "file");
+    assert_eq!(
+      parsed_info[0].path,
+      Path::new(&format!("{}/tmp", cwd.display()))
+    );
   }
 }

@@ -10,13 +10,9 @@ This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](h
 ## Why?
 
 I was inspired by [trash-cli](https://github.com/andreafrancia/trash-cli), but
-I wanted to create something with more bells
-and whistles. Drash aims to enhance the *trash-cli* experience with additional
-features like file searching and advance recovery capabilities.
-
-With Drash, you can easily put files into the 'drashcan' by simply searching
-for them in the current working directory. You can also search for and recover
-previously deleted files.
+I wanted to create something with more features that I would use. Drash aims to
+enhance the *trash-cli* experience with additional features like file searching
+and advance recovery capabilities.
 
 ## Installation:
 

@@ -1,27 +1,34 @@
 use std::{fs, path::Path, process::exit};
 
-use inquire::{min_length, Confirm, MultiSelect};
-use tabled::{settings::Style, Table};
-
 use crate::{colors::Colorize, drash::Drash};
+use inquire::{min_length, Confirm, MultiSelect};
+
+fn human_readable_size(size: u64) -> String {
+  const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+
+  let mut size = size as f64;
+  let mut unit_index = 0;
+
+  while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+    size /= 1024.0;
+    unit_index += 1;
+  }
+
+  format!("{:.2} {}", size, UNITS[unit_index])
+}
 
 /// List files in the **Drash-Can**
 pub fn list_drash_files(drash: &Drash) {
-  let mut original_paths = drash.list_file_paths();
+  let original_paths = drash.list_file_paths();
   if original_paths.len() == 0 {
     println!("Nothing is the drashcan");
     return;
   }
 
-  original_paths.sort_unstable_by(|a, b| match (a.file_type.as_str(), b.file_type.as_str()) {
-    ("directory", "dir") | ("file", "file") => a.path.cmp(&b.path),
-    ("directory", "file") => std::cmp::Ordering::Less,
-    ("file", "directory") => std::cmp::Ordering::Greater,
-    _ => std::cmp::Ordering::Equal,
-  });
+  for file in &original_paths {
+    println!("{} - {}", human_readable_size(file.size), file.path)
+  }
 
-  let table_style = Style::psql();
-  println!("{}", Table::new(&original_paths).with(table_style));
   println!("\nTotal entries: {}", original_paths.len());
 }
 

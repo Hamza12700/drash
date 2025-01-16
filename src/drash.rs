@@ -22,13 +22,15 @@ pub struct Drash {
 pub struct FileList {
   pub time: String,
   pub path: String,
-  pub file_type: String,
+  pub size: u64,
+  // pub file_type: String,
 }
 
 pub struct FileInfo {
   pub path: PathBuf,
-  pub filetype: String,
   pub time: String,
+  pub size: u64,
+  pub filetype: String,
 }
 
 impl fmt::Display for FileList {
@@ -76,6 +78,10 @@ impl Drash {
         path: lines[1].trim_start_matches("Path=").into(),
         filetype: lines[2].trim_start_matches("FileType=").to_string(),
         time: lines[3].trim_start_matches("Time=").to_string(),
+        size: lines[4]
+          .trim_start_matches("Size=")
+          .parse()
+          .expect("failed to parse the file-size into u64"),
       });
     }
 
@@ -118,8 +124,9 @@ impl Drash {
     for file in parsed_info {
       files.push(FileList {
         path: file.path.display().to_string(),
-        file_type: file.filetype,
+        // file_type: file.filetype,
         time: file.time,
+        size: file.size,
       });
     }
 
@@ -176,7 +183,7 @@ impl Drash {
     let formatted_string = format!("Path={}\n", current_file.display());
     buffer.write_all(formatted_string.as_bytes())?;
 
-    // Write what file type it is:
+    // Store the file-type
     buffer.write_all(b"FileType=")?;
     if path.is_dir() {
       buffer.write_all(b"directory\n")?;
@@ -184,9 +191,18 @@ impl Drash {
       buffer.write_all(b"file\n")?;
     }
 
+    // Store the custom timestamp when was the file removed
     buffer.write_all(b"Time=")?;
     let local_time = Local::now().format("%-d %b, %a %Y %H:%M").to_string();
     buffer.write_all(local_time.as_bytes())?;
+
+    // Store the file-size
+    buffer.write_all(b"\nSize=")?;
+    let file_size = path
+      .metadata()
+      .expect("failed to get file's metadata")
+      .len();
+    writeln!(buffer, "{}\n", file_size)?;
 
     // Move the file to drashed files directory
     fs::rename(path, Path::new(&self.files_path).join(file_name))?;

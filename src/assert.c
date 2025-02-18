@@ -5,12 +5,13 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Assert on truethy value
-static inline void assert(bool truethy, const char *msg) {
+void assert(bool truethy, const char *msg) {
   if (truethy) {
-    fprintf(stderr, "[ASSERT FAILED]: errno = %d\n", errno);
-    perror(msg);
+    fprintf(stderr, "[ASSERT FAILED]: %s\n", msg);
+    fprintf(stderr, "Error: %s\n", strerror(errno));
     exit(errno);
   }
 }

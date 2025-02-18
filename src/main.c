@@ -31,14 +31,31 @@ drash_t drash_make(bump_allocator *alloc) {
   }
 
   // Buffer to hold the drash directory path
-  char drash_dir[sizeof(char *) + strlen(home_env) + strlen("./local/share/Drash") + 1];
-  sprintf(drash_dir, "%s./local/share/Drash", home_env);
+  char drash_dir[sizeof(char *) + strlen(home_env) + strlen("/.local/share/Drash") + 1];
+  sprintf(drash_dir, "%s/.local/share/Drash", home_env);
+  int err = 0;
+
+  // Premission: rwx|r--|---
+  err = mkdir(drash_dir, 0740);
+
+  // Skip the error check if the directory already exists
+  if (errno != EEXIST) {
+    assert(err != 0, "mkdir failed to creaet drash directory");
+  }
 
   drash.files = bump_alloc(alloc, sizeof(drash.files) + strlen(drash_dir) + strlen("/files") + 1);
   sprintf(drash.files, "%s/files", drash_dir);
+  err = mkdir(drash.files, 0700);
+  if (errno != EEXIST) {
+    assert(err != 0, "mkdir failed to creaet drash directory");
+  }
 
   drash.metadata = bump_alloc(alloc, sizeof(drash.metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
   sprintf(drash.metadata, "%s/metadata", drash_dir);
+  err = mkdir(drash.metadata, 0700);
+  if (errno != EEXIST) {
+    assert(err != 0, "mkdir failed to creaet drash directory");
+  }
 
   return drash;
 }
@@ -59,7 +76,7 @@ void print_command_options() {
   uint8_t longest_desc = 0;
   uint8_t longest_name = 0;
 
-  // Get the largest desc and name of the command
+  // Get the largest desc and name from the commands
   for (int i = 0; commands[i].name != NULL; i++) {
     const command_t cmd = commands[i];
   
@@ -106,6 +123,7 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  // @NOTE: shouldn't exceed more than 1000 bytes
   bump_allocator buffer_alloc = bump_alloc_new(1000);
   drash_t drash = drash_make(&buffer_alloc);
 
@@ -129,6 +147,8 @@ int main(int argc, char **argv) {
       }
     }
 
+    // Check for symlink files and delete if found
+    // If file doesn't exist then report the error and continue to next file
     {
       struct stat statbuf;
       int err = 0;

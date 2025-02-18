@@ -21,11 +21,17 @@ drash_t drash_make(bump_allocator *alloc) {
   drash_t drash = {0};
 
   char *home_env = getenv("HOME");
-  assert(home_env == NULL, "failed to HOME environment variable");
+  assert(home_env == NULL, "failed to get HOME environment variable");
 
-  // Allocate the path to drash directory separately because it only needs to
-  // live inside the function body
-  char *drash_dir = malloc(sizeof(drash_dir) + strlen(home_env) + strlen("./local/share/Drash"));
+  // HOME environment variable grater than 25 chars seems odd or rather malformed/malicious
+  if (strlen(home_env) > 25) {
+    fprintf(stderr, "HOME environment variable too long or malformed, length: %zu\n", strlen(home_env));
+    printf("max length 25 characters\n");
+    exit(-1);
+  }
+
+  // Buffer to hold the drash directory path
+  char drash_dir[sizeof(char *) + strlen(home_env) + strlen("./local/share/Drash") + 1];
   sprintf(drash_dir, "%s./local/share/Drash", home_env);
 
   drash.files = bump_alloc(alloc, sizeof(drash.files) + strlen(drash_dir) + strlen("/files") + 1);
@@ -34,7 +40,6 @@ drash_t drash_make(bump_allocator *alloc) {
   drash.metadata = bump_alloc(alloc, sizeof(drash.metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
   sprintf(drash.metadata, "%s/metadata", drash_dir);
 
-  free(drash_dir);
   return drash;
 }
 
@@ -146,5 +151,5 @@ int main(int argc, char **argv) {
     printf("file: %s\n", arg);
   }
 
-  bump_free(&buffer_alloc);
+  bump_alloc_free(&buffer_alloc);
 }

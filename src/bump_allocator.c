@@ -34,7 +34,7 @@ void *bump_alloc(bump_allocator* buffer_alloc, uint16_t size) {
 }
 
 // Upon successful completion, munmap() shall return 0; otherwise, it return -1 and set errno to indicate the error.
-int bump_free(bump_allocator *buffer_alloc) {
+int bump_alloc_free(bump_allocator *buffer_alloc) {
   int err = munmap(buffer_alloc->data, buffer_alloc->capacity);
   buffer_alloc->size = 0;
   buffer_alloc->capacity = 0;

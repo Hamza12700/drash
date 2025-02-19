@@ -1,2 +1,2 @@
-debug: src/main.c
-	gcc -Wall -Wextra -fsanitize=address -g3 src/main.c -o ./build/debug
+debug: src/main.cpp
+	g++ -Wall -Wextra -fsanitize=address -fsanitize=undefined -fbounds-check -fstack-check -fstack-protector-all -g3 src/main.cpp -o ./build/debug

@@ -5,64 +5,60 @@
 #include <sys/stat.h>
 
 #include "./assert.c"
-#include "./bump_allocator.c"
+#include "./bump_allocator.cpp"
 
 #define VERSION "0.1.0"
 
-typedef struct {
+struct drash_t {
   // Heap pointer to filepath of removed files
   char *files;
   // Heap pointer to filepath of metadata about the removed files
   char *metadata;
-} drash_t;
 
-drash_t drash_make(bump_allocator *alloc) {
-  drash_t drash = {0};
+  drash_t(bump_allocator &buffer_alloc) {
+    const char *home_env = getenv("HOME");
+    assert(home_env == nullptr, "failed to get HOME environment variable");
 
-  char *home_env = getenv("HOME");
-  assert(home_env == NULL, "failed to get HOME environment variable");
+    // HOME environment variable grater than 25 chars seems odd or rather malformed/malicious
+    if (strlen(home_env) > 25) {
+      fprintf(stderr, "HOME environment variable too long or malformed, length: %zu\n", strlen(home_env));
+      printf("max length 25 characters\n");
+      exit(-1);
+    }
 
-  // HOME environment variable grater than 25 chars seems odd or rather malformed/malicious
-  if (strlen(home_env) > 25) {
-    fprintf(stderr, "HOME environment variable too long or malformed, length: %zu\n", strlen(home_env));
-    printf("max length 25 characters\n");
-    exit(-1);
+    // Buffer to hold the drash directory path
+    char drash_dir[strlen(home_env) + strlen("/.local/share/Drash") + 1];
+    sprintf(drash_dir, "%s/.local/share/Drash", home_env);
+    int err = 0;
+
+    // Premission: rwx|r--|---
+    err = mkdir(drash_dir, 0740);
+
+    // Skip the error check if the directory already exists
+    if (errno != EEXIST) {
+      assert(err != 0, "mkdir failed to creaet drash directory");
+    }
+
+    files = (char *)buffer_alloc.alloc(sizeof(files) + strlen(drash_dir) + strlen("/files") + 1);
+    sprintf(files, "%s/files", drash_dir);
+    err = mkdir(files, 0700);
+    if (errno != EEXIST) {
+      assert(err != 0, "mkdir failed to creaet drash directory");
+    }
+
+    metadata = (char *)buffer_alloc.alloc(sizeof(metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
+    sprintf(metadata, "%s/metadata", drash_dir);
+    err = mkdir(metadata, 0700);
+    if (errno != EEXIST) {
+      assert(err != 0, "mkdir failed to creaet drash directory");
+    }
   }
+};
 
-  // Buffer to hold the drash directory path
-  char drash_dir[strlen(home_env) + strlen("/.local/share/Drash") + 1];
-  sprintf(drash_dir, "%s/.local/share/Drash", home_env);
-  int err = 0;
-
-  // Premission: rwx|r--|---
-  err = mkdir(drash_dir, 0740);
-
-  // Skip the error check if the directory already exists
-  if (errno != EEXIST) {
-    assert(err != 0, "mkdir failed to creaet drash directory");
-  }
-
-  drash.files = bump_alloc(alloc, sizeof(drash.files) + strlen(drash_dir) + strlen("/files") + 1);
-  sprintf(drash.files, "%s/files", drash_dir);
-  err = mkdir(drash.files, 0700);
-  if (errno != EEXIST) {
-    assert(err != 0, "mkdir failed to creaet drash directory");
-  }
-
-  drash.metadata = bump_alloc(alloc, sizeof(drash.metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
-  sprintf(drash.metadata, "%s/metadata", drash_dir);
-  err = mkdir(drash.metadata, 0700);
-  if (errno != EEXIST) {
-    assert(err != 0, "mkdir failed to creaet drash directory");
-  }
-
-  return drash;
-}
-
-typedef struct {
+struct command_t {
   const char *name;
   const char *desc;
-} command_t;
+};
 
 const command_t commands[] = {
     {.name = "list", .desc = "List Drash'd files"},
@@ -116,35 +112,40 @@ void print_command_options() {
   }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
   if (argc == 1) {
     fprintf(stderr, "Missing argument file(s)\n");
     return -1;
   }
 
+  // Skip the binary path, because I always off by one error when looping throught the array
+  argv++;
+  argc = argc - 1;
+
   // @NOTE: shouldn't exceed more than 1000 bytes
-  bump_allocator buffer_alloc = bump_alloc_new(1000);
-  drash_t drash = drash_make(&buffer_alloc);
+  auto buffer_allocator = bump_allocator(1000);
+  auto drash = drash_t(buffer_allocator);
 
-  // Skip the first argument for the binary path
-  for (int i = 1; i < argc; i++) {
-    const char *arg = argv[i];
+  // Handle option arguments
+  if (argv[0][0] == '-') {
+    const char *arg = argv[0];
 
-    // Handle option arguments
-    if (arg[0] == '-') {
-      if (strcmp(arg, "-help") == 0 || strcmp(arg, "-h") == 0) {
-        printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
-        printf("\nCommands:\n");
-        print_command_options();
-        return 0;
-      } else if (strcmp(arg, "-version") == 0 || strcmp(arg, "-v") == 0) {
-        printf("drash version: %s\n", VERSION);
-        return 0;
-      } else {
-        fprintf(stderr, "Unknown option: %s\n", arg);
-        return -1;
-      }
+    if (strcmp(arg, "-help") == 0 || strcmp(arg, "-h") == 0) {
+      printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
+      printf("\nCommands:\n");
+      print_command_options();
+      return 0;
+    } else if (strcmp(arg, "-version") == 0 || strcmp(arg, "-v") == 0) {
+      printf("drash version: %s\n", VERSION);
+      return 0;
+    } else {
+      fprintf(stderr, "Unknown option: %s\n", arg);
+      return -1;
     }
+  }
+
+  for (int i = 0; i < argc; i++) {
+    const char *arg = argv[i];
 
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
@@ -170,5 +171,5 @@ int main(int argc, char **argv) {
     printf("file: %s\n", arg);
   }
 
-  bump_alloc_free(&buffer_alloc);
+  buffer_allocator.free();
 }

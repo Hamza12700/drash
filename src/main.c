@@ -1,8 +1,7 @@
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
+#include <stdint.h>
 #include <sys/stat.h>
 
 #include "./assert.c"
@@ -31,7 +30,7 @@ drash_t drash_make(bump_allocator *alloc) {
   }
 
   // Buffer to hold the drash directory path
-  char drash_dir[sizeof(char *) + strlen(home_env) + strlen("/.local/share/Drash") + 1];
+  char drash_dir[strlen(home_env) + strlen("/.local/share/Drash") + 1];
   sprintf(drash_dir, "%s/.local/share/Drash", home_env);
   int err = 0;
 

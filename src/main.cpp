@@ -119,9 +119,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Skip the binary path, because I'm always off by one error when looping throught the array
-  // Avoid doing 1 base indexing
   argv++;
-  argc = argc - 1;
+  argc -= 1;
 
   // @NOTE: shouldn't exceed more than 1000 bytes
   auto buffer_allocator = bump_allocator(1000);
@@ -152,7 +151,16 @@ int main(int argc, char *argv[]) {
     // If file doesn't exist then report the error and continue to next file
     {
       struct stat statbuf;
-      assert(lstat(arg, &statbuf), "lstat failed");
+      int err = 0;
+      err = lstat(arg, &statbuf);
+
+      // If file not found
+      if (err != 0 && errno == 2) {
+        fprintf(stderr, "file not found: %s\n", arg);
+        continue;
+      }
+
+      assert(err != 0, "lstat failed");
 
       // Remove symlink files
       if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {

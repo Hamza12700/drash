@@ -61,20 +61,18 @@ struct command_t {
 };
 
 const command_t commands[] = {
-    {.name = "list", .desc = "List Drash'd files"},
-    {.name = "remove", .desc = "Remove files from the Drash/can"},
-    {.name = "empty", .desc = "Empty the Drash/can"},
-    {.name = "restore", .desc = "Restore removed files"},
-    NULL};
+  {.name = "list", .desc = "List Drash'd files"},
+  {.name = "remove", .desc = "Remove files from the Drash/can"},
+  {.name = "empty", .desc = "Empty the Drash/can"},
+  {.name = "restore", .desc = "Restore removed files"},
+};
 
 void print_command_options() {
   uint8_t longest_desc = 0;
   uint8_t longest_name = 0;
 
   // Get the largest desc and name from the commands
-  for (int i = 0; commands[i].name != NULL; i++) {
-    const command_t cmd = commands[i];
-  
+  for (command_t cmd : commands) {
     uint8_t current_desc_len = strlen(cmd.desc);
     uint8_t current_name_len = strlen(cmd.name);
 
@@ -89,8 +87,7 @@ void print_command_options() {
   uint16_t buf_cursor = 0;
 
   // Fill the buffer
-  for (int i = 0; commands[i].name != NULL; i++) {
-    command_t cmd = commands[i];
+  for (command_t cmd : commands) {
     buf_cursor = 0;
 
     // Fill the buffer with whitespace

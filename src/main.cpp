@@ -1,8 +1,11 @@
+#include <filesystem>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
+
+using namespace std;
 
 #include "./assert.c"
 #include "./bump_allocator.cpp"
@@ -118,7 +121,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  // Skip the binary path, because I always off by one error when looping throught the array
+  // Skip the binary path, because I'm always off by one error when looping throught the array
+  // Avoid doing 1 base indexing
   argv++;
   argc = argc - 1;
 
@@ -150,19 +154,10 @@ int main(int argc, char *argv[]) {
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
     {
-      struct stat statbuf;
-      int err = 0;
-      err = lstat(arg, &statbuf);
-
-      if (err != 0 && errno == ENOENT) {
-        fprintf(stderr, "file not found: %s\n", arg);
-        continue; 
-      }
-
-      assert(err != 0, "lstat failed");
+      bool is_symlink = filesystem::is_symlink(arg);
 
       // Remove symlink files
-      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+      if (is_symlink) {
         assert(remove(arg) != 0, "failed to remove symlink-file");
         printf("Removed symlink: %s\n", arg);
       }

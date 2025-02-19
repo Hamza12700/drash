@@ -1,11 +1,8 @@
-#include <filesystem>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
-
-using namespace std;
 
 #include "./assert.c"
 #include "./bump_allocator.cpp"
@@ -154,10 +151,11 @@ int main(int argc, char *argv[]) {
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
     {
-      bool is_symlink = filesystem::is_symlink(arg);
+      struct stat statbuf;
+      assert(lstat(arg, &statbuf), "lstat failed");
 
       // Remove symlink files
-      if (is_symlink) {
+      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
         assert(remove(arg) != 0, "failed to remove symlink-file");
         printf("Removed symlink: %s\n", arg);
       }

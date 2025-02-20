@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -6,55 +7,41 @@
 
 #include "./assert.c"
 #include "./bump_allocator.cpp"
+#include "./drash.cpp"
 
 #define VERSION "0.1.0"
 
-struct drash_t {
-  // Heap pointer to filepath of removed files
-  char *files;
-  // Heap pointer to filepath of metadata about the removed files
-  char *metadata;
+char *file_basename(char *path) {
+  int path_len = strlen(path) - 1;
 
-  drash_t(bump_allocator &buffer_alloc) {
-    const char *home_env = getenv("HOME");
-    assert(home_env == nullptr, "failed to get HOME environment variable");
+  if (path_len == 1 || path_len == 0) return nullptr;
 
-    // HOME environment variable grater than 25 chars seems odd or rather malformed/malicious
-    if (strlen(home_env) > 25) {
-      fprintf(stderr, "HOME environment variable too long or malformed, length: %zu\n", strlen(home_env));
-      printf("max length 25 characters\n");
-      exit(-1);
-    }
-
-    // Buffer to hold the drash directory path
-    // Don't need to compute the home_env size because we know the max size of the string
-    char drash_dir[25 + strlen("/.local/share/Drash") + 1];
-    sprintf(drash_dir, "%s/.local/share/Drash", home_env);
-    int err = 0;
-
-    // Premission: rwx|r--|---
-    err = mkdir(drash_dir, 0740);
-
-    // Skip the error check if the directory already exists
-    if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
-    }
-
-    files = (char *)buffer_alloc.alloc(sizeof(files) + strlen(drash_dir) + strlen("/files") + 1);
-    sprintf(files, "%s/files", drash_dir);
-    err = mkdir(files, 0700);
-    if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
-    }
-
-    metadata = (char *)buffer_alloc.alloc(sizeof(metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
-    sprintf(metadata, "%s/metadata", drash_dir);
-    err = mkdir(metadata, 0700);
-    if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
-    }
+  bool contain_slash = false;
+  for (int i = 0; i < path_len; i++) {
+    if (path[i] == '/') { contain_slash = true; break; }
   }
-};
+
+  if (!contain_slash) return path;
+
+  // Filename shoundn't exceed 25 chars
+  char buf[25];
+  int j = 0;
+  for (int i = path_len; path[i] != '/'; i--) {
+    buf[j] = path[i];
+    j++;
+  }
+
+  int end = strlen(buf) - 1;
+  for (int i = 0; i < end; i++) {
+    char tmp = buf[i];
+    buf[i] = buf[end]; 
+    buf[end] = tmp;
+    end -= 1;
+  }
+
+  printf("%s", buf);
+  return nullptr;
+}
 
 struct command_t {
   const char *name;
@@ -81,7 +68,7 @@ void print_command_options() {
     if (current_name_len > longest_name) { longest_name = current_name_len; }
   }
 
-  uint16_t total_size = longest_name + longest_desc + 30;
+  const uint16_t total_size = longest_name + longest_desc + 30;
 
   // Create a tmp buffer
   char buffer[total_size];
@@ -122,7 +109,7 @@ int main(int argc, char *argv[]) {
 
   // @NOTE: shouldn't exceed more than 1000 bytes
   auto buffer_allocator = bump_allocator(1000);
-  auto drash = drash_t(buffer_allocator);
+  auto drash = Drash(buffer_allocator);
 
   // Handle option arguments
   if (argv[0][0] == '-') {
@@ -166,8 +153,6 @@ int main(int argc, char *argv[]) {
         printf("Removed symlink: %s\n", arg);
       }
     }
-
-    printf("file: %s\n", arg);
   }
 
   buffer_allocator.free();

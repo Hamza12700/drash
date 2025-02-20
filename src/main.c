@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -6,22 +5,23 @@
 #include <sys/stat.h>
 
 #include "./assert.c"
-#include "./bump_allocator.cpp"
-#include "./drash.cpp"
+#include "./bump_allocator.c"
+#include "./drash.c"
 
 #define VERSION "0.1.0"
 
-char *file_basename(char *path) {
+// Mutates the string and give the file-basename if exists
+void file_basename(char *path) {
   int path_len = strlen(path) - 1;
 
-  if (path_len == 1 || path_len == 0) return nullptr;
+  if (path_len == 1 || path_len == 0) return;
 
   bool contain_slash = false;
   for (int i = 0; i < path_len; i++) {
     if (path[i] == '/') { contain_slash = true; break; }
   }
 
-  if (!contain_slash) return path;
+  if (!contain_slash) return;
 
   // Filename shoundn't exceed 25 chars
   char buf[25];
@@ -38,21 +38,19 @@ char *file_basename(char *path) {
     buf[end] = tmp;
     end -= 1;
   }
-
-  printf("%s", buf);
-  return nullptr;
 }
 
-struct command_t {
+typedef struct {
   const char *name;
   const char *desc;
-};
+} Command;
 
-const command_t commands[] = {
+const Command commands[] = {
   {.name = "list", .desc = "List Drash'd files"},
   {.name = "remove", .desc = "Remove files from the Drash/can"},
   {.name = "empty", .desc = "Empty the Drash/can"},
   {.name = "restore", .desc = "Restore removed files"},
+  NULL
 };
 
 void print_command_options() {
@@ -60,7 +58,9 @@ void print_command_options() {
   uint8_t longest_name = 0;
 
   // Get the largest desc and name from the commands
-  for (command_t cmd : commands) {
+  for (int i = 0; commands[i].name != NULL; i++) {
+    const Command cmd = commands[i];
+
     uint8_t current_desc_len = strlen(cmd.desc);
     uint8_t current_name_len = strlen(cmd.name);
 
@@ -75,7 +75,8 @@ void print_command_options() {
   uint16_t buf_cursor = 0;
 
   // Fill the buffer
-  for (command_t cmd : commands) {
+  for (int i = 0; commands[i].name != NULL; i++) {
+    const Command cmd = commands[i];
     buf_cursor = 0;
 
     // Fill the buffer with whitespace
@@ -108,8 +109,8 @@ int main(int argc, char *argv[]) {
   argc -= 1;
 
   // @NOTE: shouldn't exceed more than 1000 bytes
-  auto buffer_allocator = bump_allocator(1000);
-  auto drash = Drash(buffer_allocator);
+  bump_allocator buffer_alloc = bump_alloc_new(1000);
+  Drash drash = make_drash(&buffer_alloc);
 
   // Handle option arguments
   if (argv[0][0] == '-') {
@@ -130,18 +131,19 @@ int main(int argc, char *argv[]) {
   }
 
   for (int i = 0; i < argc; i++) {
-    const char *arg = argv[i];
+    const char *path = argv[i];
+    const uint16_t path_len = strlen(path);
 
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
     {
       struct stat statbuf;
       int err = 0;
-      err = lstat(arg, &statbuf);
+      err = lstat(path, &statbuf);
 
       // If file not found
       if (err != 0 && errno == 2) {
-        fprintf(stderr, "file not found: %s\n", arg);
+        fprintf(stderr, "file not found: %s\n", path);
         continue;
       }
 
@@ -149,11 +151,11 @@ int main(int argc, char *argv[]) {
 
       // Remove symlink files
       if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-        assert(remove(arg) != 0, "failed to remove symlink-file");
-        printf("Removed symlink: %s\n", arg);
+        assert(remove(path) != 0, "failed to remove symlink-file");
+        printf("Removed symlink: %s\n", path);
       }
     }
   }
 
-  buffer_allocator.free();
+  bump_alloc_free(&buffer_alloc);
 }

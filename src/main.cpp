@@ -27,7 +27,8 @@ struct drash_t {
     }
 
     // Buffer to hold the drash directory path
-    char drash_dir[strlen(home_env) + strlen("/.local/share/Drash") + 1];
+    // Don't need to compute the home_env size because we know the max size of the string
+    char drash_dir[25 + strlen("/.local/share/Drash") + 1];
     sprintf(drash_dir, "%s/.local/share/Drash", home_env);
     int err = 0;
 

@@ -10,34 +10,55 @@
 
 #define VERSION "0.1.0"
 
-// Mutates the string and give the file-basename if exists
-void file_basename(char *path) {
+// Get the basename of the file or directory
+void basename(char *path) {
   int path_len = strlen(path) - 1;
+  const uint8_t max_filename_len = 50;
 
-  if (path_len == 1 || path_len == 0) return;
-
-  bool contain_slash = false;
-  for (int i = 0; i < path_len; i++) {
-    if (path[i] == '/') { contain_slash = true; break; }
+  if (path == NULL) return;
+  else if (path_len <= 0) return;
+  else if (path[path_len] == '/') {
+    path[path_len] = '\0';
+    basename(path);
   }
 
-  if (!contain_slash) return;
+  // Return if the string doesn't contain any forward-slashes
+  {
+    bool contain_slash = false;
+    for (int i = 0; i < path_len; i++) {
+      if (path[i] == '/') {
+        contain_slash = true;
+        break;
+      }
+    }
 
-  // Filename shoundn't exceed 25 chars
-  char buf[25];
+    if (!contain_slash) return;
+  }
+
+  int filename_len = 0;
+  for (int i = path_len; path[i] != '/'; i--) {
+    filename_len++;
+  }
+
+  if (filename_len > max_filename_len) return;
+
+  char buf[max_filename_len];
   int j = 0;
   for (int i = path_len; path[i] != '/'; i--) {
     buf[j] = path[i];
     j++;
   }
 
-  int end = strlen(buf) - 1;
+  int end = j - 1;
   for (int i = 0; i < end; i++) {
     char tmp = buf[i];
     buf[i] = buf[end]; 
     buf[end] = tmp;
     end -= 1;
   }
+
+  // Copy the buffer into the string
+  strcpy(path, buf);
 }
 
 typedef struct {
@@ -132,7 +153,6 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < argc; i++) {
     const char *path = argv[i];
-    const uint16_t path_len = strlen(path);
 
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file

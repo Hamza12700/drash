@@ -5,24 +5,38 @@
 #include <sys/stat.h>
 
 #include "./assert.c"
-#include "./bump_allocator.c"
-#include "./drash.c"
+#include "./bump_allocator.cpp"
+#include "./drash.cpp"
 
 #define VERSION "0.1.0"
+#define MAX_ARGLEN 300
+
+// Error enum for function: basename
+typedef enum {
+  // No Errors
+  OK = 0,
+
+  // Path is NULL
+  EMPTY = 1,
+
+  // Path is too long
+  TOO_LONG = 2,
+} BN_RET;
 
 // Get the basename of the file or directory
-void basename(char *path) {
+// Mutates the string
+BN_RET file_basename(char *path) {
   int path_len = strlen(path) - 1;
   const uint8_t max_filename_len = 50;
 
-  if (path == NULL) return;
-  else if (path_len <= 0) return;
-  else if (path[path_len] == '/') {
+  if (path == NULL) return EMPTY;
+  else if (path_len <= 0) return EMPTY;
+  else if (path[path_len] == '/') { // remove any trailing forward-slashs
     path[path_len] = '\0';
     basename(path);
   }
 
-  // Return if the string doesn't contain any forward-slashes
+  // Return if the string doesn't contain any forward-slashs
   {
     bool contain_slash = false;
     for (int i = 0; i < path_len; i++) {
@@ -32,7 +46,7 @@ void basename(char *path) {
       }
     }
 
-    if (!contain_slash) return;
+    if (!contain_slash) return OK;
   }
 
   int filename_len = 0;
@@ -40,9 +54,11 @@ void basename(char *path) {
     filename_len++;
   }
 
-  if (filename_len > max_filename_len) return;
+  if (filename_len > max_filename_len) return TOO_LONG;
 
   char buf[max_filename_len];
+  memset(buf, 0, max_filename_len);
+
   int j = 0;
   for (int i = path_len; path[i] != '/'; i--) {
     buf[j] = path[i];
@@ -59,6 +75,7 @@ void basename(char *path) {
 
   // Copy the buffer into the string
   strcpy(path, buf);
+  return OK;
 }
 
 typedef struct {
@@ -130,8 +147,8 @@ int main(int argc, char *argv[]) {
   argc -= 1;
 
   // @NOTE: shouldn't exceed more than 1000 bytes
-  bump_allocator buffer_alloc = bump_alloc_new(1000);
-  Drash drash = make_drash(&buffer_alloc);
+  auto buffer_alloc = bump_allocator(1000);
+  auto drash = Drash(buffer_alloc);
 
   // Handle option arguments
   if (argv[0][0] == '-') {
@@ -153,6 +170,7 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < argc; i++) {
     const char *path = argv[i];
+    const uint16_t path_len = strlen(path);
 
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
@@ -175,7 +193,25 @@ int main(int argc, char *argv[]) {
         printf("Removed symlink: %s\n", path);
       }
     }
+
+    if (path_len > MAX_ARGLEN) {
+      fprintf(stderr, "path is too long: %d", path_len);
+      fprintf(stderr, "max length is %d", MAX_ARGLEN);
+      continue;
+    }
+
+    // Copy the path argument in this buffer and pass it to basename to get the filename.
+    // Because basename muteates the string that's why it needs to copy the path argument in this buffer.
+    char filename[MAX_ARGLEN] = {0};
+
+    strcpy(filename, path);
+
+    // Get the filename
+    BN_RET bn_err = OK;
+    bn_err = file_basename(filename);
+    if (bn_err == TOO_LONG) fprintf(stderr, "basename failed because path is too long\n");
+    else if (bn_err == EMPTY) fprintf(stderr, "basename: empty path: %s\n", path);
   }
 
-  bump_alloc_free(&buffer_alloc);
+  buffer_alloc.free();
 }

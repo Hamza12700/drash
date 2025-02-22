@@ -22,7 +22,11 @@ struct bump_allocator {
 
   void *alloc(uint16_t bytes) {
     assert((size + bytes) > capacity, "bump allocator capacity full");
-    void *memory = (char *)buffer + bytes;
+    void *memory = {0};
+
+    if (size == 0) memory = buffer;
+    else memory = (char *)buffer + bytes;
+
     size += bytes;
     return memory;
   }

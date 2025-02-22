@@ -34,14 +34,14 @@ struct Drash {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
-    files = (char *)buffer_alloc.alloc(sizeof(files) + strlen(drash_dir) + strlen("/files") + 1);
+    files = (char *)buffer_alloc.alloc(sizeof(files) + strlen(drash_dir) + strlen("/files"));
     sprintf(files, "%s/files", drash_dir);
     err = mkdir(files, 0700);
     if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
-    metadata = (char *)buffer_alloc.alloc(sizeof(metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
+    metadata = (char *)buffer_alloc.alloc(sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
     sprintf(metadata, "%s/metadata", drash_dir);
     err = mkdir(metadata, 0700);
     if (errno != EEXIST) {

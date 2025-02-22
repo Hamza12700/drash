@@ -11,7 +11,7 @@ struct Drash {
 
   Drash(bump_allocator &buffer_alloc) {
     const char *home_env = getenv("HOME");
-    assert(home_env == NULL, "failed to get HOME environment variable");
+    assert_err(home_env == NULL, "failed to get HOME environment variable");
 
     // HOME environment variable grater than 25 chars seems odd or rather malformed/malicious
     if (strlen(home_env) > 25) {
@@ -31,21 +31,21 @@ struct Drash {
 
     // Skip the error check if the directory already exists
     if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
+      assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
     files = (char *)buffer_alloc.alloc(sizeof(files) + strlen(drash_dir) + strlen("/files") + 1);
     sprintf(files, "%s/files", drash_dir);
     err = mkdir(files, 0700);
     if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
+      assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
     metadata = (char *)buffer_alloc.alloc(sizeof(metadata) + strlen(drash_dir) + strlen("/metadata") + 1);
     sprintf(metadata, "%s/metadata", drash_dir);
     err = mkdir(metadata, 0700);
     if (errno != EEXIST) {
-      assert(err != 0, "mkdir failed to creaet drash directory");
+      assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
   }
 };

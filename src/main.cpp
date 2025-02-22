@@ -13,14 +13,10 @@
 
 // Error enum for function: basename
 typedef enum {
-  // No Errors
   OK = 0,
 
-  // Path is NULL
-  EMPTY = 1,
-
-  // Path is too long
-  TOO_LONG = 2,
+  EMPTY = 1,    // Path is NULL
+  TOO_LONG = 2, // Path is too long
 } BN_RET;
 
 // Get the basename of the file or directory
@@ -185,11 +181,11 @@ int main(int argc, char *argv[]) {
         continue;
       }
 
-      assert(err != 0, "lstat failed");
+      assert_err(err != 0, "lstat failed");
 
       // Remove symlink files
       if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-        assert(remove(path) != 0, "failed to remove symlink-file");
+        assert_err(remove(path) != 0, "failed to remove symlink-file");
         printf("Removed symlink: %s\n", path);
       }
     }

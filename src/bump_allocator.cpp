@@ -13,7 +13,7 @@ struct bump_allocator {
 
   bump_allocator(uint16_t bytes) {
     void *memory = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    assert(memory == MAP_FAILED, "mmap failed");
+    assert_err(memory == MAP_FAILED, "mmap failed");
 
     capacity = bytes;
     size = 0;
@@ -28,7 +28,7 @@ struct bump_allocator {
   }
 
   void free() {
-    assert(munmap(buffer, capacity) != 0, "munmap failed");
+    assert_err(munmap(buffer, capacity) != 0, "munmap failed");
     size = 0;
     capacity = 0;
     buffer = nullptr;

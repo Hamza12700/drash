@@ -31,6 +31,12 @@ struct bump_allocator {
     return memory;
   }
 
+  // Set the entire buffer to zero with MEMSET
+  void reset() {
+    memset(buffer, 0, size);
+    size = 0;
+  }
+
   void free() {
     assert_err(munmap(buffer, capacity) != 0, "munmap failed");
     size = 0;

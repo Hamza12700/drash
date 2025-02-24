@@ -108,11 +108,11 @@ struct Option {
 
   // Compare a string with an option->name
   bool cmp(const char *str) const {
-    char lbuf[10];
-    char sbuf[5];
+    char lbuf[10] = {0};
+    char sbuf[5] = {0};
 
     int x = 0;
-    for (int i = 0; i < strlen(name) - 1; i++) {
+    for (size_t i = 0; i < strlen(name) - 1; i++) {
       const char name_char = name[i];
 
       if (name_char != '|') {
@@ -248,6 +248,7 @@ int main(int argc, char *argv[]) {
         }
 
         case Force: {
+          // Skip the current argument
           for (int i = 1; i < argc; i++) {
             const char *file = argv[i];
             assert_err(remove(file) != 0, "failed to remove file");

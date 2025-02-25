@@ -22,8 +22,8 @@ typedef enum {
 // Get the basename of the file or directory
 // Mutates the string
 BN_RET file_basename(char *path) {
-  uint16_t path_len = strlen(path) - 1;
-  const uint8_t max_filename_len = 50;
+  const int path_len = strlen(path) - 1;
+  const int max_filename_len = 50;
 
   if (path == NULL) return EMPTY;
   else if (path_len <= 0) return EMPTY;
@@ -136,13 +136,13 @@ const Option options[] = {
 };
 
 void print_help() {
-  uint8_t longest_desc = 0;
-  uint8_t longest_name = 0;
+  int longest_desc = 0;
+  int longest_name = 0;
 
   // Get the largest desc and name from the commands
   for (auto cmd : commands) {
-    uint8_t current_desc_len = strlen(cmd.desc);
-    uint8_t current_name_len = strlen(cmd.name);
+    int current_desc_len = strlen(cmd.desc);
+    int current_name_len = strlen(cmd.name);
 
     if (current_desc_len > longest_desc) { longest_desc = current_desc_len; }
     if (current_name_len > longest_name) { longest_name = current_name_len; }
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    const uint16_t path_len = strlen(arg) - 1;
+    const int path_len = strlen(arg) - 1;
 
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file

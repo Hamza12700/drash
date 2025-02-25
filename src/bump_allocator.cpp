@@ -1,17 +1,16 @@
 #ifndef BUMP_ALLOC_H
 #define BUMP_ALLOC_H
 
-#include <stdint.h>
 #include <sys/mman.h>
 
 #include "./assert.c"
 
 struct bump_allocator {
-  uint16_t capacity;
-  uint16_t size;
+  size_t capacity;
+  size_t size;
   void *buffer;
 
-  bump_allocator(uint16_t bytes) {
+  bump_allocator(size_t bytes) {
     void *memory = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     assert_err(memory == MAP_FAILED, "mmap failed");
 
@@ -20,7 +19,7 @@ struct bump_allocator {
     buffer = memory;
   }
 
-  void *alloc(uint16_t bytes) {
+  void *alloc(size_t bytes) {
     assert((size + bytes) > capacity, "bump allocator capacity full");
     void *memory = {0};
 

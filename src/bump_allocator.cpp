@@ -19,6 +19,13 @@ struct bump_allocator {
     buffer = memory;
   }
 
+  ~bump_allocator() {
+    assert_err(munmap(buffer, capacity) != 0, "munmap failed");
+    size = 0;
+    capacity = 0;
+    buffer = nullptr;
+  }
+
   void *alloc(size_t bytes) {
     assert((size + bytes) > capacity, "bump allocator capacity full");
     void *memory = {0};

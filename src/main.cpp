@@ -248,11 +248,17 @@ int main(int argc, char *argv[]) {
         }
 
         case Force: {
+          if (argc == 1) {
+            fprintf(stderr, "Missing argument file(s)\n");
+            return -1;
+          }
+
           // Skip the current argument
           for (int i = 1; i < argc; i++) {
             const char *file = argv[i];
             assert_err(remove(file) != 0, "failed to remove file");
           }
+
           return 0;
         }
       }
@@ -345,7 +351,4 @@ int main(int argc, char *argv[]) {
     fclose(file_metadata);
     scratch_alloc.reset();
   }
-
-  scratch_alloc.free();
-  buffer_alloc.free();
 }

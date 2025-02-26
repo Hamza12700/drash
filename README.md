@@ -1,18 +1,11 @@
 # Drash
 
-Drash is a nifty Command-Line Interface application which is a better
-alternative to the Linux `rm` command. It records the original path of the
-removed file, and puts it into a directory, making it easy to recovery
-them later if you accidentally deleted the wrong file.
+A simple Command-Line Interface app, a better alternative to the Linux `rm`
+command. It keeps track of the original file-path of the removed file, and puts
+it into a directory, making it easy to recovery them later if you accidentally
+deleted the wrong file.
 
 This same functionality is used by KDE, GNOME, and XFCE [freedesktop-trashcan](https://www.freedesktop.org/wiki/Specifications/trash-spec/).
-
-## Why?
-
-I was inspired by [trash-cli](https://github.com/andreafrancia/trash-cli), but
-I wanted to create something with more features that I would use. Drash aims to
-enhance the *trash-cli* experience with additional features like file searching
-and advance recovery capabilities.
 
 ## Installation:
 
@@ -21,10 +14,12 @@ Clone the repo into your local machine:
 git clone https://github.com/hamza12700/drash
 ```
 
-Use [Cargo](https://doc.rust-lang.org/cargo/) to build and install the binary.
+There's only two dependencies: `g++` and `make`:
 ```bsah
 cd drash
-cargo install --path .
+
+# 'opt' for release build
+make opt
 ```
 
 ## Usage
@@ -38,12 +33,7 @@ drash foo
 
 Pass `--force/-f` flag to delete a file permanently:
 ```
-drash foo -f
-```
-
-Pass no arguments and options to remove multiple files in current directory:
-```
-drash
+drash -f foo
 ```
 
 ### SubCommands
@@ -88,11 +78,3 @@ Pass `--yes/-y` pass to not show the confirm prompt:
 ```
 drash empty -y
 ```
-
-## Bugs
-
-If you discover any bugs please report them [here](https://github.com/Hamza12700/drash/issues/).
-
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.

@@ -244,9 +244,8 @@ int main(int argc, char *argv[]) {
   if (argv[0][0] == '-') {
     char *arg = argv[0];
 
-    // Remove the leading '-'
-    // @Incomplete: Check for double '--'
     arg++;
+    if (arg[0] == '-') arg++;
 
     for (const auto opt : options) {
       if (!opt.cmp(arg)) {

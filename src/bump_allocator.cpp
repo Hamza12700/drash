@@ -10,24 +10,24 @@ struct bump_allocator {
   size_t size;
   void *buffer;
 
-  bump_allocator(size_t bytes) {
-    void *memory = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    assert_err(memory == MAP_FAILED, "mmap failed");
+  bump_allocator sub_allocator(size_t total_size) {
+    assert(total_size + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
+    void *memory = {0};
 
-    capacity = bytes;
-    size = 0;
-    buffer = memory;
-  }
+    if (size == 0) memory = buffer;
+    else memory = (char *)buffer + total_size;
 
-  ~bump_allocator() {
-    assert_err(munmap(buffer, capacity) != 0, "munmap failed");
-    size = 0;
-    capacity = 0;
-    buffer = nullptr;
+    size += total_size;
+
+    return bump_allocator {
+      .capacity = total_size,
+      .size = 0,
+      .buffer = memory,
+    };
   }
 
   void *alloc(size_t bytes) {
-    assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity full");
+    assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity is full");
     void *memory = {0};
 
     if (size == 0) memory = buffer;
@@ -48,8 +48,19 @@ struct bump_allocator {
     assert_err(munmap(buffer, capacity) != 0, "munmap failed");
     size = 0;
     capacity = 0;
-    buffer = nullptr;
+    buffer = NULL;
   }
 };
+
+bump_allocator new_bump_allocator(size_t capacity) {
+  void *memory = mmap(NULL, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  assert_err(memory == MAP_FAILED, "mmap failed");
+
+  return bump_allocator {
+    .capacity = capacity,
+    .size = 0,
+    .buffer = memory
+  };
+}
 
 #endif /* ifndef BUMP_ALLOC_H */

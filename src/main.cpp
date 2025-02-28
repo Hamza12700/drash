@@ -12,7 +12,7 @@
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
 
-auto buffer_alloc = bump_allocator(1000);
+auto buffer_alloc = new_bump_allocator(getpagesize());
 auto drash = Drash(buffer_alloc);
 
 // Error enum for 'file_basename' function
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
 
   // @Optimize: Add the ability to get an allocator from the bump_allocator struct.
   // This is way we can have multiple allocators without any allocations.
-  auto scratch_alloc = bump_allocator(500);
+  auto scratch_alloc = buffer_alloc.sub_allocator(500);
 
   const char *current_dir = getenv("PWD");
   assert(current_dir == NULL, "PWD envirnoment not found");
@@ -414,4 +414,6 @@ int main(int argc, char *argv[]) {
     fclose(file_metadata);
     scratch_alloc.reset();
   }
+
+  buffer_alloc.free();
 }

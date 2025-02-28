@@ -27,7 +27,7 @@ struct bump_allocator {
   }
 
   void *alloc(size_t bytes) {
-    assert((size + bytes) > capacity, "bump allocator capacity full");
+    assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity full");
     void *memory = {0};
 
     if (size == 0) memory = buffer;
@@ -39,6 +39,7 @@ struct bump_allocator {
 
   // Set the entire buffer to zero with MEMSET
   void reset() {
+    // @NOTE: Is memset necessary or just setting the size to 0 is good enough?
     memset(buffer, 0, size);
     size = 0;
   }

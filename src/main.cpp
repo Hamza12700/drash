@@ -1,8 +1,9 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 #include <sys/stat.h>
+#include <ftw.h>
+#include <dirent.h>
+#include <unistd.h>
 
 #include "./assert.c"
 #include "./bump_allocator.cpp"
@@ -11,7 +12,10 @@
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
 
-// Error enum for function: basename
+auto buffer_alloc = bump_allocator(1000);
+auto drash = Drash(buffer_alloc);
+
+// Error enum for 'file_basename' function
 typedef enum {
   OK = 0,
 
@@ -33,17 +37,15 @@ BN_RET file_basename(char *path) {
   }
 
   // Return if the string doesn't contain any forward-slashs
-  {
-    bool contain_slash = false;
-    for (int i = 0; i < path_len; i++) {
-      if (path[i] == '/') {
-        contain_slash = true;
-        break;
-      }
+  bool contain_slash = false;
+  for (int i = 0; i < path_len; i++) {
+    if (path[i] == '/') {
+      contain_slash = true;
+      break;
     }
-
-    if (!contain_slash) return OK;
   }
+
+  if (!contain_slash) return OK;
 
   int filename_len = 0;
   for (int i = path_len; path[i] != '/'; i--) {
@@ -152,11 +154,11 @@ void print_help() {
   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
   printf("\nCommands:\n");
 
-  uint16_t total_size = longest_name + longest_desc + 30;
+  int total_size = longest_name + longest_desc + 30;
 
   {
     char buffer[total_size];
-    uint16_t cursor = 0;
+    int cursor = 0;
 
     for (const auto cmd : commands) {
       cursor = 0;
@@ -209,6 +211,24 @@ void print_help() {
   }
 }
 
+// Recursively remove files and directories by using nftw
+int recursive_remove(const char *fpath, const struct stat *, int typeflag, struct FTW *) {
+  switch (typeflag) {
+    case FTW_DP: {
+      // @Optimize: Is there a better way of checking if the directory is the root directory?
+      if (strcmp(fpath, drash.files) == 0) return 0;
+      else if (strcmp(fpath, drash.metadata) == 0) return 0;
+
+      assert_err(rmdir(fpath) != 0, "failed to remove directory");
+      break;
+    }
+
+    case FTW_F: assert_err(unlink(fpath) != 0, "failed to remove file"); break;
+  }
+
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   if (argc == 1) {
     fprintf(stderr, "Missing argument file(s)\n");
@@ -219,9 +239,6 @@ int main(int argc, char *argv[]) {
   argv++;
   argc -= 1;
 
-  // @NOTE: shouldn't exceed more than 1000 bytes
-  auto buffer_alloc = bump_allocator(1000);
-  auto drash = Drash(buffer_alloc);
 
   // Handle option arguments
   if (argv[0][0] == '-') {
@@ -272,6 +289,9 @@ int main(int argc, char *argv[]) {
   // This is way we can have multiple allocators without any allocations.
   auto scratch_alloc = bump_allocator(500);
 
+  const char *current_dir = getenv("PWD");
+  assert(current_dir == NULL, "PWD envirnoment not found");
+
   for (int i = 0; i < argc; i++) {
     const char *arg = argv[i];
 
@@ -282,14 +302,36 @@ int main(int argc, char *argv[]) {
             printf("TODO: LIST");
             return 0;
           }
+
           case Restore: {
             printf("TODO: Restore");
             return 0;
           }
+
           case Empty: {
-            printf("TODO: Empty");
+            DIR *metadata_dir = opendir(drash.metadata);
+            assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
+
+            struct dirent *dir_stat;
+            int count = 0;
+
+            while ((dir_stat = readdir(metadata_dir)) != NULL) {
+              count++; 
+            }
+
+            if (count <= 2) {
+              printf("Drashcan is already empty\n");
+              closedir(metadata_dir);
+              return 0;
+            }
+
+            nftw(drash.files, recursive_remove, 8, FTW_DEPTH|FTW_MOUNT|FTW_PHYS);
+            nftw(drash.metadata, recursive_remove, 0, FTW_DEPTH|FTW_MOUNT|FTW_PHYS);
+
+            closedir(metadata_dir);
             return 0;
           }
+
           case Remove: {
             printf("TODO: Remove");
             return 0;
@@ -298,30 +340,27 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    const int path_len = strlen(arg) - 1;
-
     // Check for symlink files and delete if found
     // If file doesn't exist then report the error and continue to next file
-    {
-      struct stat statbuf;
-      int err = 0;
-      err = lstat(arg, &statbuf);
+    struct stat statbuf;
+    int err = 0;
+    err = lstat(arg, &statbuf);
 
-      // If file not found
-      if (err != 0 && errno == 2) {
-        fprintf(stderr, "file not found: %s\n", arg);
-        continue;
-      }
-
-      assert_err(err != 0, "lstat failed");
-
-      // Remove symlink files
-      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-        assert_err(remove(arg) != 0, "failed to remove symlink-file");
-        printf("Removed symlink: %s\n", arg);
-      }
+    // If file not found
+    if (err != 0 && errno == 2) {
+      fprintf(stderr, "file not found: %s\n", arg);
+      continue;
     }
 
+    assert_err(err != 0, "lstat failed");
+
+    // Remove symlink files
+    if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+      assert_err(remove(arg) != 0, "failed to remove symlink-file");
+      printf("Removed symlink: %s\n", arg);
+    }
+
+    const int path_len = strlen(arg) - 1;
     if (path_len > MAX_ARGLEN) {
       fprintf(stderr, "path is too long: %d", path_len);
       fprintf(stderr, "max length is %d", MAX_ARGLEN);
@@ -342,11 +381,36 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    char *file_metadata_path = (char *)scratch_alloc.alloc(sizeof(file_metadata_path) + strlen(filename) + strlen(drash.metadata));
+    char *file_metadata_path = (char *)scratch_alloc.alloc(sizeof(char *) + strlen(filename) + strlen(drash.metadata));
     sprintf(file_metadata_path, "%s/%s.info", drash.metadata, filename);
 
-    FILE *file_metadata = fopen(file_metadata_path, "a");
+    err = lstat(file_metadata_path, &statbuf);
+    bool file_exists = true;
+
+    if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+      fprintf(stderr, "Error: metadata file is a symlink-file\n");
+      continue;
+    }
+
+    if (err != 0 && errno == 2) file_exists = false;
+
+    if (file_exists) {
+      fprintf(stderr, "Error: file '%s' already exists in the drashcan\n", arg);
+      fprintf(stderr, "Can't overwrite it\n");
+      continue;
+    }
+
+    FILE *file_metadata = fopen(file_metadata_path, "w");
     assert_err(file_metadata == NULL, "fopen failed");
+
+    char *absolute_path = (char *)scratch_alloc.alloc(sizeof(char *) + strlen(current_dir) + strlen(filename));
+    sprintf(absolute_path, "%s/%s", current_dir, filename);
+    fprintf(file_metadata, "Path: %s", absolute_path);
+
+    char *drashd_file = (char *)scratch_alloc.alloc(sizeof(char *) + path_len);
+    sprintf(drashd_file, "%s/%s", drash.files, filename);
+
+    assert_err(rename(arg, drashd_file) != 0, "failed to renamae file to new location");
 
     fclose(file_metadata);
     scratch_alloc.reset();

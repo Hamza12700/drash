@@ -10,19 +10,26 @@ struct bump_allocator {
   size_t size;
   void *buffer;
 
+  // @NOTE:
+  //
+  // For sub-allocators add a check for if something tried to overwrite some
+  // part of the memory owned by a sub-allocator. Because the sub-allocator is
+  // allocated at the end of the memory region, storing the pointer/idx for the
+  // sub-allocator in some kind-of array and upon new allocation checking if the
+  // requested bytes overlap by doing pointer arithmetic.
+  //
+  // -Hamza, Feb 2025
+  //
   bump_allocator sub_allocator(size_t total_size) {
     assert(total_size + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
-    void *memory = {0};
 
-    if (size == 0) memory = buffer;
-    else memory = (char *)buffer + total_size;
-
-    size += total_size;
+    int idx = capacity - total_size;
+    capacity -= total_size;
 
     return bump_allocator {
       .capacity = total_size,
       .size = 0,
-      .buffer = memory,
+      .buffer = (char *)buffer + idx
     };
   }
 

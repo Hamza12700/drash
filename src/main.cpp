@@ -272,7 +272,8 @@ int main(int argc, char *argv[]) {
           // Skip the current argument
           for (int i = 1; i < argc; i++) {
             const char *file = argv[i];
-            assert_err(remove(file) != 0, "failed to remove file");
+            // @Optimize: 'recursive_remove' checks for drash specfic directoies which is not needed here
+            assert_err(nftw(file, recursive_remove, FTW_DEPTH|FTW_MOUNT|FTW_PHYS, 10), "nftw failed");
           }
 
           return 0;

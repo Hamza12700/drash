@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -12,8 +13,31 @@
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
 
-auto buffer_alloc = new_bump_allocator(getpagesize());
-auto drash = Drash(buffer_alloc);
+auto root_allocator = new_bump_allocator(getpagesize());
+auto drash = Drash(root_allocator);
+
+template<const size_t N>
+struct Static_Array {
+  char elm[N] = {0};
+  const size_t capacity = N;
+
+  size_t len() const {
+    size_t count = 0;
+    while (elm[count] != '\0') count++;
+
+    return count;
+  }
+
+  char& operator[] (size_t idx) {
+    if (idx > capacity) {
+      fprintf(stderr, "attempted to index into position '%zu' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%zu'.\n", capacity);
+      raise(SIGTRAP);
+    }
+
+    return elm[idx];
+  }
+};
 
 // Error enum for 'file_basename' function
 typedef enum {
@@ -53,9 +77,7 @@ BN_RET file_basename(char *path) {
   }
 
   if (filename_len > max_filename_len) return TOO_LONG;
-
-  char buf[max_filename_len];
-  memset(buf, 0, max_filename_len);
+  Static_Array<max_filename_len> buf;
 
   int j = 0;
   for (int i = path_len; path[i] != '/'; i--) {
@@ -71,7 +93,7 @@ BN_RET file_basename(char *path) {
     end -= 1;
   }
 
-  strcpy(path, buf);
+  strcpy(path, buf.elm);
   return OK;
 }
 
@@ -138,76 +160,44 @@ const Option options[] = {
 };
 
 void print_help() {
-  int longest_desc = 0;
-  int longest_name = 0;
+  Static_Array<100 + 30> buffer;
 
-  // Get the largest desc and name from the commands
-  for (auto cmd : commands) {
-    int current_desc_len = strlen(cmd.desc);
-    int current_name_len = strlen(cmd.name);
-
-    if (current_desc_len > longest_desc) { longest_desc = current_desc_len; }
-    if (current_name_len > longest_name) { longest_name = current_name_len; }
-  }
-
-  // Print commands
   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
   printf("\nCommands:\n");
 
-  int total_size = longest_name + longest_desc + 30;
+  int cursor = 0;
+  for (const auto cmd : commands) {
+    cursor = 0;
 
-  {
-    char buffer[total_size];
-    int cursor = 0;
+    // Fill the buffer with whitespace
+    for (size_t i = 0; i < buffer.capacity; i++) { buffer[i] = ' '; }
 
-    for (const auto cmd : commands) {
-      cursor = 0;
+    // Write the command name in the buffer
+    for (size_t x = 0; x < strlen(cmd.name); x++) { buffer[x+3] = cmd.name[x]; }
+    cursor = strlen(cmd.name) + 3;
 
-      // Fill the buffer with whitespace
-      for (int j = 0; j < total_size; j++) { buffer[j] = ' '; }
+    // Insert a semicolon after the command name
+    buffer[cursor] = ':';
 
-      // Write the command name in the buffer
-      for (size_t x = 0; x < strlen(cmd.name); x++) { buffer[x+3] = cmd.name[x]; }
-      cursor = strlen(cmd.name) + 3;
+    // Write the command description in the buffer
+    for (size_t x = 0; x < strlen(cmd.desc); x++) { buffer[x+10+6] = cmd.desc[x]; }
 
-      // Insert a semicolon after the command name
-      buffer[cursor] = ':';
-
-      // Write the command description in the buffer
-      for (size_t x = 0; x < strlen(cmd.desc); x++) { buffer[x+longest_name+6] = cmd.desc[x]; }
-
-      // @NOTE: Because the buffer isn't null-terminated; only print the
-      // buffer by its total_size.
-      printf("%.*s\n", total_size, buffer);
-    }
+    printf("%s\n", buffer.elm);
   }
 
   printf("\nOptions:\n");
 
-  // Get the longest desc and name for the options commands
-  for (auto opt : options) {
-    // NOTE: Don't need to compute the short name because it should be longer than 2 characters
-    int current_name_len = strlen(opt.name);
-    int current_desc_len = strlen(opt.desc);
- 
-    if (current_desc_len > longest_desc) { longest_desc = current_desc_len; }
-    if (current_name_len > longest_name) { longest_name = current_name_len; }
-  }
-
-  total_size = longest_name + longest_desc + 20;
-  char buffer[total_size];
-
   for (const auto opt : options) {
     // Fill the buffer with whitespace
-    for (int i = 0; i < total_size; i++) { buffer[i] = ' '; }
+    for (size_t i = 0; i < buffer.capacity; i++) { buffer[i] = ' '; }
 
     // Write the option in the buffer
     for (size_t i = 0; i < strlen(opt.name); i++) { buffer[i+3] = opt.name[i]; }
 
     // Write the option description in the buffer
-    for (size_t i = 0; i < strlen(opt.desc); i++) { buffer[i+longest_name+6] = opt.desc[i]; }
+    for (size_t i = 0; i < strlen(opt.desc); i++) { buffer[i+10+6] = opt.desc[i]; }
 
-    printf("%.*s\n", total_size, buffer);
+    printf("%s\n", buffer.elm);
   }
 }
 
@@ -285,9 +275,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  // @Optimize: Add the ability to get an allocator from the bump_allocator struct.
-  // This is way we can have multiple allocators without any allocations.
-  auto scratch_alloc = buffer_alloc.sub_allocator(500);
+  auto scratch_alloc = root_allocator.sub_allocator(500);
 
   const char *current_dir = getenv("PWD");
   assert(current_dir == NULL, "PWD envirnoment not found");
@@ -416,5 +404,5 @@ int main(int argc, char *argv[]) {
     scratch_alloc.reset();
   }
 
-  buffer_alloc.free();
+  root_allocator.free();
 }

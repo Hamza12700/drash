@@ -237,6 +237,9 @@ int main(int argc, char *argv[]) {
     arg++;
     if (arg[0] == '-') arg++;
 
+    // @NOTE: Check files/directories if they exists so that way I don't have to
+    // do error checking in every case for the command line option.
+
     for (const auto opt : options) {
       if (!opt.cmp(arg)) {
         continue;
@@ -261,9 +264,13 @@ int main(int argc, char *argv[]) {
 
           // Skip the current argument
           for (int i = 1; i < argc; i++) {
-            const char *file = argv[i];
-            // @Optimize: 'recursive_remove' checks for drash specfic directoies which is not needed here
-            assert_err(nftw(file, recursive_remove, FTW_DEPTH|FTW_MOUNT|FTW_PHYS, 10), "nftw failed");
+            const char *path = argv[i];
+
+            // @Incomplete: Implement a function that will delete files and directories recursively
+            auto string = Dynamic_String(root_allocator, strlen(path) + 10);
+            sprintf(string.buf, "rm -rf %s", path);
+
+            assert_err(system(string.buf) != 0, "system command failed");
           }
 
           return 0;

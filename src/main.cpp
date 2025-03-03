@@ -1,3 +1,4 @@
+#include <alloca.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,12 +31,62 @@ struct Static_Array {
 
   char& operator[] (size_t idx) {
     if (idx > capacity) {
-      fprintf(stderr, "attempted to index into position '%zu' which is out of bounds.\n", idx);
+      fprintf(stderr, "array - attempted to index into position '%zu' which is out of bounds.\n", idx);
       fprintf(stderr, "max size is '%zu'.\n", capacity);
       raise(SIGTRAP);
     }
 
     return elm[idx];
+  }
+};
+
+struct Static_String {
+  char *buf;
+  size_t len;
+
+  Static_String(const char *string) {
+    size_t str_len = strlen(string);
+    buf = (char *)alloca(str_len + 1);
+    len = str_len;
+
+    memcpy(buf, string, len + 1);
+  }
+
+  char& operator[] (size_t idx) {
+    if (idx > len) {
+      fprintf(stderr, "string - attempted to index into position '%zu' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%zu'.\n", len);
+      raise(SIGTRAP);
+    }
+
+    return buf[idx];
+  }
+};
+
+struct Dynamic_String {
+  char *buf;
+  size_t capacity;
+
+  Dynamic_String(bump_allocator &allocator, const size_t size) {
+    buf = (char *)allocator.alloc(size);
+    capacity = size;
+  }
+
+  size_t len() const {
+    int count = 0;
+
+    while (buf[count] != '\0') count++;
+    return count;
+  }
+
+  char& operator[] (size_t idx) {
+    if (idx > capacity) {
+      fprintf(stderr, "dynamic-string - attempted to index into position '%zu' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%zu'.\n", capacity);
+      raise(SIGTRAP);
+    }
+
+    return buf[idx];
   }
 };
 
@@ -49,20 +100,14 @@ typedef enum {
 
 // Get the basename of the file or directory
 // Mutates the string
-BN_RET file_basename(char *path) {
-  const int path_len = strlen(path) - 1;
+BN_RET file_basename(Dynamic_String path) {
   const int max_filename_len = 50;
 
-  if (path == NULL) return EMPTY;
-  else if (path_len <= 0) return EMPTY;
-  else if (path[path_len] == '/') { // remove any trailing forward-slashs
-    path[path_len] = '\0';
-    basename(path);
-  }
+  if (path.len() <= 0) return EMPTY;
 
   // Return if the string doesn't contain any forward-slashs
   bool contain_slash = false;
-  for (int i = 0; i < path_len; i++) {
+  for (size_t i = 0; i < path.len(); i++) {
     if (path[i] == '/') {
       contain_slash = true;
       break;
@@ -72,7 +117,7 @@ BN_RET file_basename(char *path) {
   if (!contain_slash) return OK;
 
   int filename_len = 0;
-  for (int i = path_len; path[i] != '/'; i--) {
+  for (int i = path.len(); path[i] != '/'; i--) {
     filename_len++;
   }
 
@@ -80,7 +125,7 @@ BN_RET file_basename(char *path) {
   Static_Array<max_filename_len> buf;
 
   int j = 0;
-  for (int i = path_len; path[i] != '/'; i--) {
+  for (int i = path.len(); path[i] != '/'; i--) {
     buf[j] = path[i];
     j++;
   }
@@ -93,7 +138,7 @@ BN_RET file_basename(char *path) {
     end -= 1;
   }
 
-  strcpy(path, buf.elm);
+  strcpy(path.buf, buf.elm);
   return OK;
 }
 
@@ -362,8 +407,8 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    char *filename = (char *)scratch_alloc.alloc(path_len);
-    strcpy(filename, arg);
+    auto filename = Dynamic_String(scratch_alloc, path_len + 1);
+    strcpy(filename.buf, arg);
 
     // Get the filename
     BN_RET bn_err = OK;
@@ -376,8 +421,8 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    char *file_metadata_path = (char *)scratch_alloc.alloc(sizeof(char *) + strlen(filename) + strlen(drash.metadata));
-    sprintf(file_metadata_path, "%s/%s.info", drash.metadata, filename);
+    char *file_metadata_path = (char *)scratch_alloc.alloc(filename.capacity + strlen(drash.metadata) + 1);
+    sprintf(file_metadata_path, "%s/%s.info", drash.metadata, filename.buf);
 
     err = lstat(file_metadata_path, &statbuf);
     bool file_exists = true;
@@ -398,12 +443,12 @@ int main(int argc, char *argv[]) {
     FILE *file_metadata = fopen(file_metadata_path, "w");
     assert_err(file_metadata == NULL, "fopen failed");
 
-    char *absolute_path = (char *)scratch_alloc.alloc(sizeof(char *) + strlen(current_dir) + strlen(filename));
-    sprintf(absolute_path, "%s/%s", current_dir, filename);
+    char *absolute_path = (char *)scratch_alloc.alloc(strlen(current_dir) + filename.capacity + 1);
+    sprintf(absolute_path, "%s/%s", current_dir, filename.buf);
     fprintf(file_metadata, "Path: %s", absolute_path);
 
     char *drashd_file = (char *)scratch_alloc.alloc(sizeof(char *) + path_len);
-    sprintf(drashd_file, "%s/%s", drash.files, filename);
+    sprintf(drashd_file, "%s/%s", drash.files, filename.buf);
 
     assert_err(rename(arg, drashd_file) != 0, "failed to renamae file to new location");
 

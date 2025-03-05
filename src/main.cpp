@@ -7,9 +7,9 @@
 #include <dirent.h>
 #include <unistd.h>
 
-#include "./assert.c"
-#include "./bump_allocator.cpp"
-#include "./drash.cpp"
+#include "assert.c"
+#include "bump_allocator.cpp"
+#include "drash.cpp"
 
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
@@ -67,7 +67,7 @@ struct Dynamic_String {
   char *buf;
   size_t capacity;
 
-  Dynamic_String(bump_allocator &allocator, const size_t size) {
+  Dynamic_String(Bump_Allocator &allocator, const size_t size) {
     buf = (char *)allocator.alloc(size);
     capacity = size;
   }
@@ -311,11 +311,20 @@ int main(int argc, char *argv[]) {
           for (int i = 1; i < argc; i++) {
             const char *path = argv[i];
 
+            struct stat sb;
+            assert_err(lstat(path, &sb) != 0, "lstat failed");
+
+            if ((sb.st_mode & S_IFMT) == S_IFREG) {
+              assert_err(unlink(path) != 0, "failed to remove file");
+              continue;
+            }
+
             // @Incomplete: Implement a function that will delete files and directories recursively
             auto string = Dynamic_String(root_allocator, strlen(path) + 10);
             sprintf(string.buf, "rm -rf %s", path);
 
             assert_err(system(string.buf) != 0, "system command failed");
+            root_allocator.reset();
           }
 
           return 0;

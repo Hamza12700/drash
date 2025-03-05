@@ -9,7 +9,7 @@ struct Drash {
   // Heap pointer to filepath of metadata about the removed files
   char *metadata;
 
-  Drash(bump_allocator &buffer_alloc) {
+  Drash(Bump_Allocator &buffer_alloc) {
     const char *home_env = getenv("HOME");
     assert_err(home_env == NULL, "failed to get HOME environment variable");
 

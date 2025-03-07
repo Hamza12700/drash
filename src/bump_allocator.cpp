@@ -36,9 +36,7 @@ struct Bump_Allocator {
   void *alloc(size_t bytes) {
     assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity is full");
     void *memory = {0};
-
-    if (size == 0) memory = buffer;
-    else memory = (char *)buffer + bytes;
+    memory = (char *)buffer + size;
 
     size += bytes;
     return memory;

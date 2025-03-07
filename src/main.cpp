@@ -205,63 +205,19 @@ const Option options[] = {
 };
 
 void print_help() {
-  Static_Array<100 + 30> buffer;
-
   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
   printf("\nCommands:\n");
-
-  int cursor = 0;
   for (const auto cmd : commands) {
-    cursor = 0;
-
-    // Fill the buffer with whitespace
-    for (size_t i = 0; i < buffer.capacity; i++) { buffer[i] = ' '; }
-
-    // Write the command name in the buffer
-    for (size_t x = 0; x < strlen(cmd.name); x++) { buffer[x+3] = cmd.name[x]; }
-    cursor = strlen(cmd.name) + 3;
-
-    // Insert a semicolon after the command name
-    buffer[cursor] = ':';
-
-    // Write the command description in the buffer
-    for (size_t x = 0; x < strlen(cmd.desc); x++) { buffer[x+10+6] = cmd.desc[x]; }
-
-    printf("%s\n", buffer.elm);
+      printf("   %-10s", cmd.name);
+      printf("   %-10s\n", cmd.desc);
   }
+
 
   printf("\nOptions:\n");
-
   for (const auto opt : options) {
-    // Fill the buffer with whitespace
-    for (size_t i = 0; i < buffer.capacity; i++) { buffer[i] = ' '; }
-
-    // Write the option in the buffer
-    for (size_t i = 0; i < strlen(opt.name); i++) { buffer[i+3] = opt.name[i]; }
-
-    // Write the option description in the buffer
-    for (size_t i = 0; i < strlen(opt.desc); i++) { buffer[i+10+6] = opt.desc[i]; }
-
-    printf("%s\n", buffer.elm);
+    printf("   %-10s", opt.name);
+    printf("   %-10s\n", opt.desc);
   }
-}
-
-// Recursively remove files and directories by using nftw
-int recursive_remove(const char *fpath, const struct stat *, int typeflag, struct FTW *) {
-  switch (typeflag) {
-    case FTW_DP: {
-      // @Optimize: Is there a better way of checking if the directory is the root directory?
-      if (strcmp(fpath, drash.files) == 0) return 0;
-      else if (strcmp(fpath, drash.metadata) == 0) return 0;
-
-      assert_err(rmdir(fpath) != 0, "failed to remove directory");
-      break;
-    }
-
-    case FTW_F: assert_err(unlink(fpath) != 0, "failed to remove file"); break;
-  }
-
-  return 0;
 }
 
 int main(int argc, char *argv[]) {

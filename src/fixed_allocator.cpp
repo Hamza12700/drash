@@ -1,11 +1,18 @@
-#ifndef BUMP_ALLOC_H
-#define BUMP_ALLOC_H
+#ifndef FIXED_ALLOC_H
+#define FIXED_ALLOC_H
 
 #include <sys/mman.h>
 
 #include "./assert.c"
 
-struct Bump_Allocator {
+
+// NOTE:
+//
+// Don't add a constructor or demonstrator because the 'sub_allocator' method creates a new
+// allocator which points to the memory allocated by another allocator.
+//
+
+struct Fixed_Allocator {
   size_t capacity;
   size_t size;
   void *buffer;
@@ -18,15 +25,16 @@ struct Bump_Allocator {
   // sub-allocator in some kind-of array and upon new allocation checking if the
   // requested bytes overlap by doing pointer arithmetic.
   //
-  // -Hamza, Feb 2025
+  // -Hamza, March 1, 2025
   //
-  Bump_Allocator sub_allocator(size_t total_size) {
+
+  Fixed_Allocator sub_allocator(size_t total_size) {
     assert(total_size + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
 
     int idx = capacity - total_size;
     capacity -= total_size;
 
-    return Bump_Allocator {
+    return Fixed_Allocator {
       .capacity = total_size,
       .size = 0,
       .buffer = (char *)buffer + idx
@@ -56,15 +64,15 @@ struct Bump_Allocator {
   }
 };
 
-Bump_Allocator new_bump_allocator(size_t capacity) {
+Fixed_Allocator new_bump_allocator(const uint capacity) {
   void *memory = mmap(NULL, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
   assert_err(memory == MAP_FAILED, "mmap failed");
 
-  return Bump_Allocator {
+  return Fixed_Allocator {
     .capacity = capacity,
     .size = 0,
     .buffer = memory
   };
 }
 
-#endif /* ifndef BUMP_ALLOC_H */
+#endif /* ifndef FIXED_ALLOC_H */

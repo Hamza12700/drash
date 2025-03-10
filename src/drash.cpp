@@ -15,7 +15,7 @@ struct Drash {
   // Heap pointer to filepath of metadata about the removed files
   String metadata;
 
-  Drash(Fixed_Allocator &allocator) {
+  Drash(Fixed_Allocator *allocator) {
     const char *home_env = getenv("HOME");
     assert_err(home_env == NULL, "failed to get HOME environment variable");
 
@@ -40,14 +40,14 @@ struct Drash {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
-    auto drash_files = dynamic_string_with_size(allocator, sizeof(files) + strlen(drash_dir) + strlen("/files"));
+    auto drash_files = dynamic_string(allocator, sizeof(files) + strlen(drash_dir) + strlen("/files"));
     sprintf(drash_files.buf, "%s/files", drash_dir);
     err = mkdir(drash_files.buf, DIR_PERM);
     if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
     }
 
-    auto metadata_files = dynamic_string_with_size(allocator, sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
+    auto metadata_files = dynamic_string(allocator, sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
     sprintf(metadata_files.buf, "%s/metadata", drash_dir);
     err = mkdir(metadata_files.buf, DIR_PERM);
     if (errno != EEXIST) {
@@ -58,8 +58,8 @@ struct Drash {
     metadata = metadata_files.to_string();
   }
 
-  void empty_drash(Fixed_Allocator &allocator) {
-    auto string = dynamic_string_with_size(allocator, files.len + 10);
+  void empty_drash(Fixed_Allocator *allocator) {
+    auto string = dynamic_string(allocator, files.len + 10);
     sprintf(string.buf, "rm -rf %s", files.buf); // @Incomplete: Implement a function that will delete files and directories recursively
     assert_err(system(string.buf) != 0, "failed to remove drashd files");
     assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");

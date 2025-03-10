@@ -15,6 +15,16 @@ struct String {
   char *buf = NULL;
   uint len = 0;
 
+  char& operator[] (const uint idx) const {
+    if (idx > len) {
+      fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%u'.\n", len);
+      raise(SIGTRAP);
+    }
+
+    return buf[idx];
+  }
+
   char& operator[] (const uint idx) {
     if (idx > len) {
       fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
@@ -48,14 +58,24 @@ struct Dynamic_String {
   String to_string() const {
     return String {
       .buf = buf,
-      .len = len()
+      .len = nlen()
     };
   }
 
+  // Return the length of the string and excluding the null-byte
   uint len() const {
     uint count = 0;
 
     while (buf[count] != '\0') count++;
+    return count;
+  }
+
+  // Return the length of the string including the null-byte
+  uint nlen() const {
+    uint count = 0;
+    while (buf[count] != '\0') count++;
+    count += 1;
+
     return count;
   }
 
@@ -170,37 +190,30 @@ struct Char_Iter {
 };
 
 
-Dynamic_String dynamic_string_with_size(Fixed_Allocator &allocator, const uint size) {
-  char *buf = (char *)allocator.alloc(size);
-
+Dynamic_String dynamic_string(Fixed_Allocator *allocator, const uint size) {
   return Dynamic_String {
-    .buf = buf,
+    .buf = (char *)allocator->alloc(size),
     .capacity = size
   };
 }
 
 template<typename ...Args>
-Dynamic_String format_dynamic_string(Fixed_Allocator &allocator, const char *fmt_string, Args ...args) {
+Dynamic_String format_dynamic_string(Fixed_Allocator *allocator, const char *fmt_string, Args ...args) {
   auto arg_list = { args... }; 
-  uint format_len = strlen(fmt_string) + 1;
+  const uint format_len = strlen(fmt_string) + 1;
   uint total_size = 0;
 
   for (const auto arg : arg_list) {
-    if (typeid(arg) != typeid(const char *)) {
-      fprintf(stderr, "format-string - non 'char *' type provided\n");
-      raise(SIGTRAP);
-    }
-
     total_size += strlen(arg);
   }
 
   total_size += 1;
-  auto dyn_string = dynamic_string_with_size(allocator, format_len + total_size);
+  auto dyn_string = dynamic_string(allocator, format_len + total_size);
   uint arg_idx = 0;
 
   for (size_t i = 0; i < format_len - 1; i++) {
     if (fmt_string[i] == '%') {
-      if (arg_idx < arg_list.size()) dyn_string = *(std::next(arg_list.begin(), arg_idx++));
+      if (arg_idx < arg_list.size()) dyn_string += *(std::next(arg_list.begin(), arg_idx++));
       else fprintf(stderr, "format-string - not enough arguments provided for format string");
     } else dyn_string += fmt_string[i];
   }

@@ -50,7 +50,6 @@ struct Fixed_Allocator {
     return memory;
   }
 
-  // Set the entire buffer to zero with MEMSET
   void reset() {
     memset(buffer, 0, size);
     size = 0;
@@ -64,7 +63,7 @@ struct Fixed_Allocator {
   }
 };
 
-Fixed_Allocator new_bump_allocator(const uint capacity) {
+Fixed_Allocator fixed_allocator(const uint capacity) {
   void *memory = mmap(NULL, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
   assert_err(memory == MAP_FAILED, "mmap failed");
 

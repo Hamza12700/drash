@@ -15,10 +15,10 @@
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
 
-auto root_allocator = new_bump_allocator(getpagesize());
-auto drash = Drash(root_allocator);
+auto root_allocator = fixed_allocator(getpagesize());
+auto drash = Drash(&root_allocator);
 
-String file_basename(String path) {
+String file_basename(Fixed_Allocator *allocator, const String path) {
   bool contain_slash = false;
   for (size_t i = 0; i < path.len; i++) {
     if (path[i] == '/') {
@@ -29,7 +29,7 @@ String file_basename(String path) {
 
   if (!contain_slash) return path;
 
-  auto char_array = Temp_Array<char>(path.len);
+  auto char_array = temp_array(allocator, path.len);
   uint file_idx;
 
   for (int i = path.len - 1; path[i] != '/'; i--) {
@@ -37,7 +37,7 @@ String file_basename(String path) {
   }
 
   char_array = path;
-  file_idx += 2;
+  file_idx += 1;
   char_array.skip(file_idx);
 
   return char_array.to_string();
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             }
 
             // @Incomplete: Implement a function that will delete files and directories recursively
-            auto string = dynamic_string_with_size(root_allocator, strlen(path) + 10);
+            auto string = dynamic_string(&root_allocator, strlen(path) + 10);
             sprintf(string.buf, "rm -rf %s", path);
 
             assert_err(system(string.buf) != 0, "system command failed");
@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
               return 0;
             }
 
-            drash.empty_drash(root_allocator);
+            drash.empty_drash(&root_allocator);
 
             closedir(metadata_dir);
             return 0;
@@ -271,15 +271,18 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    auto filename = dynamic_string_with_size(scratch_allocator, path_len+1);
-    filename = arg;
-    file_basename(filename.to_string());
+    auto path = dynamic_string(&scratch_allocator, path_len+1);
+    path = arg;
 
-    auto file_metadata_path = dynamic_string_with_size(scratch_allocator, filename.capacity + drash.metadata.len + 10);
-    file_metadata_path = drash.metadata;
-    file_metadata_path = "/";
-    file_metadata_path = filename;
-    file_metadata_path = ".info";
+    auto filename = file_basename(&scratch_allocator, path.to_string());
+
+    auto file_metadata_path = format_dynamic_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
+
+    /*auto file_metadata_path = dynamic_string(scratch_allocator, filename.len + drash.metadata.len + 10);*/
+    /*file_metadata_path = drash.metadata;*/
+    /*file_metadata_path = "/";*/
+    /*file_metadata_path = filename;*/
+    /*file_metadata_path = ".info";*/
 
     err = lstat(file_metadata_path.buf, &statbuf);
     bool file_exists = true;
@@ -300,13 +303,13 @@ int main(int argc, char *argv[]) {
     FILE *file_metadata = fopen(file_metadata_path.buf, "w");
     assert_err(file_metadata == NULL, "fopen failed");
 
-    auto absolute_path = dynamic_string_with_size(scratch_allocator, strlen(current_dir) + filename.len() + 2);
+    auto absolute_path = dynamic_string(&scratch_allocator, strlen(current_dir) + filename.len + 2);
     absolute_path = current_dir;
     absolute_path = "/";
     absolute_path = filename;
     fprintf(file_metadata, "Path: %s", absolute_path.buf);
 
-    auto drash_file = dynamic_string_with_size(scratch_allocator, filename.len() + drash.files.len + 2);
+    auto drash_file = dynamic_string(&scratch_allocator, filename.len + drash.files.len + 2);
     drash_file = drash.files;
     drash_file = "/";
     drash_file = filename;

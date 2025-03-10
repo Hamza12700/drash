@@ -18,62 +18,33 @@
 // -Hamza, 10 March, 2025
 //
 
-template<typename T>
 struct Temp_Array {
-  T *ptr = NULL;
+  char *ptr = NULL;
   uint size = 0;
   bool with_allocator = false;
 
-  Temp_Array(const uint n) {
-    ptr = (char *)malloc(sizeof(T) + n);
-    size = n;
-  }
+  void array_free() {
+    if (with_allocator) return;
 
-  Temp_Array(Fixed_Allocator &allocator, const uint n) {
-    ptr = (char *)allocator.alloc(n);
-    size = n;
-    with_allocator = true;
-  }
-
-  ~Temp_Array() {
-    if (!with_allocator) free(ptr);
+    free(ptr);
     size = 0;
   }
 
-  uint str_len() const {
-    if (typeid(ptr) != typeid(char *)) {
-      fprintf(stderr, "temp-array - array is not 'char *' type\n");
-      raise(SIGTRAP);
-    }
+  String copy_string(Fixed_Allocator allocator) {
+    char *buf = (char *)allocator.alloc(size);
 
-    uint count = 0;
-    while (ptr[count] != '\0') count++;
+    String ret;
+    ret.len = size;
+    ret.buf = buf;
 
-    return count;
+    return ret;
   }
 
   String to_string() {
-    if (typeid(ptr) != typeid(char *)) {
-      fprintf(stderr, "temp-array - failed to convert type 'T' to String because it's not a 'char *'\n");
-      raise(SIGTRAP);
-    }
-
     return String {
       .buf = ptr,
-      .len = str_len()
+      .len = size
     };
-  }
-
-  String copy_string() {
-    if (typeid(ptr) != typeid(char *)) {
-      fprintf(stderr, "temp-array - failed to convert type 'T' to String because it's not a 'char *'\n");
-      raise(SIGTRAP);
-    }
-
-    String ret;
-    ret.len = str_len();
-    memcpy(ret.buf, ptr, ret.len);
-    return ret;
   }
 
   void skip(const uint idx = 1) {
@@ -97,7 +68,17 @@ struct Temp_Array {
       raise(SIGTRAP);
     }
 
-    memcpy(ptr, string.buf, string.len+1);
+    memcpy(ptr, string.buf, string.len);
+  }
+
+  void operator= (const String &string) {
+    if (string.len > size) {
+      fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
+      fprintf(stderr, "max-array size is '%u'.\n", size);
+      raise(SIGTRAP);
+    }
+
+    memcpy(ptr, string.buf, string.len);
   }
 
   void operator= (const char *s) {
@@ -109,10 +90,26 @@ struct Temp_Array {
       raise(SIGTRAP);
     }
 
-    for (uint i = 0; i < str_len; i++) {
-      ptr[i] = s[i];
-    }
+    strcpy(ptr, s);
   }
 };
+
+Temp_Array temp_array(const uint size) {
+  Temp_Array ret;
+  void *mem = malloc(size);
+
+  ret.ptr = (char *)mem;
+  ret.size = size;
+  return ret;
+}
+
+Temp_Array temp_array(Fixed_Allocator *allocator, const uint size) {
+  Temp_Array ret;
+  void *mem = allocator->alloc(size);
+
+  ret.size = size;
+  ret.ptr = (char *)mem;
+  return ret;
+}
 
 #endif

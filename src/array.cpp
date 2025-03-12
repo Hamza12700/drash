@@ -18,20 +18,20 @@
 // -Hamza, 10 March, 2025
 //
 
-struct Temp_Array {
+struct Array {
    char *ptr = NULL;
    uint size = 0;
    bool custom_allocator = false;
 
-   ~Temp_Array() {
+   ~Array() {
       if (!custom_allocator) {
          free(ptr); 
          size = 0;
       }
    }
 
-   static Temp_Array make(const uint size) {
-      Temp_Array ret;
+   static Array make(const uint size) {
+      Array ret;
       void *mem = xmalloc(size);
 
       ret.ptr = static_cast <char *>(mem);
@@ -39,8 +39,8 @@ struct Temp_Array {
       return ret;
    }
 
-   static Temp_Array make(Fixed_Allocator *allocator, const uint size) {
-      Temp_Array ret;
+   static Array make(Fixed_Allocator *allocator, const uint size) {
+      Array ret;
       void *mem = allocator->alloc(size);
 
       ret.size = size;

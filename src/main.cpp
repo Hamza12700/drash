@@ -28,7 +28,7 @@ String file_basename(Fixed_Allocator *allocator, const String path) {
 
    if (!contain_slash) return path;
 
-   auto char_array = Temp_Array::make(allocator, path.len);
+   auto char_array = Array::make(allocator, path.len);
    uint file_idx;
 
    for (int i = path.len - 1; path[i] != '/'; i--) {

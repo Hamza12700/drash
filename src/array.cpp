@@ -19,97 +19,107 @@
 //
 
 struct Temp_Array {
-  char *ptr = NULL;
-  uint size = 0;
-  bool with_allocator = false;
+   char *ptr = NULL;
+   uint size = 0;
+   bool custom_allocator = false;
 
-  void array_free() {
-    if (with_allocator) return;
+   ~Temp_Array() {
+      if (!custom_allocator) {
+         free(ptr); 
+         size = 0;
+      }
+   }
 
-    free(ptr);
-    size = 0;
-  }
+   static Temp_Array make(const uint size) {
+      Temp_Array ret;
+      void *mem = malloc(size);
 
-  String copy_string(Fixed_Allocator allocator) {
-    char *buf = (char *)allocator.alloc(size);
+      ret.ptr = static_cast <char *>(mem);
+      ret.size = size;
+      return ret;
+   }
 
-    String ret;
-    ret.len = size;
-    ret.buf = buf;
+   static Temp_Array make(Fixed_Allocator *allocator, const uint size) {
+      Temp_Array ret;
+      void *mem = allocator->alloc(size);
 
-    return ret;
-  }
+      ret.size = size;
+      ret.ptr = static_cast <char *>(mem);
+      ret.custom_allocator = true;
+      return ret;
+   }
 
-  String to_string() {
-    return String {
-      .buf = ptr,
-      .len = size
-    };
-  }
+   // Deep copy
+   String copy_string(Fixed_Allocator *allocator) {
+      char *buf = static_cast <char *>(allocator->alloc(size));
 
-  void skip(const uint idx = 1) {
-    ptr += idx;
-  }
+      String ret;
+      ret.len = size;
+      ret.buf = buf;
 
-  char& operator[] (const uint idx) {
-    if (idx > size) {
-      fprintf(stderr, "array - attempted to index into position '%u' which is out of bounds.\n", idx);
-      fprintf(stderr, "max size is '%u'.\n", size);
-      raise(SIGTRAP);
-    }
+      return ret;
+   }
 
-    return ptr[idx];
-  }
+   // Shallow copy
+   String to_string() {
+      // NOTE: Do not shallow copy the string if it's malloc'd because it will be free'd at the end of the scope!
+      if (!custom_allocator) {
+         fprintf(stderr, "temp-array - attempted to shallow copy the string which will be free'd at the end of the scope!");
+         raise(SIGTRAP);
+      }
 
-  void operator= (String &string) {
-    if (string.len > size) {
-      fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
-      fprintf(stderr, "max-array size is '%u'.\n", size);
-      raise(SIGTRAP);
-    }
+      return String {
+         .buf = ptr,
+         .len = size
+      };
+   }
 
-    memcpy(ptr, string.buf, string.len);
-  }
+   void skip(const uint idx = 1) {
+      ptr += idx;
+      size -= idx;
+   }
 
-  void operator= (const String &string) {
-    if (string.len > size) {
-      fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
-      fprintf(stderr, "max-array size is '%u'.\n", size);
-      raise(SIGTRAP);
-    }
+   char& operator[] (const uint idx) {
+      if (idx > size) {
+         fprintf(stderr, "array - attempted to index into position '%u' which is out of bounds.\n", idx);
+         fprintf(stderr, "max size is '%u'.\n", size);
+         raise(SIGTRAP);
+      }
 
-    memcpy(ptr, string.buf, string.len);
-  }
+      return ptr[idx];
+   }
 
-  void operator= (const char *s) {
-    const uint str_len = strlen(s);
+   void operator= (String &string) {
+      if (string.len > size) {
+         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
+         fprintf(stderr, "max-array size is '%u'.\n", size);
+         raise(SIGTRAP);
+      }
 
-    if (str_len > size) {
-      fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", str_len);
-      fprintf(stderr, "max-array size is '%u'.\n", size);
-      raise(SIGTRAP);
-    }
+      memcpy(ptr, string.buf, string.len);
+   }
 
-    strcpy(ptr, s);
-  }
+   void operator= (const String &string) {
+      if (string.len > size) {
+         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
+         fprintf(stderr, "max-array size is '%u'.\n", size);
+         raise(SIGTRAP);
+      }
+
+      memcpy(ptr, string.buf, string.len);
+   }
+
+   void operator= (const char *s) {
+      const uint str_len = strlen(s);
+
+      if (str_len > size) {
+         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", str_len);
+         fprintf(stderr, "max-array size is '%u'.\n", size);
+         raise(SIGTRAP);
+      }
+
+      strcpy(ptr, s);
+   }
 };
-
-Temp_Array temp_array(const uint size) {
-  Temp_Array ret;
-  void *mem = malloc(size);
-
-  ret.ptr = (char *)mem;
-  ret.size = size;
-  return ret;
-}
-
-Temp_Array temp_array(Fixed_Allocator *allocator, const uint size) {
-  Temp_Array ret;
-  void *mem = allocator->alloc(size);
-
-  ret.size = size;
-  ret.ptr = (char *)mem;
-  return ret;
-}
 
 #endif

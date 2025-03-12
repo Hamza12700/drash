@@ -19,306 +19,292 @@ auto root_allocator = fixed_allocator(getpagesize());
 auto drash = Drash(&root_allocator);
 
 String file_basename(Fixed_Allocator *allocator, const String path) {
-  bool contain_slash = false;
-  for (size_t i = 0; i < path.len; i++) {
-    if (path[i] == '/') {
-      contain_slash = true;
-      break;
-    }
-  }
+   bool contain_slash = false;
+   for (size_t i = 0; i < path.len; i++) {
+      if (path[i] == '/') {
+         contain_slash = true;
+         break;
+      }
+   }
 
-  if (!contain_slash) return path;
+   if (!contain_slash) return path;
 
-  auto char_array = temp_array(allocator, path.len);
-  uint file_idx;
+   auto char_array = Temp_Array::make(allocator, path.len);
+   uint file_idx;
 
-  for (int i = path.len - 1; path[i] != '/'; i--) {
-    file_idx++;
-  }
+   for (int i = path.len - 1; path[i] != '/'; i--) {
+      file_idx++;
+   }
 
-  char_array = path;
-  file_idx += 1;
-  char_array.skip(file_idx);
+   char_array = path;
+   file_idx += 1;
+   char_array.skip(file_idx);
 
-  return char_array.to_string();
+   return char_array.to_string();
 }
 
 enum CmdAction {
-  List,
-  Remove, 
-  Empty,
-  Restore,
+   List,
+   Remove, 
+   Empty,
+   Restore,
 };
 
 struct Command {
-  const char *name;
-  const char *desc;
+   const char *name;
+   const char *desc;
 
-  const CmdAction action;
+   const CmdAction action;
 };
 
 const Command commands[] = {
-  {.name = "list", .desc = "List Drash'd files", .action = List },
-  {.name = "remove", .desc = "Remove files from the Drash/can", .action = Remove },
-  {.name = "empty", .desc = "Empty the Drash/can", .action = Empty },
-  {.name = "restore", .desc = "Restore removed files", .action = Restore },
+   {.name = "list", .desc = "List Drash'd files", .action = List },
+   {.name = "remove", .desc = "Remove files from the Drash/can", .action = Remove },
+   {.name = "empty", .desc = "Empty the Drash/can", .action = Empty },
+   {.name = "restore", .desc = "Restore removed files", .action = Restore },
 };
 
 enum OptAction {
-  Force,    // Remove the file without storing it in the drashcan
-  Help,     // Help message. @NOTE: Add ability to show help for separate commands
-  Version,  // Print version of the project
+   Force,    // Remove the file without storing it in the drashcan
+   Help,     // Help message. @NOTE: Add ability to show help for separate commands
+   Version,  // Print version of the project
 };
 
 struct Option {
-  const char *name;
-  const char *desc;
-  
-  const OptAction action;
+   const char *name;
+   const char *desc;
 
-  // Compare a string with an option->name
-  bool cmp(const char *str) const {
-    char lbuf[10] = {0};
-    char sbuf[5] = {0};
+   const OptAction action;
 
-    int x = 0;
-    for (size_t i = 0; i < strlen(name) - 1; i++) {
-      const char name_char = name[i];
+   // Compare a string with an option->name
+   bool cmp(const char *str) const {
+      char lbuf[10] = {0};
+      char sbuf[5] = {0};
 
-      if (name_char != '|') {
-        lbuf[i] = name_char;
-        continue;
+      int x = 0;
+      for (size_t i = 0; i < strlen(name) - 1; i++) {
+         const char name_char = name[i];
+
+         if (name_char != '|') {
+            lbuf[i] = name_char;
+            continue;
+         }
+
+         sbuf[x] = name[i+1];
+         x++;
       }
 
-      sbuf[x] = name[i+1];
-      x++;
-    }
-
-    if (strcmp(str, lbuf) == 0 || strcmp(str, sbuf) ==  0) return true;
-    return false;
-  }
+      if (strcmp(str, lbuf) == 0 || strcmp(str, sbuf) ==  0) return true;
+      return false;
+   }
 };
 
 const Option options[] = {
-  { .name = "force|f", .desc = "Force remove file" , .action = Force },
-  { .name = "help|h", .desc = "Display the help message" , .action = Help },
-  { .name = "version|v", .desc = "Print the version" , .action = Version },
+   { .name = "force|f", .desc = "Force remove file" , .action = Force },
+   { .name = "help|h", .desc = "Display the help message" , .action = Help },
+   { .name = "version|v", .desc = "Print the version" , .action = Version },
 };
 
 void print_help() {
-  printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
-  printf("\nCommands:\n");
-  for (const auto cmd : commands) {
+   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
+   printf("\nCommands:\n");
+   for (const auto cmd : commands) {
       printf("   %-10s", cmd.name);
       printf("   %-10s\n", cmd.desc);
-  }
+   }
 
-  printf("\nOptions:\n");
-  for (const auto opt : options) {
-    printf("   %-10s", opt.name);
-    printf("   %-10s\n", opt.desc);
-  }
+   printf("\nOptions:\n");
+   for (const auto opt : options) {
+      printf("   %-10s", opt.name);
+      printf("   %-10s\n", opt.desc);
+   }
 }
 
 int main(int argc, char *argv[]) {
-  if (argc == 1) {
-    fprintf(stderr, "Missing argument file(s)\n");
-    return -1;
-  }
+   if (argc == 1) {
+      fprintf(stderr, "Missing argument file(s)\n");
+      return -1;
+   }
 
-  // Skip the binary path, because I'm always off by one error when looping throught the array
-  argv++;
-  argc -= 1;
+   // Skip the binary path
+   argv++;
+   argc -= 1;
 
-  // Handle option arguments
-  if (argv[0][0] == '-') {
-    char *arg = argv[0];
+   // Handle option arguments
+   if (argv[0][0] == '-') {
+      const char *arg = argv[0];
 
-    arg++;
-    if (arg[0] == '-') arg++;
+      arg++;
+      if (arg[0] == '-') arg++;
 
-    // @NOTE: Check files/directories if they exists so that way I don't have to
-    // do error checking in every case for the command line option.
+      // @NOTE: Check files/directories if they exists so that way I don't have to
+      // do error checking in every case for the command line option.
 
-    for (const auto opt : options) {
-      if (!opt.cmp(arg)) {
-        continue;
-      }
+      for (const auto opt : options) {
+         if (!opt.cmp(arg)) {
+            continue;
+         }
 
-      // @Factor: Handle options in a separate function/file because of indentation-level
-      switch (opt.action) {
-        case Help: {
-          print_help();
-          return 0;
-        }
-
-        case Version: {
-          printf("drash version: %s\n", VERSION);
-          return 0;
-        }
-
-        case Force: {
-          if (argc == 1) {
-            fprintf(stderr, "Missing argument file(s)\n");
-            return -1;
-          }
-
-          // Skip the current argument
-          for (int i = 1; i < argc; i++) {
-            const char *path = argv[i];
-
-            struct stat sb;
-            assert_err(lstat(path, &sb) != 0, "lstat failed");
-
-            if ((sb.st_mode & S_IFMT) == S_IFREG) {
-              assert_err(unlink(path) != 0, "failed to remove file");
-              continue;
+         // @Factor: Handle options in a separate function/file because of indentation-level
+         switch (opt.action) {
+            case Help: {
+               print_help();
+               return 0;
             }
 
-            // @Incomplete: Implement a function that will delete files and directories recursively
-            auto string = dynamic_string(&root_allocator, strlen(path) + 10);
-            sprintf(string.buf, "rm -rf %s", path);
-
-            assert_err(system(string.buf) != 0, "system command failed");
-            root_allocator.reset();
-          }
-
-          return 0;
-        }
-      }
-    }
-
-    fprintf(stderr, "Unkonwn option: %s\n", arg);
-    return -1;
-  }
-
-  auto scratch_allocator = root_allocator.sub_allocator(1000);
-
-  const char *current_dir = getenv("PWD");
-  assert(current_dir == NULL, "PWD envirnoment not found");
-
-  for (int i = 0; i < argc; i++) {
-    const char *arg = argv[i];
-
-    for (auto cmd : commands) {
-      if (strcmp(arg, cmd.name) == 0) {
-        switch (cmd.action) {
-          case List: {
-            printf("TODO: LIST");
-            return 0;
-          }
-
-          case Restore: {
-            printf("TODO: Restore");
-            return 0;
-          }
-
-          case Empty: {
-            DIR *metadata_dir = opendir(drash.metadata.buf);
-            assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
-
-            struct dirent *dir_stat;
-            int count = 0;
-
-            while ((dir_stat = readdir(metadata_dir)) != NULL) {
-              count++; 
+            case Version: {
+               printf("drash version: %s\n", VERSION);
+               return 0;
             }
 
-            if (count <= 2) {
-              printf("Drashcan is already empty\n");
-              closedir(metadata_dir);
-              return 0;
+            case Force: {
+               if (argc == 1) {
+                  fprintf(stderr, "Missing argument file(s)\n");
+                  return -1;
+               }
+
+               // Skip the current argument
+               for (int i = 1; i < argc; i++) {
+                  const char *path = argv[i];
+
+                  struct stat sb;
+                  assert_err(lstat(path, &sb) != 0, "lstat failed");
+
+                  if ((sb.st_mode & S_IFMT) == S_IFREG) {
+                     assert_err(unlink(path) != 0, "failed to remove file");
+                     continue;
+                  }
+
+                  // @Incomplete: Implement a function that will delete files and directories recursively
+                  auto string = Dynamic_String::make(&root_allocator, strlen(path) + 10);
+                  sprintf(string.buf, "rm -rf %s", path);
+
+                  assert_err(system(string.buf) != 0, "system command failed");
+                  root_allocator.reset();
+               }
+
+               return 0;
             }
-
-            drash.empty_drash(&root_allocator);
-
-            closedir(metadata_dir);
-            return 0;
-          }
-
-          case Remove: {
-            printf("TODO: Remove");
-            return 0;
-          }
-        }
+         }
       }
-    }
 
-    // Check for symlink files and delete if found
-    // If file doesn't exist then report the error and continue to next file
-    struct stat statbuf;
-    int err = 0;
-    err = lstat(arg, &statbuf);
+      fprintf(stderr, "Unkonwn option: %s\n", arg);
+      return -1;
+   }
 
-    // If file not found
-    if (err != 0 && errno == 2) {
-      fprintf(stderr, "file not found: %s\n", arg);
-      continue;
-    }
+   auto scratch_allocator = root_allocator.sub_allocator(1000);
 
-    assert_err(err != 0, "lstat failed");
+   const char *current_dir = getenv("PWD");
+   assert(current_dir == NULL, "PWD envirnoment not found");
 
-    // Remove symlink files
-    if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-      assert_err(remove(arg) != 0, "failed to remove symlink-file");
-      printf("Removed symlink: %s\n", arg);
-    }
+   for (int i = 0; i < argc; i++) {
+      const char *arg = argv[i];
 
-    const int path_len = strlen(arg);
-    if (path_len > MAX_ARGLEN) {
-      fprintf(stderr, "path is too long: %d", path_len);
-      fprintf(stderr, "max length is %d", MAX_ARGLEN);
-      continue;
-    }
+      for (auto cmd : commands) {
+         if (strcmp(arg, cmd.name) == 0) {
+            switch (cmd.action) {
+               case List: {
+                  printf("TODO: LIST");
+                  return 0;
+               }
 
-    auto path = dynamic_string(&scratch_allocator, path_len+1);
-    path = arg;
+               case Restore: {
+                  printf("TODO: Restore");
+                  return 0;
+               }
 
-    auto filename = file_basename(&scratch_allocator, path.to_string());
+               case Empty: {
+                  DIR *metadata_dir = opendir(drash.metadata.buf);
+                  assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
 
-    auto file_metadata_path = format_dynamic_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
+                  struct dirent *dir_stat;
+                  int count = 0;
 
-    /*auto file_metadata_path = dynamic_string(scratch_allocator, filename.len + drash.metadata.len + 10);*/
-    /*file_metadata_path = drash.metadata;*/
-    /*file_metadata_path = "/";*/
-    /*file_metadata_path = filename;*/
-    /*file_metadata_path = ".info";*/
+                  while ((dir_stat = readdir(metadata_dir)) != NULL) {
+                     count++; 
+                  }
 
-    err = lstat(file_metadata_path.buf, &statbuf);
-    bool file_exists = true;
+                  if (count <= 2) {
+                     printf("Drashcan is already empty\n");
+                     closedir(metadata_dir);
+                     return 0;
+                  }
 
-    if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-      fprintf(stderr, "Error: metadata file is a symlink-file\n");
-      continue;
-    }
+                  drash.empty_drash(&root_allocator);
 
-    if (err != 0 && errno == 2) file_exists = false;
+                  closedir(metadata_dir);
+                  return 0;
+               }
 
-    if (file_exists) {
-      fprintf(stderr, "Error: file '%s' already exists in the drashcan\n", arg);
-      fprintf(stderr, "Can't overwrite it\n");
-      continue;
-    }
+               case Remove: {
+                  printf("TODO: Remove");
+                  return 0;
+               }
+            }
+         }
+      }
 
-    FILE *file_metadata = fopen(file_metadata_path.buf, "w");
-    assert_err(file_metadata == NULL, "fopen failed");
+      // Check for symlink files and delete if found
+      // If file doesn't exist then report the error and continue to next file
+      struct stat statbuf;
+      int err = 0;
+      err = lstat(arg, &statbuf);
 
-    auto absolute_path = dynamic_string(&scratch_allocator, strlen(current_dir) + filename.len + 2);
-    absolute_path = current_dir;
-    absolute_path = "/";
-    absolute_path = filename;
-    fprintf(file_metadata, "Path: %s", absolute_path.buf);
+      // If file not found
+      if (err != 0 && errno == 2) {
+         fprintf(stderr, "file not found: %s\n", arg);
+         continue;
+      }
 
-    auto drash_file = dynamic_string(&scratch_allocator, filename.len + drash.files.len + 2);
-    drash_file = drash.files;
-    drash_file = "/";
-    drash_file = filename;
+      assert_err(err != 0, "lstat failed");
 
-    assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");
+      // Remove symlink files
+      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+         assert_err(remove(arg) != 0, "failed to remove symlink-file");
+         printf("Removed symlink: %s\n", arg);
+      }
 
-    fclose(file_metadata);
-    scratch_allocator.reset();
-  }
+      const int path_len = strlen(arg);
+      if (path_len > MAX_ARGLEN) {
+         fprintf(stderr, "path is too long: %d", path_len);
+         fprintf(stderr, "max length is %d", MAX_ARGLEN);
+         continue;
+      }
 
-  root_allocator.free();
+      auto path = Dynamic_String::make(&scratch_allocator, path_len+1);
+      path = arg;
+
+      auto filename = file_basename(&scratch_allocator, path.to_string());
+      auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
+
+      err = lstat(file_metadata_path.buf, &statbuf);
+      bool file_exists = true;
+
+      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+         fprintf(stderr, "Error: metadata file is a symlink-file\n");
+         continue;
+      }
+
+      if (err != 0 && errno == 2) file_exists = false;
+
+      if (file_exists) {
+         fprintf(stderr, "Error: file '%s' already exists in the drashcan\n", arg);
+         fprintf(stderr, "Can't overwrite it\n");
+         continue;
+      }
+
+      FILE *file_metadata = fopen(file_metadata_path.buf, "w");
+      assert_err(file_metadata == NULL, "fopen failed");
+
+      auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, filename.buf);
+      fprintf(file_metadata, "Path: %s", absolute_path.buf);
+
+      auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
+      assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");
+
+      fclose(file_metadata);
+      scratch_allocator.reset();
+   }
+
+   root_allocator.free();
 }

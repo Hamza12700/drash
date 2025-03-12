@@ -12,9 +12,9 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 
 void *xmalloc(const uint size) {
-  void *mem = malloc(size);
-  assert_err(mem == NULL, "malloc - failed");
-  return mem;
+   void *mem = malloc(size);
+   assert_err(mem == NULL, "malloc - failed");
+   return mem;
 }
 
 #endif

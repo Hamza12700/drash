@@ -1,4 +1,3 @@
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -15,7 +14,7 @@
 #define VERSION "0.1.0"
 #define MAX_ARGLEN 300
 
-auto root_allocator = fixed_allocator(getpagesize());
+auto root_allocator = Fixed_Allocator::make(getpagesize());
 auto drash = Drash(&root_allocator);
 
 String file_basename(Fixed_Allocator *allocator, const String path) {
@@ -176,8 +175,7 @@ int main(int argc, char *argv[]) {
                   }
 
                   // @Incomplete: Implement a function that will delete files and directories recursively
-                  auto string = Dynamic_String::make(&root_allocator, strlen(path) + 10);
-                  sprintf(string.buf, "rm -rf %s", path);
+                  auto string = format_string(&root_allocator, "rm -rf %", path);
 
                   assert_err(system(string.buf) != 0, "system command failed");
                   root_allocator.reset();

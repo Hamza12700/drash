@@ -17,16 +17,16 @@ struct Fixed_Allocator {
    size_t size;
    void *buffer;
 
-   // @NOTE:
-   //
-   // For sub-allocators add a check for if something tried to overwrite some
-   // part of the memory owned by a sub-allocator. Because the sub-allocator is
-   // allocated at the end of the memory region, storing the pointer/idx for the
-   // sub-allocator in some kind-of array and upon new allocation checking if the
-   // requested bytes overlap by doing pointer arithmetic.
-   //
-   // -Hamza, March 1, 2025
-   //
+   static Fixed_Allocator make(const uint size) {
+      void *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+      assert_err(memory == MAP_FAILED, "mmap failed");
+
+      return Fixed_Allocator {
+         .capacity = size,
+         .size = 0,
+         .buffer = memory
+      };
+   }
 
    Fixed_Allocator sub_allocator(size_t total_size) {
       assert(total_size + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
@@ -62,16 +62,5 @@ struct Fixed_Allocator {
       buffer = NULL;
    }
 };
-
-Fixed_Allocator fixed_allocator(const uint capacity) {
-   void *memory = mmap(NULL, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-   assert_err(memory == MAP_FAILED, "mmap failed");
-
-   return Fixed_Allocator {
-      .capacity = capacity,
-      .size = 0,
-      .buffer = memory
-   };
-}
 
 #endif /* ifndef FIXED_ALLOC_H */

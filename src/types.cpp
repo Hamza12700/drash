@@ -17,4 +17,12 @@ void *xmalloc(const uint size) {
    return mem;
 }
 
-#endif
+#ifdef DEBUG
+#define STOP raise(SIGTRAP);
+
+#else
+#define STOP exit(-1);
+
+#endif // DEBUG
+
+#endif // TYPES_H

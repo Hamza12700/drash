@@ -32,7 +32,7 @@ struct Temp_Array {
 
    static Temp_Array make(const uint size) {
       Temp_Array ret;
-      void *mem = malloc(size);
+      void *mem = xmalloc(size);
 
       ret.ptr = static_cast <char *>(mem);
       ret.size = size;
@@ -65,7 +65,7 @@ struct Temp_Array {
       // NOTE: Do not shallow copy the string if it's malloc'd because it will be free'd at the end of the scope!
       if (!custom_allocator) {
          fprintf(stderr, "temp-array - attempted to shallow copy the string which will be free'd at the end of the scope!");
-         raise(SIGTRAP);
+         STOP
       }
 
       return String {
@@ -83,7 +83,7 @@ struct Temp_Array {
       if (idx > size) {
          fprintf(stderr, "array - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", size);
-         raise(SIGTRAP);
+         STOP
       }
 
       return ptr[idx];
@@ -93,7 +93,7 @@ struct Temp_Array {
       if (string.len > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         raise(SIGTRAP);
+         STOP
       }
 
       memcpy(ptr, string.buf, string.len);
@@ -103,7 +103,7 @@ struct Temp_Array {
       if (string.len > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         raise(SIGTRAP);
+         STOP
       }
 
       memcpy(ptr, string.buf, string.len);
@@ -115,7 +115,7 @@ struct Temp_Array {
       if (str_len > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", str_len);
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         raise(SIGTRAP);
+         STOP
       }
 
       strcpy(ptr, s);

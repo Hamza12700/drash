@@ -19,7 +19,7 @@ struct String {
       if (idx > len) {
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", len);
-         raise(SIGTRAP);
+         STOP
       }
 
       return buf[idx];
@@ -29,7 +29,7 @@ struct String {
       if (idx > len) {
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", len);
-         raise(SIGTRAP);
+         STOP
       }
 
       return buf[idx];
@@ -90,7 +90,7 @@ struct Dynamic_String {
       if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
          fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
-         raise(SIGTRAP);
+         STOP
       }
 
       current_idx++;
@@ -123,7 +123,7 @@ struct Dynamic_String {
          if (current_idx > capacity) {
             fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
             fprintf(stderr, "max size is '%u'.\n", capacity);
-            raise(SIGTRAP);
+            STOP
          }
 
          buf[current_idx] = string[idx];
@@ -136,7 +136,7 @@ struct Dynamic_String {
       if (current_idx > capacity) {
          fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
-         raise(SIGTRAP);
+         STOP
       }
 
       buf[current_idx] = str;
@@ -148,7 +148,7 @@ struct Dynamic_String {
          if (current_idx > capacity) {
             fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
             fprintf(stderr, "max size is '%u'.\n", capacity);
-            raise(SIGTRAP);
+            STOP
          }
 
          buf[current_idx] = string[i];
@@ -163,7 +163,7 @@ struct Dynamic_String {
          if (current_idx > capacity) {
             fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
             fprintf(stderr, "max size is '%u'.\n", capacity);
-            raise(SIGTRAP);
+            STOP
          }
 
          buf[current_idx] = other.buf[i];
@@ -195,6 +195,19 @@ struct Char_Iter {
    Iterator begin() const { return Iterator(str, str + length); }
    Iterator end() const { return Iterator(str + length, str + length); }
 };
+
+//
+// NOTE:
+//
+// This only works if the 'Args' are the same type include constant values.
+// I would like to fix this but for now this gets the job done.
+//
+// Also add a function overload for this that formats the string without taking a custom allocator that
+// way if the string is only needed at a specific scope then it would be easy return a custom 'string'
+// that has a destructor which will get ran if the string isn't allocated by a custom allocator.
+//
+// - Hamza, March 12 2025
+//
 
 template<typename ...Args>
 Dynamic_String format_string(Fixed_Allocator *allocator, const char *fmt_string, const Args ...args) {

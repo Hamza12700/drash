@@ -40,26 +40,26 @@ struct Drash {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto drash_files = Dynamic_String::make(allocator, sizeof(files) + strlen(drash_dir) + strlen("/files"));
+      auto drash_files = String::with_size(allocator, sizeof(files) + strlen(drash_dir) + strlen("/files"));
       sprintf(drash_files.buf, "%s/files", drash_dir);
       err = mkdir(drash_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto metadata_files = Dynamic_String::make(allocator, sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
+      auto metadata_files = String::with_size(allocator, sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
       sprintf(metadata_files.buf, "%s/metadata", drash_dir);
       err = mkdir(metadata_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      files = drash_files.to_string();
-      metadata = metadata_files.to_string();
+      files = drash_files;
+      metadata = metadata_files;
    }
 
    void empty_drash(Fixed_Allocator *allocator) {
-      auto string = Dynamic_String::make(allocator, files.len + 10);
+      auto string = String::with_size(allocator, files.nlen() + 10);
       sprintf(string.buf, "rm -rf %s", files.buf); // @Incomplete: Implement a function that will delete files and directories recursively
       assert_err(system(string.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");

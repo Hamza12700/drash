@@ -49,17 +49,6 @@ struct Array {
       return ret;
    }
 
-   // Deep copy
-   String copy_string(Fixed_Allocator *allocator) {
-      char *buf = static_cast <char *>(allocator->alloc(size));
-
-      String ret;
-      ret.len = size;
-      ret.buf = buf;
-
-      return ret;
-   }
-
    // Shallow copy
    String to_string() {
       // NOTE: Do not shallow copy the string if it's malloc'd because it will be free'd at the end of the scope!
@@ -70,7 +59,7 @@ struct Array {
 
       return String {
          .buf = ptr,
-         .len = size
+         .capacity = size
       };
    }
 
@@ -89,24 +78,24 @@ struct Array {
       return ptr[idx];
    }
 
-   void operator= (String &string) {
-      if (string.len > size) {
-         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
+   void operator= (String *string) {
+      if (string->len() > size) {
+         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string->len());
          fprintf(stderr, "max-array size is '%u'.\n", size);
          STOP
       }
 
-      memcpy(ptr, string.buf, string.len);
+      memcpy(ptr, string->buf, string->nlen());
    }
 
-   void operator= (const String &string) {
-      if (string.len > size) {
-         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string.len);
+   void operator= (const String *string) {
+      if (string->len() > size) {
+         fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string->len());
          fprintf(stderr, "max-array size is '%u'.\n", size);
          STOP
       }
 
-      memcpy(ptr, string.buf, string.len);
+      memcpy(ptr, string->buf, string->len());
    }
 
    void operator= (const char *s) {

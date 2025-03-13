@@ -3,7 +3,8 @@
 
 #include <sys/mman.h>
 
-#include "./assert.c"
+#include "assert.c"
+#include "types.cpp"
 
 
 // NOTE:
@@ -13,8 +14,8 @@
 //
 
 struct Fixed_Allocator {
-   size_t capacity;
-   size_t size;
+   uint capacity;
+   uint size;
    void *buffer;
 
    static Fixed_Allocator make(const uint size) {
@@ -28,7 +29,7 @@ struct Fixed_Allocator {
       };
    }
 
-   Fixed_Allocator sub_allocator(size_t total_size) {
+   Fixed_Allocator sub_allocator(uint total_size) {
       assert(total_size + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
 
       int idx = capacity - total_size;
@@ -41,7 +42,7 @@ struct Fixed_Allocator {
       };
    }
 
-   void *alloc(size_t bytes) {
+   void *alloc(uint bytes) {
       assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity is full");
       void *memory = {0};
       memory = (char *)buffer + size;

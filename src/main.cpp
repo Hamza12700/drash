@@ -17,21 +17,21 @@
 auto root_allocator = Fixed_Allocator::make(getpagesize());
 auto drash = Drash(&root_allocator);
 
-String file_basename(Fixed_Allocator *allocator, const String path) {
+String file_basename(Fixed_Allocator *allocator, const String *path) {
    bool contain_slash = false;
-   for (size_t i = 0; i < path.len; i++) {
-      if (path[i] == '/') {
+   for (uint i = 0; i < path->len(); i++) {
+      if ((*path)[i] == '/') {
          contain_slash = true;
          break;
       }
    }
 
-   if (!contain_slash) return path;
+   if (!contain_slash) return *path;
 
-   auto char_array = Array::make(allocator, path.len);
+   auto char_array = Array::make(allocator, path->nlen());
    uint file_idx;
 
-   for (int i = path.len - 1; path[i] != '/'; i--) {
+   for (int i = path->len(); (*path)[i] != '/'; i--) {
       file_idx++;
    }
 
@@ -81,7 +81,7 @@ struct Option {
       char sbuf[5] = {0};
 
       int x = 0;
-      for (size_t i = 0; i < strlen(name) - 1; i++) {
+      for (uint i = 0; i < strlen(name) - 1; i++) {
          const char name_char = name[i];
 
          if (name_char != '|') {
@@ -269,10 +269,10 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      auto path = Dynamic_String::make(&scratch_allocator, path_len+1);
+      auto path = String::with_size(&scratch_allocator, path_len);
       path = arg;
 
-      auto filename = file_basename(&scratch_allocator, path.to_string());
+      auto filename = file_basename(&scratch_allocator, &path);
       auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
 
       err = lstat(file_metadata_path.buf, &statbuf);

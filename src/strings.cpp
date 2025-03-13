@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
-#include <typeinfo>
 #include <iterator>
 
 #include "fixed_allocator.cpp"
@@ -13,59 +12,13 @@
 
 struct String {
    char *buf = NULL;
-   uint len = 0;
-
-   char& operator[] (const uint idx) const {
-      if (idx > len) {
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
-         fprintf(stderr, "max size is '%u'.\n", len);
-         STOP
-      }
-
-      return buf[idx];
-   }
-
-   char& operator[] (const uint idx) {
-      if (idx > len) {
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
-         fprintf(stderr, "max size is '%u'.\n", len);
-         STOP
-      }
-
-      return buf[idx];
-   }
-
-   bool operator== (const String &other) const {
-      if (len != other.len) return false;
-      else if (strcmp(other.buf, buf) != 0) return false;
-
-      return true;
-   }
-
-   bool operator== (const char *other) const {
-      if (len != strlen(other)) return false;
-      else if (strcmp(buf, other) != 0) return false;
-
-      return true;
-   }
-};
-
-struct Dynamic_String {
-   char *buf = NULL;
    uint capacity = 0;
    uint current_idx = 0;
 
-   static Dynamic_String make(Fixed_Allocator *allocator, const uint size) {
-      return Dynamic_String {
-         .buf = static_cast <char *>(allocator->alloc(size)),
-         .capacity = size,
-      }; 
-   }
-
-   String to_string() const {
+   static String with_size(Fixed_Allocator *allocator, const uint size) {
       return String {
-         .buf = buf,
-         .len = nlen()
+         .buf = static_cast <char *>(allocator->alloc(sizeof(char) + size)),
+         .capacity = (uint)sizeof(char) + size,
       };
    }
 
@@ -88,7 +41,7 @@ struct Dynamic_String {
 
    char& operator[] (const uint idx) {
       if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
-         fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", idx);
+         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
          STOP
       }
@@ -97,8 +50,18 @@ struct Dynamic_String {
       return buf[idx];
    }
 
+   const char& operator[] (const uint idx) const {
+      if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
+         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+         fprintf(stderr, "max size is '%u'.\n", capacity);
+         STOP
+      }
+
+      return buf[idx];
+   }
+
    void operator= (const char *string) {
-      memset(buf, 0, len()+1);
+      memset(buf, 0, nlen());
       current_idx = 0;
 
       for (uint i = 0; string[i] != '\0'; i++) {
@@ -107,21 +70,11 @@ struct Dynamic_String {
       }
    }
 
-   void operator= (String &string) {
-      memset(buf, 0, len()+1);
-      current_idx = 0;
-
-      for (uint i = 0; i < string.len; i++) {
-         buf[i] = string.buf[i];
-         current_idx++;
-      }
-   }
-
    void operator+= (const char *string) {
       uint idx = 0;
       while (string[idx] != '\0') {
          if (current_idx > capacity) {
-            fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
+            fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
             fprintf(stderr, "max size is '%u'.\n", capacity);
             STOP
          }
@@ -134,43 +87,13 @@ struct Dynamic_String {
 
    void operator+= (const char str) {
       if (current_idx > capacity) {
-         fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
+         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
          STOP
       }
 
       buf[current_idx] = str;
       current_idx++;
-   }
-
-   void operator+= (String &string) {
-      for (size_t i = 0; i < string.len; i++) {
-         if (current_idx > capacity) {
-            fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
-            fprintf(stderr, "max size is '%u'.\n", capacity);
-            STOP
-         }
-
-         buf[current_idx] = string[i];
-         current_idx++;
-      }
-   }
-
-   Dynamic_String& operator=(const Dynamic_String &other) {
-      if (this == &other) return *this;
-
-      for (size_t i = 0; i < other.len(); i++) {
-         if (current_idx > capacity) {
-            fprintf(stderr, "dynamic-string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
-            fprintf(stderr, "max size is '%u'.\n", capacity);
-            STOP
-         }
-
-         buf[current_idx] = other.buf[i];
-         current_idx++;
-      }
-
-      return *this;
    }
 };
 
@@ -190,7 +113,7 @@ struct Char_Iter {
    };
 
    Char_Iter(const char* s) : str(s), length(strlen(s)) {}
-   Char_Iter(const String &s) : str(s.buf), length(s.len) {}
+   Char_Iter(const String &s) : str(s.buf), length(s.nlen()) {}
 
    Iterator begin() const { return Iterator(str, str + length); }
    Iterator end() const { return Iterator(str + length, str + length); }
@@ -210,9 +133,9 @@ struct Char_Iter {
 //
 
 template<typename ...Args>
-Dynamic_String format_string(Fixed_Allocator *allocator, const char *fmt_string, const Args ...args) {
+String format_string(Fixed_Allocator *allocator, const char *fmt_string, const Args ...args) {
    const auto arg_list = { args... }; 
-   const uint format_len = strlen(fmt_string) + 1;
+   const uint format_len = strlen(fmt_string);
    uint total_size = 0;
 
    for (const auto arg : arg_list) {
@@ -220,10 +143,10 @@ Dynamic_String format_string(Fixed_Allocator *allocator, const char *fmt_string,
    }
 
    total_size += 1;
-   auto dyn_string = Dynamic_String::make(allocator, format_len + total_size);
+   auto dyn_string = String::with_size(allocator, format_len + total_size);
    uint arg_idx = 0;
 
-   for (size_t i = 0; i < format_len - 1; i++) {
+   for (uint i = 0; i < format_len; i++) {
       if (fmt_string[i] == '%') {
          if (arg_idx < arg_list.size()) dyn_string += *(std::next(arg_list.begin(), arg_idx++));
          else fprintf(stderr, "format-string - not enough arguments provided for format string");

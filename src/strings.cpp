@@ -10,10 +10,13 @@
 #include "fixed_allocator.cpp"
 #include "types.cpp"
 
+//
+// NOTE: Add a de-contractor which will only deallocates memory which is malloc'd
+//
+
 struct String {
    char *buf = NULL;
    uint capacity = 0;
-   uint current_idx = 0;
 
    static String with_size(Fixed_Allocator *allocator, const uint size) {
       return String {
@@ -22,31 +25,48 @@ struct String {
       };
    }
 
+   // @Incomplete: Deallocate the malloc'd memory
+   static String with_size(const uint size) {
+      return String {
+         .buf = static_cast <char *>(malloc(sizeof(char) + size)),
+         .capacity = (uint)sizeof(char) + size,
+      };
+   }
+
+   void remove(const uint idx) {
+      if (idx >= capacity) {
+         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+         fprintf(stderr, "max size is '%u'.\n", capacity);
+         STOP;
+      }
+
+      buf[idx] = '\0';
+      capacity -= 1;
+   }
+
    // Return the length of the string and excluding the null-byte
    uint len() const {
-      uint count = 0;
+      uint idx = 0;
+      while (buf[idx] != '\0')  idx += 1;
 
-      while (buf[count] != '\0') count++;
-      return count;
+      return idx;
    }
 
    // Return the length of the string including the null-byte
    uint nlen() const {
-      uint count = 0;
-      while (buf[count] != '\0') count++;
-      count += 1;
+      uint idx = 0;
+      while (buf[idx] != '\0')  idx += 1;
 
-      return count;
+      return idx + 1;
    }
 
    char& operator[] (const uint idx) {
       if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP
+         STOP;
       }
 
-      current_idx++;
       return buf[idx];
    }
 
@@ -54,7 +74,7 @@ struct String {
       if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP
+         STOP;
       }
 
       return buf[idx];
@@ -62,61 +82,41 @@ struct String {
 
    void operator= (const char *string) {
       memset(buf, 0, nlen());
-      current_idx = 0;
 
-      for (uint i = 0; string[i] != '\0'; i++) {
-         buf[i] = string[i];
-         current_idx++;
-      }
+      for (uint i = 0; string[i] != '\0'; i++) buf[i] = string[i];
    }
 
-   void operator+= (const char *string) {
-      uint idx = 0;
-      while (string[idx] != '\0') {
-         if (current_idx > capacity) {
-            fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
-            fprintf(stderr, "max size is '%u'.\n", capacity);
-            STOP
-         }
+   void concat(const char *s) {
+      const uint s_len = strlen(s);
 
-         buf[current_idx] = string[idx];
-         current_idx++;
-         idx++;
-      }
-   }
-
-   void operator+= (const char str) {
-      if (current_idx > capacity) {
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", current_idx);
-         fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP
+      if (nlen() + s_len >= capacity) {
+         fprintf(stderr, "string - can't concat strings because not enought space\n");
+         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, nlen() + s_len);
+         STOP;
       }
 
-      buf[current_idx] = str;
-      current_idx++;
+      strcat(buf, s);
    }
-};
 
-struct Char_Iter {
-   const char* str;
-   uint length;
+   void concat(const String *s) {
+      if (s->nlen() + len() > capacity) {
+         fprintf(stderr, "string - can't concat strings because not enought space\n");
+         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, s->nlen() + len());
+         STOP;
+      }
 
-   struct Iterator {
-      const char* ptr;
-      const char* end;
+      strcat(buf, s->buf);
+   }
 
-      Iterator(const char* p, const char* e) : ptr(p), end(e) {}
+   void concat(const char s) {
+      if (nlen() + 1 >= capacity) {
+         fprintf(stderr, "string - can't concat strings because not enought space\n");
+         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, 1 + nlen());
+         STOP;
+      }
 
-      char operator*() const { return *ptr; }
-      Iterator& operator++() { ++ptr; return *this; }
-      bool operator!=(const Iterator& other) const { return ptr != other.ptr; }
-   };
-
-   Char_Iter(const char* s) : str(s), length(strlen(s)) {}
-   Char_Iter(const String &s) : str(s.buf), length(s.nlen()) {}
-
-   Iterator begin() const { return Iterator(str, str + length); }
-   Iterator end() const { return Iterator(str + length, str + length); }
+      buf[len()] = s;
+   }
 };
 
 //
@@ -129,7 +129,7 @@ struct Char_Iter {
 // way if the string is only needed at a specific scope then it would be easy return a custom 'string'
 // that has a destructor which will get ran if the string isn't allocated by a custom allocator.
 //
-// - Hamza, March 12 2025
+// - Hamza, 12 March 2025
 //
 
 template<typename ...Args>
@@ -148,9 +148,32 @@ String format_string(Fixed_Allocator *allocator, const char *fmt_string, const A
 
    for (uint i = 0; i < format_len; i++) {
       if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) dyn_string += *(std::next(arg_list.begin(), arg_idx++));
+         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
          else fprintf(stderr, "format-string - not enough arguments provided for format string");
-      } else dyn_string += fmt_string[i];
+      } else dyn_string.concat(fmt_string[i]);
+   }
+
+   return dyn_string;
+}
+
+template<typename ...Args>
+String format_string(const char *fmt_string, const Args ...args) {
+   const auto arg_list = { args... }; 
+   const uint format_len = strlen(fmt_string);
+   uint total_size = 0;
+
+   for (const auto arg : arg_list) {
+      total_size += strlen(arg);
+   }
+
+   auto dyn_string = String::with_size(format_len + total_size + 1);
+
+   uint arg_idx = 0;
+   for (uint i = 0; i < format_len; i++) {
+      if (fmt_string[i] == '%') {
+         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
+         else fprintf(stderr, "format-string - not enough arguments provided for format string");
+      } else dyn_string.concat(fmt_string[i]);
    }
 
    return dyn_string;

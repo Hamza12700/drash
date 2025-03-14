@@ -12,10 +12,12 @@
 #include "types.cpp"
 
 #define VERSION "0.1.0"
+
+// @Think: Does it make sense to limit the argument path length to only XXX characters long?
 #define MAX_ARGLEN 300
 
 auto root_allocator = Fixed_Allocator::make(getpagesize());
-auto drash = Drash(&root_allocator);
+auto drash = Drash();
 
 String file_basename(Fixed_Allocator *allocator, const String *path) {
    bool contain_slash = false;
@@ -228,7 +230,7 @@ int main(int argc, char *argv[]) {
                      return 0;
                   }
 
-                  drash.empty_drash(&root_allocator);
+                  drash.empty_drash();
 
                   closedir(metadata_dir);
                   return 0;
@@ -271,6 +273,9 @@ int main(int argc, char *argv[]) {
 
       auto path = String::with_size(&scratch_allocator, path_len);
       path = arg;
+
+      // Remove the trailing slash
+      if (path[path.len()-1] == '/') path.remove(path.len()-1);
 
       auto filename = file_basename(&scratch_allocator, &path);
       auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);

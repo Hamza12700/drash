@@ -15,7 +15,16 @@ struct Drash {
    // Heap pointer to filepath of metadata about the removed files
    String metadata;
 
-   Drash(Fixed_Allocator *allocator) {
+   //
+   // NOTE:
+   //
+   // This struct will live entirety of the program, so malloc'ing memory is fine,
+   // even if the memory doesn't get free'd then that's fine because the OS is gona handle that.
+   //
+   // - Hamza, 14 March 2025
+   //
+
+   Drash() {
       const char *home_env = getenv("HOME");
       assert_err(home_env == NULL, "failed to get HOME environment variable");
 
@@ -26,48 +35,37 @@ struct Drash {
          exit(-1);
       }
 
-      // Buffer to hold the drash directory path
-      // Don't need to compute the home_env size because we know the max size of the string
-      char drash_dir[25 + strlen("/.local/share/Drash") + 1];
-      sprintf(drash_dir, "%s/.local/share/Drash", home_env);
-      int err = 0;
+      auto drash_dir = format_string("%/%", home_env, (const char *)".local/share/Drash");
 
-      // Premission: rwx|r--|---
-      err = mkdir(drash_dir, DIR_PERM);
+      int err = 0;
+      err = mkdir(drash_dir.buf, DIR_PERM);
 
       // Skip the error check if the directory already exists
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto drash_files = String::with_size(allocator, sizeof(files) + strlen(drash_dir) + strlen("/files"));
-      sprintf(drash_files.buf, "%s/files", drash_dir);
+      auto drash_files = format_string("%/files", drash_dir.buf);
       err = mkdir(drash_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto metadata_files = String::with_size(allocator, sizeof(metadata) + strlen(drash_dir) + strlen("/metadata"));
-      sprintf(metadata_files.buf, "%s/metadata", drash_dir);
+      auto metadata_files = format_string("%s/metadata", drash_dir.buf);
       err = mkdir(metadata_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
+      free(drash_dir.buf);
       files = drash_files;
       metadata = metadata_files;
    }
 
-   void empty_drash(Fixed_Allocator *allocator) {
-      auto string = String::with_size(allocator, files.nlen() + 10);
-      sprintf(string.buf, "rm -rf %s", files.buf); // @Incomplete: Implement a function that will delete files and directories recursively
-      assert_err(system(string.buf) != 0, "failed to remove drashd files");
+   // @ToDo: Confirm before wiping the files!
+   void empty_drash() {
+      auto command = format_string("rm -rm %", files.buf);
+      assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
-
-      DIR *dir = opendir(metadata.buf);
-      assert_err(dir == NULL, "failed to open drash metadata directory");
-
-      struct dirent *dst;
-      while ((dst = readdir(dir)) != NULL) {}
    }
 };

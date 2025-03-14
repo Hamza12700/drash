@@ -18,10 +18,10 @@ void *xmalloc(const uint size) {
 }
 
 #ifdef DEBUG
-#define STOP raise(SIGTRAP);
+#define STOP raise(SIGTRAP)
 
 #else
-#define STOP exit(-1);
+#define STOP exit(-1)
 
 #endif // DEBUG
 

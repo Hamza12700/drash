@@ -54,7 +54,7 @@ struct Array {
       // NOTE: Do not shallow copy the string if it's malloc'd because it will be free'd at the end of the scope!
       if (!custom_allocator) {
          fprintf(stderr, "temp-array - attempted to shallow copy the string which will be free'd at the end of the scope!");
-         STOP
+         STOP;
       }
 
       return String {
@@ -72,7 +72,7 @@ struct Array {
       if (idx > size) {
          fprintf(stderr, "array - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", size);
-         STOP
+         STOP;
       }
 
       return ptr[idx];
@@ -82,7 +82,7 @@ struct Array {
       if (string->len() > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string->len());
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         STOP
+         STOP;
       }
 
       memcpy(ptr, string->buf, string->nlen());
@@ -92,7 +92,7 @@ struct Array {
       if (string->len() > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", string->len());
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         STOP
+         STOP;
       }
 
       memcpy(ptr, string->buf, string->len());
@@ -104,7 +104,7 @@ struct Array {
       if (str_len > size) {
          fprintf(stderr, "array: operator '=' - 'const char *' length exceeds the Array->size: %u \n", str_len);
          fprintf(stderr, "max-array size is '%u'.\n", size);
-         STOP
+         STOP;
       }
 
       strcpy(ptr, s);

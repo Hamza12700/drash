@@ -51,7 +51,7 @@ struct Drash {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto metadata_files = format_string("%s/metadata", drash_dir.buf);
+      auto metadata_files = format_string("%/metadata", drash_dir.buf);
       err = mkdir(metadata_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");

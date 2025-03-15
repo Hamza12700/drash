@@ -16,9 +16,6 @@
 // @Think: Does it make sense to limit the argument path length to only XXX characters long?
 #define MAX_ARGLEN 300
 
-auto root_allocator = Fixed_Allocator::make(getpagesize());
-auto drash = Drash();
-
 String file_basename(Fixed_Allocator *allocator, const String *path) {
    bool contain_slash = false;
    for (uint i = 0; i < path->len(); i++) {
@@ -131,6 +128,9 @@ int main(int argc, char *argv[]) {
    argv++;
    argc -= 1;
 
+   auto scratch_allocator = Fixed_Allocator::make(getpagesize());
+   Drash drash;
+
    // Handle option arguments
    if (argv[0][0] == '-') {
       const char *arg = argv[0];
@@ -177,10 +177,10 @@ int main(int argc, char *argv[]) {
                   }
 
                   // @Incomplete: Implement a function that will delete files and directories recursively
-                  auto string = format_string(&root_allocator, "rm -rf %", path);
+                  auto string = format_string(&scratch_allocator, "rm -rf %", path);
 
                   assert_err(system(string.buf) != 0, "system command failed");
-                  root_allocator.reset();
+                  scratch_allocator.reset();
                }
 
                return 0;
@@ -191,8 +191,6 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Unkonwn option: %s\n", arg);
       return -1;
    }
-
-   auto scratch_allocator = root_allocator.sub_allocator(1000);
 
    const char *current_dir = getenv("PWD");
    assert(current_dir == NULL, "PWD envirnoment not found");
@@ -309,5 +307,5 @@ int main(int argc, char *argv[]) {
       scratch_allocator.reset();
    }
 
-   root_allocator.free();
+   scratch_allocator.free();
 }

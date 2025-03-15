@@ -28,7 +28,7 @@ struct String {
    // @Incomplete: Deallocate the malloc'd memory
    static String with_size(const uint size) {
       return String {
-         .buf = static_cast <char *>(malloc(sizeof(char) + size)),
+         .buf = static_cast <char *>(calloc(size + sizeof(char), sizeof(char))),
          .capacity = (uint)sizeof(char) + size,
       };
    }
@@ -41,7 +41,6 @@ struct String {
       }
 
       buf[idx] = '\0';
-      capacity -= 1;
    }
 
    // Return the length of the string and excluding the null-byte

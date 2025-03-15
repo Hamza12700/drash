@@ -28,6 +28,19 @@ struct String {
    // @Incomplete: Deallocate the malloc'd memory
    static String with_size(const uint size) {
       return String {
+
+         //
+         // @Hack | @NOTE:
+         //
+         // This is stupid because malloc gets replaced by ASAN and because we mutate the string buffer
+         // it thinks that we are access memory out of bounds even thought we are not! Because the memory returned by
+         // ASAN 'malloc' isn't zero initialize. That's why we have to use 'calloc'.
+         //
+         // Because we are doing the bounds checking ourself ASAN is useless here.
+         //
+         // - Hamza, 15 March 2025
+         //
+
          .buf = static_cast <char *>(calloc(size + sizeof(char), sizeof(char))),
          .capacity = (uint)sizeof(char) + size,
       };

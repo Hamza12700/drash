@@ -62,10 +62,25 @@ struct Drash {
       metadata = metadata_files;
    }
 
-   // @ToDo: Confirm before wiping the files!
-   void empty_drash() {
-      auto command = format_string("rm -rm %", files.buf);
+   // @ToDo: Confirm before wiping out the files!
+   void empty_drash(Fixed_Allocator *allocator) {
+      auto command = format_string(allocator, "rm -rf %", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
+
+      DIR *dir = opendir(metadata.buf);
+
+      struct dirent *rdir;
+      while ((rdir = readdir(dir)) != NULL) {
+         if (rdir->d_name[0] == '.' || strcmp(rdir->d_name, "..") == 0) continue;
+
+         auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
+         unlink(path.buf);
+
+         // @Temporary: This is dangerous because there could be other part of the program that needs the memory.
+         allocator->reset();
+      }
+
+      closedir(dir);
    }
 };

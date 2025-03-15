@@ -12,9 +12,7 @@
 #include "types.cpp"
 
 #define VERSION "0.1.0"
-
-// @Think: Does it make sense to limit the argument path length to only XXX characters long?
-#define MAX_ARGLEN 300
+#define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
 
 String file_basename(Fixed_Allocator *allocator, const String *path) {
    bool contain_slash = false;
@@ -228,7 +226,7 @@ int main(int argc, char *argv[]) {
                      return 0;
                   }
 
-                  drash.empty_drash();
+                  drash.empty_drash(&scratch_allocator);
 
                   closedir(metadata_dir);
                   return 0;
@@ -297,7 +295,7 @@ int main(int argc, char *argv[]) {
       FILE *file_metadata = fopen(file_metadata_path.buf, "w");
       assert_err(file_metadata == NULL, "fopen failed");
 
-      auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, filename.buf);
+      auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
       fprintf(file_metadata, "Path: %s", absolute_path.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);

@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <dirent.h>
-#include <unistd.h>
 
 #include "assert.c"
 #include "fixed_allocator.cpp"
@@ -126,8 +124,6 @@ int main(int argc, char *argv[]) {
    argv++;
    argc -= 1;
 
-   auto scratch_allocator = Fixed_Allocator::make(getpagesize());
-   Drash drash;
 
    // Handle option arguments
    if (argv[0][0] == '-') {
@@ -175,10 +171,9 @@ int main(int argc, char *argv[]) {
                   }
 
                   // @Incomplete: Implement a function that will delete files and directories recursively
-                  auto string = format_string(&scratch_allocator, "rm -rf %", path);
+                  auto string = format_string("rm -rf %", path);
 
                   assert_err(system(string.buf) != 0, "system command failed");
-                  scratch_allocator.reset();
                }
 
                return 0;
@@ -192,6 +187,9 @@ int main(int argc, char *argv[]) {
 
    const char *current_dir = getenv("PWD");
    assert(current_dir == NULL, "PWD envirnoment not found");
+
+   auto scratch_allocator = Fixed_Allocator::make(getpagesize());
+   Drash drash;
 
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
@@ -226,7 +224,7 @@ int main(int argc, char *argv[]) {
                      return 0;
                   }
 
-                  drash.empty_drash(&scratch_allocator);
+                  drash.empty_drash();
 
                   closedir(metadata_dir);
                   return 0;
@@ -240,8 +238,7 @@ int main(int argc, char *argv[]) {
          }
       }
 
-      // Check for symlink files and delete if found
-      // If file doesn't exist then report the error and continue to next file
+      // Remove symlinks
       struct stat statbuf;
       int err = 0;
       err = lstat(arg, &statbuf);

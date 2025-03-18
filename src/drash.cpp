@@ -45,26 +45,38 @@ struct Drash {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto drash_files = format_string("%/files", drash_dir.buf);
-      err = mkdir(drash_files.buf, DIR_PERM);
+      auto tmp_files = format_string("%/files", drash_dir.buf);
+      err = mkdir(tmp_files.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      auto metadata_files = format_string("%/metadata", drash_dir.buf);
-      err = mkdir(metadata_files.buf, DIR_PERM);
+      auto tmp_metadata = format_string("%/metadata", drash_dir.buf);
+      err = mkdir(tmp_metadata.buf, DIR_PERM);
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      free(drash_dir.buf);
-      files = drash_files;
-      metadata = metadata_files;
+      //
+      // @Hack:
+      //
+      // We need the temporary string buffer but because the buffer only gets deallocated
+      // when it's allocated by 'malloc' that's why we're setting the 'with_allocator' boolean flag to true.
+      //
+      // Maybe a adding a bit-flags field is good because then if something wants a reference to the buffer,
+      // it would easy because then we can just set a bit-flag.
+      //
+
+      tmp_files.with_allocator = true;
+      tmp_metadata.with_allocator = true;
+
+      files.buf = tmp_files.buf;
+      metadata.buf = tmp_metadata.buf;
    }
 
-   // @ToDo: Confirm before wiping out the files!
-   void empty_drash(Fixed_Allocator *allocator) {
-      auto command = format_string(allocator, "rm -rf %", files.buf);
+   // @TODO: Confirm before wiping out the files!
+   void empty_drash() {
+      auto command = format_string("rm -rf %", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
@@ -74,11 +86,8 @@ struct Drash {
       while ((rdir = readdir(dir)) != NULL) {
          if (rdir->d_name[0] == '.' || strcmp(rdir->d_name, "..") == 0) continue;
 
-         auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
+         auto path = format_string( "%/%", metadata.buf, rdir->d_name);
          unlink(path.buf);
-
-         // @Temporary: This is dangerous because there could be other part of the program that needs the memory.
-         allocator->reset();
       }
 
       closedir(dir);

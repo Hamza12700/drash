@@ -17,22 +17,27 @@
 struct String {
    char *buf = NULL;
    uint capacity = 0;
+   bool with_allocator = false;
+
+   ~String() {
+      if (!with_allocator) free(buf);
+   }
 
    static String with_size(Fixed_Allocator *allocator, const uint size) {
       return String {
          .buf = static_cast <char *>(allocator->alloc(sizeof(char) + size)),
          .capacity = (uint)sizeof(char) + size,
+         .with_allocator = true,
       };
    }
 
-   // @Incomplete: Deallocate the malloc'd memory
    static String with_size(const uint size) {
       return String {
 
          //
          // @Hack | @NOTE:
          //
-         // This is stupid because malloc gets replaced by ASAN and because we mutate the string buffer
+         // This is stupid because malloc gets replaced by ASAN and because we mutate the string buffer and overwrite the null-byte
          // it thinks that we are access memory out of bounds even thought we are not! Because the memory returned by
          // ASAN 'malloc' isn't zero initialize. That's why we have to use 'calloc'.
          //
@@ -53,7 +58,7 @@ struct String {
          STOP;
       }
 
-      buf[idx] = '\0';
+      buf[idx] = '\0'; // @Robustness: Check if the character in the string buffer is null or not for safety reasons?
    }
 
    // Return the length of the string and excluding the null-byte

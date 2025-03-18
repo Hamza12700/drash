@@ -9,6 +9,7 @@
 #include "strings.cpp"
 #include "types.cpp"
 #include "cli.cpp"
+#include "file_system.cpp"
 
 #define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
 
@@ -60,28 +61,20 @@ int main(int argc, char *argv[]) {
    Drash drash;
 
    for (int i = 0; i < argc; i++) {
-      const char *arg = argv[i];
-
       // Handle commands
       if (handle_commands((const char **)argv, argc, &drash)) return 0;
 
-      // Remove symlinks
-      struct stat statbuf;
-      int err = 0;
-      err = lstat(arg, &statbuf);
+      const char *arg = argv[i];
 
-      // If file not found
-      if (err != 0 && errno == 2) {
+      if (!file_exists(arg)) {
          fprintf(stderr, "file not found: %s\n", arg);
          continue;
       }
 
-      assert_err(err != 0, "lstat failed");
-
-      // Remove symlink files
-      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+      if (file_is_symlink(arg)) {
          assert_err(remove(arg) != 0, "failed to remove symlink-file");
          printf("Removed symlink: %s\n", arg);
+         continue;
       }
 
       const int path_len = strlen(arg);
@@ -100,26 +93,21 @@ int main(int argc, char *argv[]) {
       auto filename = file_basename(&scratch_allocator, &path);
       auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
 
-      err = lstat(file_metadata_path.buf, &statbuf);
-      bool file_exists = true;
-
-      if ((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-         fprintf(stderr, "Error: metadata file is a symlink-file\n");
-         continue;
-      }
-
-      if (err != 0 && errno == 2) file_exists = false;
-
-      if (file_exists) {
+      if (file_exists(file_metadata_path.buf)) {
          fprintf(stderr, "Error: file '%s' already exists in the drashcan\n", arg);
          fprintf(stderr, "Can't overwrite it\n");
          continue;
       }
 
-      auto file_metadata = open_file(file_metadata_path.buf, "w");
+      if (file_is_symlink(file_metadata_path.buf)) {
+         fprintf(stderr, "Error: metadata file is a symlink-file\n");
+         continue;
+      }
+
+      auto file_info = open_file(file_metadata_path.buf, "a");
 
       auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
-      fprintf(*file_metadata, "Path: %s", absolute_path.buf);
+      fprintf(*file_info, "Path: %s", absolute_path.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");

@@ -2,6 +2,7 @@
 #define FILE_SYS
 
 #include <dirent.h>
+#include <sys/stat.h>
 
 #include "strings.cpp"
 
@@ -44,6 +45,25 @@ File open_file(const char *file_path, const char *modes) {
       .file = file,
       .path = file_path
    };
+}
+
+bool file_exists(const char *path, bool follow_symlink = false) {
+   struct stat st;
+   int err = 0;
+
+   if (follow_symlink) err = stat(path, &st);
+   else err = lstat(path, &st);
+
+   if (err != 0) return false;
+   return true;
+}
+
+bool file_is_symlink(const char *path) {
+   struct stat st;
+   if (lstat(path, &st) != 0) return false;
+
+   if ((st.st_mode & S_IFMT) == S_IFLNK) return true;
+   return false;
 }
 
 Directory open_dir(const char *dir_path) {

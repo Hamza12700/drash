@@ -9,12 +9,8 @@
 
 #include "fixed_allocator.cpp"
 
-//
-// NOTE: Add a de-contractor which will only deallocates memory which is malloc'd
-//
-
 struct String {
-   char *buf = NULL;
+   char *buf = NULL; // Null-terminated buffer
    uint capacity = 0;
    bool with_allocator = false;
 
@@ -24,8 +20,8 @@ struct String {
 
    static String with_size(Fixed_Allocator *allocator, const uint size) {
       return String {
-         .buf = static_cast <char *>(allocator->alloc(sizeof(char) + size)),
-         .capacity = (uint)sizeof(char) + size,
+         .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
+         .capacity = size+1,
          .with_allocator = true,
       };
    }
@@ -45,8 +41,8 @@ struct String {
          // - Hamza, 15 March 2025
          //
 
-         .buf = static_cast <char *>(xcalloc(size + sizeof(char), sizeof(char))),
-         .capacity = (uint)sizeof(char) + size,
+         .buf = static_cast <char *>(xcalloc(size+1, sizeof(char))),
+         .capacity = size+1,
       };
    }
 
@@ -97,7 +93,7 @@ struct String {
    }
 
    void operator= (const char *string) {
-      memset(buf, 0, nlen());
+      memset(buf, 0, len());
 
       for (uint i = 0; string[i] != '\0'; i++) buf[i] = string[i];
    }
@@ -125,7 +121,7 @@ struct String {
    }
 
    void concat(const char s) {
-      if (nlen() + 1 >= capacity) {
+      if (nlen() >= capacity) {
          fprintf(stderr, "string - can't concat strings because not enought space\n");
          fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, 1 + nlen());
          STOP;
@@ -158,7 +154,6 @@ String format_string(Fixed_Allocator *allocator, const char *fmt_string, const A
       total_size += strlen(arg);
    }
 
-   total_size += 1;
    auto dyn_string = String::with_size(allocator, format_len + total_size);
    uint arg_idx = 0;
 
@@ -182,7 +177,7 @@ String format_string(const char *fmt_string, const Args ...args) {
       total_size += strlen(arg);
    }
 
-   auto dyn_string = String::with_size(format_len + total_size + 1);
+   auto dyn_string = String::with_size(format_len + total_size);
 
    uint arg_idx = 0;
    for (uint i = 0; i < format_len; i++) {

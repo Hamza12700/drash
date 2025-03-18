@@ -3,7 +3,6 @@
 
 #include <sys/mman.h>
 
-#include "assert.cpp"
 #include "types.cpp"
 
 

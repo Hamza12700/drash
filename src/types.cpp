@@ -21,7 +21,7 @@ void *xmalloc(const uint size) {
 
 void *xcalloc(const uint number, const uint size) {
    void *mem = calloc(number, size);
-   assert_err(mem == NULL, "malloc - failed");
+   assert_err(mem == NULL, "calloc - failed");
    return mem;
 }
 

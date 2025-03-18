@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
       arg++;
       if (arg[0] == '-') arg++;
 
-      // @NOTE: Check files/directories if they exists so that way I don't have to
+      // @NOTE: Check files and directories if they exists so that way I don't have to
       // do error checking in every case for the command line option.
 
       for (const auto opt : options) {

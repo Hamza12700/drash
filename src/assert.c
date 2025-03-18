@@ -8,23 +8,21 @@
 #include <string.h>
 
 // Assert and display the message
-#define assert(bool, msg) { \
-   if (bool) { \
-      fprintf(stderr, "[ASSERT FAILED] %s:%d\n", __FILE__, __LINE__); \
-      fprintf(stderr, "Reason: %s\n", msg); \
-      exit(-1); \
-   } \
-}
+#define assert(bool, msg) \
+if (bool) { \
+   fprintf(stderr, "[ASSERT FAILED] %s:%d\n", __FILE__, __LINE__); \
+   fprintf(stderr, "Reason: %s\n", msg); \
+   exit(-1); \
+} \
 
 // Assert and display the message with errno string
 // Exit with errno code
-#define assert_err(bool, msg) { \
-   if (bool) { \
-      fprintf(stderr, "[ASSERT ERROR] %s:%d\n", __FILE__, __LINE__); \
-      fprintf(stderr, "Reason: %s\n", msg); \
-      fprintf(stderr, "Error: %s\n", strerror(errno)); \
-      exit(errno); \
-   } \
-}
+#define assert_err(bool, msg) \
+if (bool) { \
+   fprintf(stderr, "[ASSERT ERROR] %s:%d\n", __FILE__, __LINE__); \
+   fprintf(stderr, "Reason: %s\n", msg); \
+   fprintf(stderr, "Error: %s\n", strerror(errno)); \
+   exit(errno); \
+} \
 
 #endif /* ifndef ASSERT_H */

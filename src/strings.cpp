@@ -182,13 +182,15 @@ String format_string(const char *fmt_string, const Args ...args) {
 
    uint arg_idx = 0;
    for (uint i = 0; i < format_len; i++) {
+
       if (fmt_string[i] == '%') {
          if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
          else fprintf(stderr, "format-string - not enough arguments provided for format string");
+
       } else dyn_string.concat(fmt_string[i]);
    }
 
    return dyn_string;
 }
 
-#endif
+#endif // STRINGS_H

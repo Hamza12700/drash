@@ -6,6 +6,8 @@
 
 #include "assert.c"
 
+#define VERSION "0.1.0"
+
 typedef unsigned int uint;
 typedef uint8_t  u8;
 typedef uint16_t u16;

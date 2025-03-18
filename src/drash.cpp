@@ -1,3 +1,6 @@
+#ifndef DRASH_H
+#define DRASH_H
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -75,7 +78,23 @@ struct Drash {
    }
 
    // @TODO: Confirm before wiping out the files!
-   void empty_drash() {
+   void empty_drash() const {
+      DIR *metadata_dir = opendir(metadata.buf);
+      assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
+
+      int count = 0;
+      while (readdir(metadata_dir) != NULL) {
+         count++;
+      }
+
+      if (count <= 2) {
+         printf("Drashcan is already empty\n");
+         closedir(metadata_dir);
+         return;
+      }
+
+      closedir(metadata_dir);
+
       auto command = format_string("rm -rf %", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
@@ -86,10 +105,12 @@ struct Drash {
       while ((rdir = readdir(dir)) != NULL) {
          if (rdir->d_name[0] == '.' || strcmp(rdir->d_name, "..") == 0) continue;
 
-         auto path = format_string( "%/%", metadata.buf, rdir->d_name);
+         auto path = format_string("%/%", metadata.buf, rdir->d_name);
          unlink(path.buf);
       }
 
       closedir(dir);
    }
 };
+
+#endif // DRASH_H

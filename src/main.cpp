@@ -8,8 +8,8 @@
 #include "array.cpp"
 #include "strings.cpp"
 #include "types.cpp"
+#include "cli.cpp"
 
-#define VERSION "0.1.0"
 #define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
 
 String file_basename(Fixed_Allocator *allocator, const String *path) {
@@ -37,83 +37,6 @@ String file_basename(Fixed_Allocator *allocator, const String *path) {
    return char_array.to_string();
 }
 
-enum CmdAction {
-   List,
-   Remove, 
-   Empty,
-   Restore,
-};
-
-struct Command {
-   const char *name;
-   const char *desc;
-
-   const CmdAction action;
-};
-
-const Command commands[] = {
-   {.name = "list", .desc = "List Drash'd files", .action = List },
-   {.name = "remove", .desc = "Remove files from the Drash/can", .action = Remove },
-   {.name = "empty", .desc = "Empty the Drash/can", .action = Empty },
-   {.name = "restore", .desc = "Restore removed files", .action = Restore },
-};
-
-enum OptAction {
-   Force,    // Remove the file without storing it in the drashcan
-   Help,     // Help message. @NOTE: Add ability to show help for separate commands
-   Version,  // Print version of the project
-};
-
-struct Option {
-   const char *name;
-   const char *desc;
-
-   const OptAction action;
-
-   // Compare a string with an option->name
-   bool cmp(const char *str) const {
-      char lbuf[10] = {0};
-      char sbuf[5] = {0};
-
-      int x = 0;
-      for (uint i = 0; i < strlen(name) - 1; i++) {
-         const char name_char = name[i];
-
-         if (name_char != '|') {
-            lbuf[i] = name_char;
-            continue;
-         }
-
-         sbuf[x] = name[i+1];
-         x++;
-      }
-
-      if (strcmp(str, lbuf) == 0 || strcmp(str, sbuf) ==  0) return true;
-      return false;
-   }
-};
-
-const Option options[] = {
-   { .name = "force|f", .desc = "Force remove file" , .action = Force },
-   { .name = "help|h", .desc = "Display the help message" , .action = Help },
-   { .name = "version|v", .desc = "Print the version" , .action = Version },
-};
-
-void print_help() {
-   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
-   printf("\nCommands:\n");
-   for (const auto cmd : commands) {
-      printf("   %-10s", cmd.name);
-      printf("   %-10s\n", cmd.desc);
-   }
-
-   printf("\nOptions:\n");
-   for (const auto opt : options) {
-      printf("   %-10s", opt.name);
-      printf("   %-10s\n", opt.desc);
-   }
-}
-
 int main(int argc, char *argv[]) {
    if (argc == 1) {
       fprintf(stderr, "Missing argument file(s)\n");
@@ -121,68 +44,13 @@ int main(int argc, char *argv[]) {
    }
 
    // Skip the binary path
-   argv++;
+   argv += 1;
    argc -= 1;
-
 
    // Handle option arguments
    if (argv[0][0] == '-') {
-      const char *arg = argv[0];
-
-      arg++;
-      if (arg[0] == '-') arg++;
-
-      // @NOTE: Check files and directories if they exists so that way I don't have to
-      // do error checking in every case for the command line option.
-
-      for (const auto opt : options) {
-         if (!opt.cmp(arg)) {
-            continue;
-         }
-
-         // @Factor: Handle options in a separate function/file because of indentation-level
-         switch (opt.action) {
-            case Help: {
-               print_help();
-               return 0;
-            }
-
-            case Version: {
-               printf("drash version: %s\n", VERSION);
-               return 0;
-            }
-
-            case Force: {
-               if (argc == 1) {
-                  fprintf(stderr, "Missing argument file(s)\n");
-                  return -1;
-               }
-
-               // Skip the current argument
-               for (int i = 1; i < argc; i++) {
-                  const char *path = argv[i];
-
-                  struct stat sb;
-                  assert_err(lstat(path, &sb) != 0, "lstat failed");
-
-                  if ((sb.st_mode & S_IFMT) == S_IFREG) {
-                     assert_err(unlink(path) != 0, "failed to remove file");
-                     continue;
-                  }
-
-                  // @Incomplete: Implement a function that will delete files and directories recursively
-                  auto string = format_string("rm -rf %", path);
-
-                  assert_err(system(string.buf) != 0, "system command failed");
-               }
-
-               return 0;
-            }
-         }
-      }
-
-      fprintf(stderr, "Unkonwn option: %s\n", arg);
-      return -1;
+      handle_opts((const char **)argv, argc);
+      return 0;
    }
 
    const char *current_dir = getenv("PWD");
@@ -194,49 +62,8 @@ int main(int argc, char *argv[]) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
-      for (auto cmd : commands) {
-         if (strcmp(arg, cmd.name) == 0) {
-            switch (cmd.action) {
-               case List: {
-                  printf("TODO: LIST");
-                  return 0;
-               }
-
-               case Restore: {
-                  printf("TODO: Restore");
-                  return 0;
-               }
-
-               case Empty: {
-                  DIR *metadata_dir = opendir(drash.metadata.buf);
-                  assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
-
-                  struct dirent *dir_stat;
-                  int count = 0;
-
-                  while ((dir_stat = readdir(metadata_dir)) != NULL) {
-                     count++; 
-                  }
-
-                  if (count <= 2) {
-                     printf("Drashcan is already empty\n");
-                     closedir(metadata_dir);
-                     return 0;
-                  }
-
-                  drash.empty_drash();
-
-                  closedir(metadata_dir);
-                  return 0;
-               }
-
-               case Remove: {
-                  printf("TODO: Remove");
-                  return 0;
-               }
-            }
-         }
-      }
+      // Handle commands
+      if (handle_commands((const char **)argv, argc, &drash)) return 0;
 
       // Remove symlinks
       struct stat statbuf;

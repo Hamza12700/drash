@@ -8,7 +8,6 @@
 #include <iterator>
 
 #include "fixed_allocator.cpp"
-#include "types.cpp"
 
 //
 // NOTE: Add a de-contractor which will only deallocates memory which is malloc'd
@@ -46,7 +45,7 @@ struct String {
          // - Hamza, 15 March 2025
          //
 
-         .buf = static_cast <char *>(calloc(size + sizeof(char), sizeof(char))),
+         .buf = static_cast <char *>(xcalloc(size + sizeof(char), sizeof(char))),
          .capacity = (uint)sizeof(char) + size,
       };
    }
@@ -196,6 +195,12 @@ String format_string(const char *fmt_string, const Args ...args) {
    }
 
    return dyn_string;
+}
+
+template<typename ...Args>
+void report_error(const char *fmt, Args ...args) {
+   auto err_string = format_string(fmt, args...);
+   assert_err(true, err_string.buf);
 }
 
 #endif // STRINGS_H

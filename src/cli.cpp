@@ -3,7 +3,7 @@
 #include <dirent.h>
 
 #include "strings.cpp"
-#include "assert.c"
+#include "assert.cpp"
 #include "types.cpp"
 #include "drash.cpp"
 

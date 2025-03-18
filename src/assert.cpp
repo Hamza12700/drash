@@ -25,4 +25,5 @@ if (bool) { \
    exit(errno); \
 } \
 
+
 #endif /* ifndef ASSERT_H */

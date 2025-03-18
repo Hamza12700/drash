@@ -2,7 +2,7 @@
 #include <string.h>
 #include <dirent.h>
 
-#include "assert.c"
+#include "assert.cpp"
 #include "fixed_allocator.cpp"
 #include "drash.cpp"
 #include "array.cpp"
@@ -116,16 +116,14 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      FILE *file_metadata = fopen(file_metadata_path.buf, "w");
-      assert_err(file_metadata == NULL, "fopen failed");
+      auto file_metadata = open_file(file_metadata_path.buf, "w");
 
       auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
-      fprintf(file_metadata, "Path: %s", absolute_path.buf);
+      fprintf(*file_metadata, "Path: %s", absolute_path.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");
 
-      fclose(file_metadata);
       scratch_allocator.reset();
    }
 

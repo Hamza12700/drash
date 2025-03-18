@@ -6,26 +6,14 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#include "fixed_allocator.cpp"
 #include "strings.cpp"
+#include "file_system.cpp"
 
 #define DIR_PERM 0740
 
 struct Drash {
-   // Heap pointer to filepath of removed files
-   String files;
-
-   // Heap pointer to filepath of metadata about the removed files
-   String metadata;
-
-   //
-   // NOTE:
-   //
-   // This struct will live entirety of the program, so malloc'ing memory is fine,
-   // even if the memory doesn't get free'd then that's fine because the OS is gona handle that.
-   //
-   // - Hamza, 14 March 2025
-   //
+   String files; // Drashd files
+   String metadata; // Info about drashd files
 
    Drash() {
       const char *home_env = getenv("HOME");
@@ -79,37 +67,31 @@ struct Drash {
 
    // @TODO: Confirm before wiping out the files!
    void empty_drash() const {
-      DIR *metadata_dir = opendir(metadata.buf);
-      assert_err(metadata_dir == NULL, "failed to open drash metadata directory");
+      auto metadata_dir = open_dir(metadata.buf);
 
       int count = 0;
-      while (readdir(metadata_dir) != NULL) {
+      while (readdir(*metadata_dir) != NULL) {
          count++;
       }
 
       if (count <= 2) {
          printf("Drashcan is already empty\n");
-         closedir(metadata_dir);
          return;
       }
-
-      closedir(metadata_dir);
 
       auto command = format_string("rm -rf %", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
-      DIR *dir = opendir(metadata.buf);
+      auto dir = open_dir(metadata.buf);
 
       struct dirent *rdir;
-      while ((rdir = readdir(dir)) != NULL) {
+      while ((rdir = readdir(*dir)) != NULL) {
          if (rdir->d_name[0] == '.' || strcmp(rdir->d_name, "..") == 0) continue;
 
          auto path = format_string("%/%", metadata.buf, rdir->d_name);
          unlink(path.buf);
       }
-
-      closedir(dir);
    }
 };
 

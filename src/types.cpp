@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "assert.c"
+#include "assert.cpp"
 
 #define VERSION "0.1.0"
 
@@ -15,6 +15,12 @@ typedef uint32_t u32;
 
 void *xmalloc(const uint size) {
    void *mem = malloc(size);
+   assert_err(mem == NULL, "malloc - failed");
+   return mem;
+}
+
+void *xcalloc(const uint number, const uint size) {
+   void *mem = calloc(number, size);
    assert_err(mem == NULL, "malloc - failed");
    return mem;
 }

@@ -3,7 +3,6 @@
 #include <dirent.h>
 
 #include "strings.cpp"
-#include "assert.cpp"
 #include "types.cpp"
 #include "drash.cpp"
 
@@ -70,35 +69,31 @@ const Option options[] = {
    { .name = "version|v", .desc = "Print the version" , .action = Option::Version },
 };
 
-void print_help() {
-   printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
-   printf("\nCommands:\n");
-   for (const auto cmd : commands) {
-      printf("   %-10s", cmd.name);
-      printf("   %-10s\n", cmd.desc);
-   }
-
-   printf("\nOptions:\n");
-   for (const auto opt : options) {
-      printf("   %-10s", opt.name);
-      printf("   %-10s\n", opt.desc);
-   }
-}
-
 void handle_opts(const char **argv, const int argc) {
    const char *arg = argv[0] += 1;
    if (arg[0] == '-') arg += 1;
 
-   // @NOTE: Check files and directories if they exists so that way I don't have to
-   // do error checking in every case for the command line option.
-
    for (const auto opt : options) {
-      if (!opt.cmp(arg)) {
-         continue;
-      }
+      if (!opt.cmp(arg)) continue;
 
       switch (opt.action) {
-         case Option::Help: return print_help();
+         case Option::Help: {
+            printf("Usage: drash [OPTIONS] [FILES].. [SUB-COMMANDS]\n");
+            printf("\nCommands:\n");
+            for (const auto cmd : commands) {
+               printf("   %-10s", cmd.name);
+               printf("   %-10s\n", cmd.desc);
+            }
+
+            printf("\nOptions:\n");
+            for (const auto opt : options) {
+               printf("   %-10s", opt.name);
+               printf("   %-10s\n", opt.desc);
+            }
+
+            return;
+         };
+
          case Option::Version: {
             printf("drash version: %s\n", VERSION);
             return;
@@ -114,18 +109,31 @@ void handle_opts(const char **argv, const int argc) {
             for (int i = 1; i < argc; i++) {
                const char *path = argv[i];
 
-               struct stat sb;
-               assert_err(lstat(path, &sb) != 0, "lstat failed");
-
-               if ((sb.st_mode & S_IFMT) == S_IFREG) {
-                  assert_err(unlink(path) != 0, "failed to remove file");
+               if (!file_exists(path)) {
+                  fprintf(stderr, "file not found: %s\n", path);
                   continue;
                }
 
-               // @Incomplete: Implement a function that will delete files and directories recursively
-               auto string = format_string("rm -rf %", path);
+               if (is_dir(path)) {
+                  // @Incomplete: Implement a function that will delete files and directories recursively
+                  auto string = format_string("rm -rf '%'", path);
 
-               assert_err(system(string.buf) != 0, "system command failed");
+                  int err = system(string.buf);
+                  if (err != 0) {
+                     fprintf(stderr, "failed to remove directory: %s\n", path);
+                     fprintf(stderr, "Error: %s\n", strerror(errno));
+                     continue;
+                  }
+
+                  continue;
+               }
+
+               int err = unlink(path);
+               if (err != 0) {
+                  fprintf(stderr, "failed to remove file: %s\n", path);
+                  fprintf(stderr, "Error: %s\n", strerror(errno));
+                  continue;
+               }
             }
 
             return;
@@ -134,10 +142,13 @@ void handle_opts(const char **argv, const int argc) {
    }
 
    fprintf(stderr, "Unkonwn option: %s\n", arg);
-   return;
 }
 
 bool handle_commands(const char **argv, const uint argc, const Drash *drash) {
+
+   // @NOTE: Check files and directories if they exists so that way I don't have to
+   // do error checking in every case for the command line option.
+
    for (uint i = 0; i < argc; i++) {
       const char *arg = argv[i];
 

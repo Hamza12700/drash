@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <dirent.h>
-
 #include "assert.cpp"
 #include "fixed_allocator.cpp"
 #include "drash.cpp"

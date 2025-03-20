@@ -66,6 +66,22 @@ bool file_is_symlink(const char *path) {
    return false;
 }
 
+bool is_file(const char *path) {
+   struct stat st;
+   if (lstat(path, &st) != 0) return false;
+
+   if ((st.st_mode & S_IFMT) == S_IFREG) return true;
+   return false;
+}
+
+bool is_dir(const char *path) {
+   struct stat st;
+   if (lstat(path, &st) != 0) return false;
+
+   if ((st.st_mode & S_IFMT) == S_IFDIR) return true;
+   return false;
+}
+
 Directory open_dir(const char *dir_path) {
    DIR *dir = opendir(dir_path);
 

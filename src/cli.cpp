@@ -142,35 +142,31 @@ void handle_opts(const char **argv, const int argc) {
 }
 
 bool handle_commands(const char **argv, const uint argc, const Drash *drash) {
-
-   // @NOTE: Check files and directories if they exists so that way I don't have to
-   // do error checking in every case for the command line option.
-
    for (uint i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
       for (auto cmd : commands) {
-         if (strcmp(arg, cmd.name) == 0) {
-            switch (cmd.action) {
-               case Command::List: {
-                  printf("TODO: LIST");
-                  return true;
-               }
+         if (strcmp(arg, cmd.name) != 0) continue;
 
-               case Command::Restore: {
-                  printf("TODO: Restore");
-                  return true;
-               }
+         switch (cmd.action) {
+            case Command::List: {
+               printf("TODO: LIST");
+               return true;
+            }
 
-               case Command::Empty: {
-                  drash->empty_drash();
-                  return true;
-               }
+            case Command::Restore: {
+               printf("TODO: Restore");
+               return true;
+            }
 
-               case Command::Remove: {
-                  printf("TODO: Remove");
-                  return true;
-               }
+            case Command::Empty: {
+               drash->empty_drash();
+               return true;
+            }
+
+            case Command::Remove: {
+               printf("TODO: Remove");
+               return true;
             }
          }
       }

@@ -79,6 +79,16 @@ struct Drash {
          return;
       }
 
+      printf("Empty drash directory? [Y/n]: ");
+
+      char input[5];
+      fgets(input, 5, stdin);
+
+      if (strcmp(input, "n\n") == 0) {
+         printf("Canceled\n");
+         return;
+      }
+
       auto command = format_string("rm -rf %", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");

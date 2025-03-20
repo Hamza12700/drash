@@ -51,18 +51,16 @@ File open_file(const char *file_path, const char *modes) {
    };
 }
 
-bool file_exists(const char *path, bool follow_symlink = false) {
-   struct stat st;
-   int err = 0;
+bool file_exists(const char *path) {
+   FILE *file = fopen(path, "r");
 
-   if (follow_symlink) err = stat(path, &st);
-   else err = lstat(path, &st);
+   if (file == NULL) return false;
 
-   if (err != 0) return false;
+   fclose(file);
    return true;
 }
 
-bool file_is_symlink(const char *path) {
+bool is_symlink(const char *path) {
    struct stat st;
    if (lstat(path, &st) != 0) return false;
 

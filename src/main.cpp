@@ -35,14 +35,14 @@ int main(int argc, char *argv[]) {
 
       const char *arg = argv[i];
 
-      if (!file_exists(arg)) {
-         fprintf(stderr, "file not found: %s\n", arg);
+      if (is_symlink(arg)) {
+         assert_err(unlink(arg) != 0, "failed to remove symlink-file");
+         printf("Removed symlink: %s\n", arg);
          continue;
       }
 
-      if (file_is_symlink(arg)) {
-         assert_err(remove(arg) != 0, "failed to remove symlink-file");
-         printf("Removed symlink: %s\n", arg);
+      if (!file_exists(arg)) {
+         fprintf(stderr, "file not found: %s\n", arg);
          continue;
       }
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      if (file_is_symlink(file_metadata_path.buf)) {
+      if (is_symlink(file_metadata_path.buf)) {
          fprintf(stderr, "Error: metadata file is a symlink-file\n");
          continue;
       }

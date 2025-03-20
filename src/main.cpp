@@ -1,38 +1,11 @@
 #include "assert.cpp"
 #include "fixed_allocator.cpp"
 #include "drash.cpp"
-#include "array.cpp"
 #include "strings.cpp"
-#include "types.cpp"
 #include "cli.cpp"
 #include "file_system.cpp"
 
 #define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
-
-String file_basename(Fixed_Allocator *allocator, const String *path) {
-   bool contain_slash = false;
-   for (uint i = 0; i < path->len(); i++) {
-      if ((*path)[i] == '/') {
-         contain_slash = true;
-         break;
-      }
-   }
-
-   if (!contain_slash) return *path;
-
-   auto char_array = Array::make(allocator, path->nlen());
-   uint file_idx;
-
-   for (int i = path->len(); (*path)[i] != '/'; i--) {
-      file_idx++;
-   }
-
-   char_array = path;
-   file_idx += 1;
-   char_array.skip(file_idx);
-
-   return char_array.to_string();
-}
 
 int main(int argc, char *argv[]) {
    if (argc == 1) {

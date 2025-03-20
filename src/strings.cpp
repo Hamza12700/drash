@@ -173,15 +173,12 @@ String format_string(const char *fmt_string, const Args ...args) {
    const uint format_len = strlen(fmt_string);
    uint total_size = 0;
 
-   for (const auto arg : arg_list) {
-      total_size += strlen(arg);
-   }
+   for (const auto arg : arg_list) total_size += strlen(arg);
 
    auto dyn_string = String::with_size(format_len + total_size);
-
    uint arg_idx = 0;
-   for (uint i = 0; i < format_len; i++) {
 
+   for (uint i = 0; i < format_len; i++) {
       if (fmt_string[i] == '%') {
          if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
          else fprintf(stderr, "format-string - not enough arguments provided for format string");
@@ -193,9 +190,19 @@ String format_string(const char *fmt_string, const Args ...args) {
 }
 
 template<typename ...Args>
+void fatal_error(const char *fmt, Args ...args) {
+   auto err = format_string(fmt, args...);
+
+   fprintf(stderr, "[ERROR]: %s\n", err.buf);
+   fprintf(stderr, "- %s\n", strerror(errno));
+   exit(errno);
+}
+
+template<typename ...Args>
 void report_error(const char *fmt, Args ...args) {
-   auto err_string = format_string(fmt, args...);
-   assert_err(true, err_string.buf);
+   auto err = format_string(fmt, args...);
+   fprintf(stderr, "[ERROR]: %s\n", err.buf);
+   fprintf(stderr, "- %s\n", strerror(errno));
 }
 
 #endif // STRINGS_H

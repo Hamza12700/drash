@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <sys/stat.h>
 #include <dirent.h>
 
@@ -120,8 +119,7 @@ void handle_opts(const char **argv, const int argc) {
 
                   int err = system(string.buf);
                   if (err != 0) {
-                     fprintf(stderr, "failed to remove directory: %s\n", path);
-                     fprintf(stderr, "Error: %s\n", strerror(errno));
+                     report_error("failed to remove directory: '%'", path);
                      continue;
                   }
 
@@ -130,8 +128,7 @@ void handle_opts(const char **argv, const int argc) {
 
                int err = unlink(path);
                if (err != 0) {
-                  fprintf(stderr, "failed to remove file: %s\n", path);
-                  fprintf(stderr, "Error: %s\n", strerror(errno));
+                  report_error("failed to remove file: '%'", path);
                   continue;
                }
             }

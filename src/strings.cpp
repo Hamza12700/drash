@@ -129,6 +129,17 @@ struct String {
 
       buf[len()] = s;
    }
+
+   void skip(const uint idx) {
+      if (idx >= nlen()) {
+         fprintf(stderr, "string - can't index into '%u' because it's out of bounds\n", idx);
+         fprintf(stderr, "max size is: %u\n", len());
+         STOP;
+      }
+
+      buf += idx;
+      capacity -= idx;
+   }
 };
 
 //

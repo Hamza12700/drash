@@ -67,14 +67,9 @@ struct Drash {
 
    // @TODO: Confirm before wiping out the files!
    void empty_drash() const {
-      auto metadata_dir = open_dir(metadata.buf);
+      auto dir = open_dir(metadata.buf);
 
-      int count = 0;
-      while (readdir(*metadata_dir) != NULL) {
-         count++;
-      }
-
-      if (count <= 2) {
+      if (dir.is_empty()) {
          printf("Drashcan is already empty\n");
          return;
       }
@@ -93,14 +88,37 @@ struct Drash {
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
-      auto dir = open_dir(metadata.buf);
-
       struct dirent *rdir;
       while ((rdir = readdir(*dir)) != NULL) {
-         if (rdir->d_name[0] == '.' || strcmp(rdir->d_name, "..") == 0) continue;
+         if (rdir->d_name[0] == '.') continue;
 
          auto path = format_string("%/%", metadata.buf, rdir->d_name);
          unlink(path.buf);
+      }
+   }
+
+   // List drashd files
+   void list_files(Fixed_Allocator *allocator) const {
+      auto dir = open_dir(metadata.buf);
+      if (dir.is_empty()) {
+         printf("Drashcan is empty!\n");
+         return;
+      }
+
+      printf("\nDrash'd Files:\n\n");
+
+      struct dirent *rdir;
+      while ((rdir = readdir(*dir)) != NULL) {
+         if (rdir->d_name[0] == '.') continue;
+
+         auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
+         auto file = open_file(path.buf, "r");
+         auto content = file.read_to_string(allocator);
+         content.skip(strlen("Path: "));
+
+         printf("- %s\n", content.buf);
+
+         allocator->reset();
       }
    }
 };

@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
 
    for (int i = 0; i < argc; i++) {
       // Handle commands
-      if (handle_commands((const char **)argv, argc, &drash)) return 0;
+      if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) return 0;
 
       const char *arg = argv[i];
 

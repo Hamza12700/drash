@@ -22,6 +22,24 @@ struct File {
    FILE * operator* () {
       return file;
    }
+
+   uint file_length() {
+      fseek(file, 0, SEEK_END);
+      uint file_size = ftell(file);
+      rewind(file);
+
+      return file_size;
+   }
+
+   // Read the contents of the file into a string.
+   String read_to_string(Fixed_Allocator *allocator) {
+      const uint file_len = file_length();
+
+      auto buf = String::with_size(allocator, file_len);
+      fread(buf.buf, sizeof(char), file_len, file);
+
+      return buf;
+   }
 };
 
 struct Directory {
@@ -37,6 +55,20 @@ struct Directory {
 
    DIR * operator* () {
       return dir;
+   }
+
+   // Resets the directory stream back to the beginning of the directory.
+   bool is_empty() {
+      uint count = 0;
+      while (readdir(dir) != NULL) count += 1;
+
+      if (count <= 2) {
+         rewinddir(dir);
+         return true;
+      }
+
+      rewinddir(dir);
+      return false;
    }
 };
 
@@ -95,18 +127,17 @@ String file_basename(Fixed_Allocator *allocator, const String *path) {
 
    if (!contain_slash) return *path;
 
-   auto char_array = Array::make(allocator, path->nlen());
-   uint file_idx;
+   auto buffer = String::with_size(allocator, path->len());
+   uint file_idx = 0;
 
    for (int i = path->len(); (*path)[i] != '/'; i--) {
       file_idx++;
    }
 
-   char_array = path;
-   file_idx += 1;
-   char_array.skip(file_idx);
+   buffer = path->buf;
+   buffer.skip(buffer.len() - file_idx+1);
 
-   return char_array.to_string();
+   return buffer;
 }
 
 Directory open_dir(const char *dir_path) {

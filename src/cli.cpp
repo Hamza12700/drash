@@ -141,7 +141,7 @@ void handle_opts(const char **argv, const int argc) {
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-bool handle_commands(const char **argv, const uint argc, const Drash *drash) {
+bool handle_commands(const char **argv, const uint argc, const Drash *drash, Fixed_Allocator *allocator) {
    for (uint i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
@@ -150,7 +150,7 @@ bool handle_commands(const char **argv, const uint argc, const Drash *drash) {
 
          switch (cmd.action) {
             case Command::List: {
-               printf("TODO: LIST");
+               drash->list_files(allocator);
                return true;
             }
 

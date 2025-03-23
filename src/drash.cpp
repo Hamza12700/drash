@@ -113,7 +113,7 @@ struct Drash {
 
          auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
          auto file = open_file(path.buf, "r");
-         auto content = file.read_to_string(allocator);
+         auto content = file.read_line(allocator);
          content.skip(strlen("Path: "));
 
          printf("- %s\n", content.buf);

@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
       auto file_info = open_file(file_metadata_path.buf, "a");
 
       auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
-      fprintf(*file_info, "Path: %s", absolute_path.buf);
+      fprintf(*file_info, "Path: %s\n", absolute_path.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");

@@ -124,7 +124,7 @@ struct Drash {
       while ((*file_content)[count] != '\n') count += 1;
 
       drash_info.path = static_cast <char *>(allocator->alloc(count+1));
-      char *type = static_cast <char *>(xcalloc(strlen("directory")+1, sizeof(char))); // This is the max that 'Type' prefix can get.
+      auto type = String::with_size(strlen("directory")); // This is the max that 'Type' can hold.
 
       count = 0;
       while ((*file_content)[count] != '\n') {
@@ -145,10 +145,9 @@ struct Drash {
          count += 1;
       }
 
-      if (strcmp(type, "file") == 0) drash_info.type = Drash_Info::File;
+      if (type.cmp("file")) drash_info.type = Drash_Info::File;
       else drash_info.type = Drash_Info::Directory;
 
-      free(type);
       return drash_info;
    }
 

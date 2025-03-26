@@ -61,6 +61,14 @@ struct String {
       return false;
    }
 
+   bool cmp(const char *s) {
+      for (uint i = 0; i < strlen(s); i++) {
+         if (s[i] != buf[i]) return false;
+      }
+
+      return true;
+   }
+
    void remove(const uint idx) {
       if (idx >= capacity) {
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);

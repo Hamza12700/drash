@@ -6,13 +6,18 @@
 #include <signal.h>
 
 #include "types.cpp"
-#include "fixed_allocator.cpp"
 
 template<typename T>
 struct Array {
    T *ptr = NULL;
-   uint size = 0;
+   u16 size = 0;
    bool with_allocator = false;
+
+   Array() {
+      void *mem = xmalloc(sizeof(T));
+      ptr = mem;
+      size = 1;
+   }
 
    ~Array() {
       if (!with_allocator) {
@@ -21,45 +26,20 @@ struct Array {
       }
    }
 
-   void skip(const uint idx) {
-      if (idx > size) {
-         fprintf(stderr, "array:skip - index is out of bounds: '%u'\n", idx);
-         fprintf(stderr, "size of the array is: %u", size);
-         STOP;
-      }
-
-      ptr += idx;
-      size -= idx;
+   void push(T value) {
+      ptr[size+1] = value;
    }
 
-   char& operator[] (const uint idx) {
+   T& operator[] (const uint idx) {
       if (idx > size) {
          fprintf(stderr, "array - attempted to index into position '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", size);
          STOP;
       }
 
-      return ptr[idx];
+      if (idx == 0) return ptr[idx];
+      return ptr[idx+sizeof(T)];
    }
 };
-
-template<typename T>
-Array<T> make_array(const uint size) {
-   void *mem = xmalloc(sizeof(T) * size);
-
-   return Array<T> {
-      .ptr = mem,
-   };
-}
-
-template<typename T>
-Array<T> make_array(Fixed_Allocator *allocator, const uint size) {
-   void *mem = allocator->alloc(sizeof(T) * size);
-
-   return Array<T> {
-      .ptr = mem,
-      .with_allocator = true,
-   };
-}
 
 #endif

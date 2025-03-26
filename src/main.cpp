@@ -78,6 +78,11 @@ int main(int argc, char *argv[]) {
       auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
       fprintf(*file_info, "Path: %s\n", absolute_path.buf);
 
+      if (is_file(path.buf))
+         fprintf(*file_info, "Type: file\n");
+      else
+         fprintf(*file_info, "Type: directory\n");
+
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");
 

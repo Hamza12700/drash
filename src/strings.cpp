@@ -46,6 +46,21 @@ struct String {
       };
    }
 
+   void by_reference(const String string) {
+      if (!with_allocator) free(buf);
+      buf = string.buf;
+   }
+
+   void by_reference(const String *string) {
+      if (!with_allocator) free(buf);
+      buf = string->buf;
+   }
+
+   bool is_empty() {
+      if (buf[0] == '\0') return true;
+      return false;
+   }
+
    void remove(const uint idx) {
       if (idx >= capacity) {
          fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
@@ -131,7 +146,7 @@ struct String {
    }
 
    void skip(const uint idx) {
-      if (idx >= nlen()) {
+      if (idx >= capacity) {
          fprintf(stderr, "string - can't index into '%u' because it's out of bounds\n", idx);
          fprintf(stderr, "max size is: %u\n", len());
          STOP;

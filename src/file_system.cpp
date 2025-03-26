@@ -32,28 +32,13 @@ struct File {
    }
 
    // Read the entire contents of the file into a string.
-   String read_to_string(Fixed_Allocator *allocator) {
+   String read_into_string(Fixed_Allocator *allocator) {
       const uint file_len = file_length();
 
       auto buf = String::with_size(allocator, file_len);
       fread(buf.buf, sizeof(char), file_len, file);
 
       return buf;
-   }
-
-   // Read until the newline character
-   String read_line(Fixed_Allocator *allocator) {
-      char line_char = 0;
-
-      // @Temporary: We are allocating extra memory but because we are using a bump/fixed allocator this shouldn't be an issue
-      // but it'd be good if we only requested memory that we need.
-      auto buffer = String::with_size(allocator, file_length());
-
-      // @ToDo: Set the file position to pointer after the newline character.
-      while ((line_char = (char)fgetc(file)) != '\n')
-         buffer.concat(line_char);
-
-      return buffer;
    }
 };
 

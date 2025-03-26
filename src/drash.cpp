@@ -11,6 +11,25 @@
 
 #define DIR_PERM 0740
 
+//
+// @Temporary:
+//
+// I should be using the 'String' type but thanks to C++ then I have to deal with
+// copy constructor, assignment and other shit.
+//
+
+struct Drash_Info {
+   char *path = NULL;
+
+   enum Type {
+      None,
+      File,
+      Directory,
+   };
+
+   Type type = None;
+};
+
 struct Drash {
    String files; // Drashd files
    String metadata; // Info about drashd files
@@ -97,6 +116,42 @@ struct Drash {
       }
    }
 
+   Drash_Info parse_info(Fixed_Allocator *allocator, String *file_content) const {
+      Drash_Info drash_info;
+      file_content->skip(strlen("Path: ")); // Skip the prefix
+
+      uint count = 0;
+      while ((*file_content)[count] != '\n') count += 1;
+
+      drash_info.path = static_cast <char *>(allocator->alloc(count+1));
+      char *type = static_cast <char *>(xcalloc(strlen("directory")+1, sizeof(char))); // This is the max that 'Type' prefix can get.
+
+      count = 0;
+      while ((*file_content)[count] != '\n') {
+         char line_char = (*file_content)[count];
+
+         drash_info.path[count] = line_char;
+         count += 1;
+      }
+
+      file_content->skip(count+1); // Skip the Path including the newline character.
+      file_content->skip(strlen("Type: ")); // Skip the prefix
+
+      count = 0;
+      while ((*file_content)[count] != '\n') {
+         char line_char = (*file_content)[count];
+
+         type[count] = line_char;
+         count += 1;
+      }
+
+      if (strcmp(type, "file") == 0) drash_info.type = Drash_Info::File;
+      else drash_info.type = Drash_Info::Directory;
+
+      free(type);
+      return drash_info;
+   }
+
    // List drashd files
    void list_files(Fixed_Allocator *allocator) const {
       auto dir = open_dir(metadata.buf);
@@ -113,10 +168,15 @@ struct Drash {
 
          auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
          auto file = open_file(path.buf, "r");
-         auto content = file.read_line(allocator);
-         content.skip(strlen("Path: "));
+         auto content = file.read_into_string(allocator);
 
-         printf("- %s\n", content.buf);
+         auto info = parse_info(allocator, &content);
+
+         if (info.type == Drash_Info::File) {
+            printf("- %s\n", info.path);
+         } else {
+            printf("- %s/\n", info.path);
+         }
 
          allocator->reset();
       }

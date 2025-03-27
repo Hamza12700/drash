@@ -124,7 +124,7 @@ struct Drash {
       while ((*file_content)[count] != '\n') count += 1;
 
       drash_info.path = static_cast <char *>(allocator->alloc(count+1));
-      auto type = String::with_size(strlen("directory")); // This is the max that 'Type' can hold.
+      const u8 type_len = strlen("directory")+1; // Max that 'Type' can hold.
 
       count = 0;
       while ((*file_content)[count] != '\n') {
@@ -137,7 +137,14 @@ struct Drash {
       file_content->skip(count+1); // Skip the Path including the newline character.
       file_content->skip(strlen("Type: ")); // Skip the prefix
 
+      if (file_content->len() > type_len) {
+         fprintf(stderr, "Error: 'Type' feild is invalid: %s\n", file_content->buf);
+         STOP;
+      }
+
       count = 0;
+      char type[type_len] = {0};
+
       while ((*file_content)[count] != '\n') {
          char line_char = (*file_content)[count];
 
@@ -145,8 +152,15 @@ struct Drash {
          count += 1;
       }
 
-      if (type.cmp("file")) drash_info.type = Drash_Info::File;
-      else drash_info.type = Drash_Info::Directory;
+      if (strcmp(type, "file") != 0 && strcmp(type, "directory") != 0) {
+         fprintf(stderr, "Error: Unknown 'Type' value: %s\n", type);
+         STOP;
+      }
+
+      if (strcmp("file", type) == 0)
+         drash_info.type = Drash_Info::File;
+      else
+         drash_info.type = Drash_Info::Directory;
 
       return drash_info;
    }
@@ -171,11 +185,10 @@ struct Drash {
 
          auto info = parse_info(allocator, &content);
 
-         if (info.type == Drash_Info::File) {
+         if (info.type == Drash_Info::File)
             printf("- %s\n", info.path);
-         } else {
+         else
             printf("- %s/\n", info.path);
-         }
 
          allocator->reset();
       }

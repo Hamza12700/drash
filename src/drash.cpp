@@ -11,14 +11,9 @@
 
 #define DIR_PERM 0740
 
-//
-// @Temporary:
-//
-// I should be using the 'String' type but thanks to C++ then I have to deal with
-// copy constructor, assignment and other shit.
-//
-
 struct Drash_Info {
+   // @Temporary: We should be using the 'String' type but thanks to C++ then
+   // we have to deal with copy constructor, assignment and other shit.
    char *path = NULL;
 
    enum Type {
@@ -67,21 +62,8 @@ struct Drash {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
 
-      //
-      // @Hack:
-      //
-      // We need the temporary string buffer but because the buffer only gets deallocated
-      // when it's allocated by 'malloc' that's why we're setting the 'with_allocator' boolean flag to true.
-      //
-      // Maybe a adding a bit-flags field is good because then if something wants a reference to the buffer,
-      // it would easy because then we can just set a bit-flag.
-      //
-
-      tmp_files.with_allocator = true;
-      tmp_metadata.with_allocator = true;
-
-      files.buf = tmp_files.buf;
-      metadata.buf = tmp_metadata.buf;
+      files.take_reference(&tmp_files);
+      metadata.take_reference(&tmp_metadata);
    }
 
    // @TODO: Confirm before wiping out the files!

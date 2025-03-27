@@ -30,7 +30,7 @@ struct String {
       return String {
 
          //
-         // @Hack | @NOTE:
+         // @Hack:
          //
          // This is stupid because malloc gets replaced by ASAN and because we mutate the string buffer and overwrite the null-byte
          // it thinks that we are access memory out of bounds even thought we are not! Because the memory returned by
@@ -46,19 +46,23 @@ struct String {
       };
    }
 
-   void by_reference(const String string) {
-      if (!with_allocator) free(buf);
-      buf = string.buf;
-   }
+   void take_reference(String *string) {
+      if (!with_allocator) free(buf); // Free the already allocated buffer if malloc'd
 
-   void by_reference(const String *string) {
-      if (!with_allocator) free(buf);
+      capacity = string->capacity;
       buf = string->buf;
-   }
 
-   bool is_empty() {
-      if (buf[0] == '\0') return true;
-      return false;
+      //
+      // @Hack | @Temporary:
+      //
+      // We want the string buffer to live outside the scope because we take a reference to it.
+      // The string buffer only gets deallocated when it's malloc'd so, here we are abusing the variable 'with_allocator'
+      // so it doesn't get deallocated and instead the variable taking the reference should deallocate the memory.
+      //
+      // We should think about doing this in a better way, but for now it's fine here because 'this' struct lives the entirety of the program.
+      //
+
+      string->with_allocator = true;
    }
 
    bool cmp(const char *s) {
@@ -171,10 +175,6 @@ struct String {
 // This only works if the 'Args' are the same type include constant values.
 // I would like to fix this but for now this gets the job done.
 //
-// Also add a function overload for this that formats the string without taking a custom allocator that
-// way if the string is only needed at a specific scope then it would be easy return a custom 'string'
-// that has a destructor which will get ran if the string isn't allocated by a custom allocator.
-//
 // - Hamza, 12 March 2025
 //
 
@@ -235,6 +235,7 @@ void fatal_error(const char *fmt, Args ...args) {
 template<typename ...Args>
 void report_error(const char *fmt, Args ...args) {
    auto err = format_string(fmt, args...);
+
    fprintf(stderr, "[ERROR]: %s\n", err.buf);
    fprintf(stderr, "- %s\n", strerror(errno));
 }

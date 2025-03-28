@@ -41,11 +41,10 @@ struct Option {
 
    // Compare a string with an option->name
    bool cmp(const char *str) const {
-      char lbuf[15] = {0};
-      char sbuf[5] = {0};
+      char lbuf[20] = {0}; // Buffer to hold the long option name
+      char sbuf[5] = {0};  // Buffer to hold the short option name
 
-      int x = 0;
-      for (uint i = 0; i < strlen(name) - 1; i++) {
+      for (u8 i = 0, x = 0; i < strlen(name) - 1; i++) {
          const char name_char = name[i];
 
          if (name_char != '|') {
@@ -57,7 +56,10 @@ struct Option {
          x++;
       }
 
-      if (strcmp(str, lbuf) == 0 || strcmp(str, sbuf) ==  0) return true;
+      if (strcmp(str, lbuf) == 0 || strcmp(str, sbuf) ==  0) {
+         return true;
+      }
+
       return false;
    }
 };

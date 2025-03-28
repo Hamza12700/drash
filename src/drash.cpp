@@ -45,7 +45,6 @@ struct Drash {
       int err = 0;
       err = mkdir(drash_dir.buf, DIR_PERM);
 
-      // Skip the error check if the directory already exists
       if (errno != EEXIST) {
          assert_err(err != 0, "mkdir failed to creaet drash directory");
       }
@@ -78,7 +77,7 @@ struct Drash {
       printf("Empty drash directory? [Y/n]: ");
 
       char input[5];
-      fgets(input, 5, stdin);
+      fgets(input, sizeof(input), stdin);
 
       if (strcmp(input, "n\n") == 0) {
          printf("Canceled\n");

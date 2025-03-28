@@ -75,7 +75,7 @@ struct String {
 
    void remove(const uint idx) {
       if (idx >= capacity) {
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+         fprintf(stderr, "string - attempted to remove a character in index '%u' which is out of bounds.\n", idx);
          fprintf(stderr, "max size is '%u'.\n", capacity);
          STOP;
       }

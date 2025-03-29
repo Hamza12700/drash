@@ -9,8 +9,8 @@
 //
 // @NOTE:
 //
-// Don't add a constructor or demonstrator because the 'sub_allocator' method creates a new
-// allocator which points to the memory allocated by another allocator.
+// Don't add a deconstructor because the 'sub_allocator' method creates a new
+// allocator of the same type which points to the same region of memory allocated by its parent allocator.
 //
 
 struct Fixed_Allocator {

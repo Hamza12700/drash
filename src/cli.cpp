@@ -1,8 +1,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#include "strings.cpp"
-#include "types.cpp"
 #include "drash.cpp"
 
 struct Command {
@@ -20,10 +18,29 @@ struct Command {
 };
 
 static const Command commands[] = {
-   {.name = "list", .desc = "List Drash'd files", .action = Command::List },
-   {.name = "remove", .desc = "Remove files from the Drash/can", .action = Command::Remove },
-   {.name = "empty", .desc = "Empty the Drash/can", .action = Command::Empty },
-   {.name = "restore", .desc = "Restore removed files", .action = Command::Restore },
+   {
+      .name = "list",
+      .desc = "List Drash'd files",
+      .action = Command::List
+   },
+
+   {
+      .name = "remove",
+      .desc = "Remove files from the Drash/can",
+      .action = Command::Remove
+   },
+
+   {
+      .name = "empty",
+      .desc = "Empty the Drash/can",
+      .action = Command::Empty
+   },
+
+   {
+      .name = "restore",
+      .desc = "Restore removed files",
+      .action = Command::Restore
+   },
 };
 
 
@@ -65,9 +82,23 @@ struct Option {
 };
 
 static const Option options[] = {
-   { .name = "force|f", .desc = "Force remove file" , .action = Option::Force },
-   { .name = "help|h", .desc = "Display the help message" , .action = Option::Help },
-   { .name = "version|v", .desc = "Print the version" , .action = Option::Version },
+   {
+      .name = "force|f",
+      .desc = "Force remove file",
+      .action = Option::Force
+   },
+
+   {
+      .name = "help|h",
+      .desc = "Display the help message",
+      .action = Option::Help
+   },
+
+   {
+      .name = "version|v",
+      .desc = "Print the version",
+      .action = Option::Version
+   },
 };
 
 static void print_help() {
@@ -162,7 +193,7 @@ bool handle_commands(const char **argv, uint argc, const Drash *drash, Fixed_All
             }
 
             case Command::Empty: {
-               drash->empty_drash();
+               drash->empty_drash(allocator);
                return true;
             }
 

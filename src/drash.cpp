@@ -16,13 +16,7 @@ struct Drash_Info {
    // we have to deal with copy constructor, assignment and other shit.
    char *path = NULL;
 
-   enum Type {
-      None,
-      File,
-      Directory,
-   };
-
-   Type type = None;
+   File_Type type = unknown;
 };
 
 struct Drash {
@@ -32,9 +26,8 @@ struct Drash {
    Drash() {
       const char *home_env = getenv("HOME");
       assert_err(home_env == NULL, "failed to get HOME environment variable");
-      const u8 home_len = 30;
+      const u8 home_len = 30; // @Personal: I'm not gona have the HOME env greater than this.
 
-      // @Personal: I'm not gona have the HOME env greater than 'home_len' chars!
       if (strlen(home_env) > home_len) {
          fprintf(stderr, "HOME environment variable too long: %zu\n", strlen(home_env));
          printf("max length %u characters\n", home_len);
@@ -76,8 +69,7 @@ struct Drash {
       metadata.take_reference(&tmp_metadata);
    }
 
-   // @TODO: Confirm before wiping out the files!
-   void empty_drash() const {
+   void empty_drash(Fixed_Allocator *allocator) const {
       auto dir = open_dir(metadata.buf);
 
       if (dir.is_empty()) {
@@ -95,7 +87,7 @@ struct Drash {
          return;
       }
 
-      auto command = format_string("rm -rf %", files.buf);
+      auto command = format_string(allocator, "rm -rf '%'", files.buf);
       assert_err(system(command.buf) != 0, "failed to remove drashd files");
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
@@ -103,8 +95,10 @@ struct Drash {
       while ((rdir = readdir(dir.fd)) != NULL) {
          if (rdir->d_name[0] == '.') continue;
 
-         auto path = format_string("%/%", metadata.buf, rdir->d_name);
+         auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
          unlink(path.buf);
+
+         allocator->reset();
       }
    }
 
@@ -150,17 +144,17 @@ struct Drash {
       }
 
       if (strcmp("file", type) == 0)
-         drash_info.type = Drash_Info::File;
+         drash_info.type = file;
       else
-         drash_info.type = Drash_Info::Directory;
+         drash_info.type = dir;
 
       return drash_info;
    }
 
    bool is_empty() const {
       auto dir = open_dir(metadata.buf);
-
       if (dir.is_empty()) return true;
+
       return false;
    }
 
@@ -176,7 +170,9 @@ struct Drash {
 
       struct dirent *rdir;
       while ((rdir = readdir(dir.fd)) != NULL) {
+
          if (rdir->d_name[0] == '.') continue;
+         if (strcmp(rdir->d_name, "last") == 0) continue;
 
          auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
          auto file = open_file(path.buf, "r");
@@ -184,7 +180,7 @@ struct Drash {
 
          auto info = parse_info(allocator, &content);
 
-         if (info.type == Drash_Info::File)
+         if (info.type == File_Type::file)
             printf("- %s\n", info.path);
          else
             printf("- %s/\n", info.path);
@@ -201,6 +197,34 @@ struct Drash {
 
       if (argc == 0) {
          fprintf(stderr, "Missing argment 'file|directory' name\n");
+         return;
+      }
+
+      // Restore the last drash'd file/directory
+      if (argv[0][0] == '-') {
+         auto last = format_string(allocator, "%/last", metadata.buf);
+         auto ex_res = exists(last.buf);
+
+         if (!ex_res.found) {
+            printf("Nothing to restore!\n");
+            return;
+         }
+
+         auto file = open_file(last.buf, "r");
+         auto filename = file.read_into_string(allocator);
+
+         auto old_path = format_string(allocator, "%/%", files.buf, filename.buf);
+         auto info_path = format_string(allocator, "%/%.info", metadata.buf, filename.buf);
+
+         auto file_info = open_file(info_path.buf, "r");
+         auto file_info_content = file_info.read_into_string(allocator);
+
+         auto info = parse_info(allocator, &file_info_content);
+
+         move_file(old_path.buf, info.path);
+         remove_file(info_path.buf);
+         remove_file(last.buf);
+
          return;
       }
 
@@ -221,7 +245,7 @@ struct Drash {
          auto content = info_file.read_into_string(allocator);
          auto info = parse_info(allocator, &content);
 
-         if (info.type == Drash_Info::Directory &&
+         if (info.type == File_Type::dir &&
             dir_exists(info.path))
          {
             printf("Directory already exists: %s\n", info.path);

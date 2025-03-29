@@ -35,7 +35,7 @@ struct File {
    String read_into_string(Fixed_Allocator *allocator) {
       const uint file_len = file_length();
 
-      auto buf = String::with_size(allocator, file_len);
+      auto buf = string_with_size(allocator, file_len);
       fread(buf.buf, sizeof(char), file_len, fd);
 
       return buf;
@@ -147,7 +147,11 @@ bool move_file(const char *oldpath, const char *newpath) {
    return true;
 }
 
-String file_basename(Fixed_Allocator *allocator, const String *path) {
+String file_basename(Fixed_Allocator *allocator, String *path) {
+   if ((*path)[path->len()-1] == '/') {
+      path->remove(path->len()-1);
+   }
+
    bool contain_slash = false;
    for (uint i = 0; i < path->len(); i++) {
       if ((*path)[i] == '/') {
@@ -158,7 +162,7 @@ String file_basename(Fixed_Allocator *allocator, const String *path) {
 
    if (!contain_slash) return *path;
 
-   auto buffer = String::with_size(allocator, path->len());
+   auto buffer = string_with_size(allocator, path->len());
    uint file_idx = 0;
 
    for (int i = path->len(); (*path)[i] != '/'; i--) {
@@ -179,6 +183,50 @@ Directory open_dir(const char *dir_path) {
       .fd = dir,
       .path = dir_path,
    };
+}
+
+enum File_Type : u8 {
+   file = 0,
+   dir,
+   lnk,
+   unknown,
+};
+
+struct Ex_Res {
+   bool found = false;
+   File_Type type = unknown;
+};
+
+// Check if file|directory exists
+Ex_Res exists(const char *path) {
+   struct stat st;
+   Ex_Res ret;
+
+   if (lstat(path, &st) != 0) return ret;
+
+   auto st_mode = st.st_mode & S_IFMT;
+
+   switch (st_mode) {
+      case S_IFREG: {
+         ret.type = file;
+         ret.found = true;
+         return ret;
+      }
+
+      case S_IFDIR: {
+         ret.type = dir;
+         ret.found = true;
+         return ret;
+      }
+
+      case S_IFLNK: {
+         ret.type = lnk;
+         ret.found = true;
+         return ret;
+      }
+   }
+
+   return ret;
 }
 
 #endif // FILE_SYS

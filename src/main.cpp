@@ -1,9 +1,4 @@
-#include "assert.cpp"
-#include "fixed_allocator.cpp"
-#include "drash.cpp"
-#include "strings.cpp"
 #include "cli.cpp"
-#include "file_system.cpp"
 
 #define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
 
@@ -29,21 +24,55 @@ int main(int argc, char *argv[]) {
    auto scratch_allocator = fixed_allocator(getpagesize());
    Drash drash;
 
-   for (int i = 0; i < argc; i++) {
-      // Handle commands
-      if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) {
-         return 0;
+   // Handle commands
+   if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) {
+      return 0;
+   }
+
+   // Save the last filename
+   {
+      const char *file = argv[argc-1];
+      auto ex_res = exists(file);
+
+      const uint path_len = strlen(file);
+      if (path_len > MAX_ARGLEN) {
+         fprintf(stderr, "path is too long: %u", path_len);
+         fprintf(stderr, "max length is %d", MAX_ARGLEN);
+         argc -= 1;
+
+      } else if (!ex_res.found) {
+         fprintf(stderr, "file not found: %s\n", file);
+         argc -= 1;
+
+      } else if (ex_res.type == lnk) {
+         remove_file(file);
+         printf("Remove symlink: %s\n", file);
+         argc -= 1;
       }
 
-      const char *arg = argv[i];
+      auto fpath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
+      auto ofile = open_file(fpath.buf, "w");
 
-      if (is_symlink(arg)) {
-         assert_err(unlink(arg) != 0, "failed to remove symlink-file");
+      auto spath = string_with_size(&scratch_allocator, file);
+
+      auto filename = file_basename(&scratch_allocator, &spath);
+      ofile.write(filename.buf);
+   }
+
+   for (int i = 0; i < argc; i++) {
+
+      scratch_allocator.reset();
+
+      const char *arg = argv[i];
+      auto ex_res = exists(arg);
+
+      if (ex_res.type == lnk) {
+         remove_file(arg);
          printf("Removed symlink: %s\n", arg);
          continue;
       }
 
-      if (!file_exists(arg)) {
+      if (!ex_res.found) {
          fprintf(stderr, "file not found: %s\n", arg);
          continue;
       }
@@ -55,11 +84,7 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      auto path = String::with_size(&scratch_allocator, path_len);
-      path = arg;
-
-      // Remove the trailing slash
-      if (path[path.len()-1] == '/') path.remove(path.len()-1);
+      auto path = string_with_size(&scratch_allocator, arg);
 
       auto filename = file_basename(&scratch_allocator, &path);
       auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
@@ -79,7 +104,7 @@ int main(int argc, char *argv[]) {
 
       // @Hack: I know this is stupid to allocate memory for a static variable but
       // this way I don't have to do pedantic work of assigning a null-terminated string to another string.
-      auto type = String::with_size(&scratch_allocator, 20);
+      auto type = string_with_size(&scratch_allocator, 20);
 
       if (is_file(path.buf)) type = "file";
       else type = "directory";
@@ -89,8 +114,6 @@ int main(int argc, char *argv[]) {
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       move_file(arg, drash_file.buf);
-
-      scratch_allocator.reset();
    }
 
    scratch_allocator.free();

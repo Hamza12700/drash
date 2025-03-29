@@ -18,34 +18,6 @@ struct String {
       if (!with_allocator) free(buf);
    }
 
-   static String with_size(Fixed_Allocator *allocator, const uint size) {
-      return String {
-         .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
-         .capacity = size+1,
-         .with_allocator = true,
-      };
-   }
-
-   static String with_size(const uint size) {
-      return String {
-
-         //
-         // @Hack:
-         //
-         // This is stupid because malloc gets replaced by ASAN and because we mutate the string buffer and overwrite the null-byte
-         // it thinks that we are access memory out of bounds even thought we are not! Because the memory returned by
-         // ASAN 'malloc' isn't zero initialize. That's why we have to use 'calloc'.
-         //
-         // Because we are doing the bounds checking ourself ASAN is useless here.
-         //
-         // - Hamza, 15 March 2025
-         //
-
-         .buf = static_cast <char *>(xcalloc(size+1, sizeof(char))),
-         .capacity = size+1,
-      };
-   }
-
    void take_reference(String *string) {
       if (!with_allocator) free(buf); // Free the already allocated buffer if malloc'd
 
@@ -169,6 +141,46 @@ struct String {
    }
 };
 
+String string_with_size(Fixed_Allocator *allocator, const uint size) {
+   return String {
+      .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
+      .capacity = size+1,
+      .with_allocator = true,
+   };
+}
+
+String string_with_size(const uint size) {
+   return String {
+      .buf = static_cast <char *>(xmalloc(size+1)),
+      .capacity = size+1,
+   };
+}
+
+String string_with_size(const char *s) {
+   const uint size = strlen(s);
+
+   auto ret = String {
+      .buf = static_cast <char *>(xmalloc(size+1)),
+      .capacity = size+1,
+   };
+
+   ret = s;
+   return ret;
+}
+
+String string_with_size(Fixed_Allocator *allocator, const char *s) {
+   const uint size = strlen(s);
+
+   auto ret = String {
+      .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
+      .capacity = size+1,
+      .with_allocator = true,
+   };
+
+   ret = s;
+   return ret;
+}
+
 //
 // NOTE:
 //
@@ -188,7 +200,7 @@ String format_string(Fixed_Allocator *allocator, const char *fmt_string, const A
       total_size += strlen(arg);
    }
 
-   auto dyn_string = String::with_size(allocator, format_len + total_size);
+   auto dyn_string = string_with_size(allocator, format_len + total_size);
    uint arg_idx = 0;
 
    for (uint i = 0; i < format_len; i++) {
@@ -209,7 +221,7 @@ String format_string(const char *fmt_string, const Args ...args) {
 
    for (const auto arg : arg_list) total_size += strlen(arg);
 
-   auto dyn_string = String::with_size(format_len + total_size);
+   auto dyn_string = string_with_size(format_len + total_size);
    uint arg_idx = 0;
 
    for (uint i = 0; i < format_len; i++) {

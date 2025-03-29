@@ -46,6 +46,7 @@ struct Fixed_Allocator {
    }
 
    void reset() {
+      // @NOTE: We have to 'memset' the memory to zero because Null-Terminated Strings won't make your life easier!
       memset(buffer, 0, size);
       size = 0;
    }

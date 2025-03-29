@@ -31,7 +31,9 @@ int main(int argc, char *argv[]) {
 
    for (int i = 0; i < argc; i++) {
       // Handle commands
-      if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) return 0;
+      if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) {
+         return 0;
+      }
 
       const char *arg = argv[i];
 
@@ -75,16 +77,18 @@ int main(int argc, char *argv[]) {
 
       auto file_info = open_file(file_metadata_path.buf, "a");
 
-      auto absolute_path = format_string(&scratch_allocator, "%/%", (char *)current_dir, path.buf);
-      fprintf(*file_info, "Path: %s\n", absolute_path.buf);
+      // @Hack: I know this is stupid to allocate memory for a static variable but
+      // this way I don't have to do pedantic work of assigning a null-terminated string to another string.
+      auto type = String::with_size(&scratch_allocator, 20);
 
-      if (is_file(path.buf))
-         fprintf(*file_info, "Type: file\n");
-      else
-         fprintf(*file_info, "Type: directory\n");
+      if (is_file(path.buf)) type = "file";
+      else type = "directory";
+
+      auto data = format_string(&scratch_allocator, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type.buf);
+      file_info.write(data.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
-      assert_err(rename(arg, drash_file.buf) != 0, "failed to renamae file to new location");
+      move_file(arg, drash_file.buf);
 
       scratch_allocator.reset();
    }

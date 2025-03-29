@@ -8,27 +8,27 @@
 #include "array.cpp"
 
 struct File {
-   FILE *file;
+   FILE *fd;
    const char *path;
 
    ~File() {
-      int err = fclose(file);
+      int err = fclose(fd);
 
       // Closing the file shouldn't fail and if it does then it's not a big deal.
       // Just report the error.
       if (err != 0) report_error("failed to close file: %", path);
    }
 
-   FILE * operator* () {
-      return file;
-   }
-
    uint file_length() {
-      fseek(file, 0, SEEK_END);
-      uint file_size = ftell(file);
-      rewind(file);
+      fseek(fd, 0, SEEK_END);
+      uint file_size = ftell(fd);
+      rewind(fd);
 
       return file_size;
+   }
+
+   int write(const char *string) {
+      return fprintf(fd, "%s", string);
    }
 
    // Read the entire contents of the file into a string.
@@ -36,38 +36,34 @@ struct File {
       const uint file_len = file_length();
 
       auto buf = String::with_size(allocator, file_len);
-      fread(buf.buf, sizeof(char), file_len, file);
+      fread(buf.buf, sizeof(char), file_len, fd);
 
       return buf;
    }
 };
 
 struct Directory {
-   DIR *dir;
+   DIR *fd;
    const char *path;
 
    ~Directory() {
-      int err = closedir(dir);
+      int err = closedir(fd);
 
       // Closing the directory also shouldn't fail and if does then report the error.
       if (err != 0) report_error("failed to close directory: %", path);
    }
 
-   DIR * operator* () {
-      return dir;
-   }
-
    // Resets the directory stream back to the beginning of the directory.
    bool is_empty() {
       uint count = 0;
-      while (readdir(dir) != NULL) count += 1;
+      while (readdir(fd) != NULL) count += 1;
 
       if (count <= 2) {
-         rewinddir(dir);
+         rewinddir(fd);
          return true;
       }
 
-      rewinddir(dir);
+      rewinddir(fd);
       return false;
    }
 };
@@ -78,7 +74,7 @@ File open_file(const char *file_path, const char *modes) {
    if (file == NULL) fatal_error("failed to open file: %", file_path);
 
    return File {
-      .file = file,
+      .fd = file,
       .path = file_path
    };
 }
@@ -89,6 +85,17 @@ bool file_exists(const char *path) {
    if (file == NULL) return false;
 
    fclose(file);
+   return true;
+}
+
+bool dir_exists(const char *path) {
+   DIR *dir = opendir(path);
+   if (dir == NULL) {
+      closedir(dir);
+      return false;
+   }
+
+   closedir(dir);
    return true;
 }
 
@@ -114,6 +121,30 @@ bool is_dir(const char *path) {
 
    if ((st.st_mode & S_IFMT) == S_IFDIR) return true;
    return false;
+}
+
+// Return's true on success otherwise false
+bool remove_file(const char *path) {
+   int err = unlink(path);
+
+   if (err != 0) {
+      report_error("failed to remove file '%'", path);
+      return false;
+   }
+
+   return true;
+}
+
+// Return's true on success otherwise false
+bool move_file(const char *oldpath, const char *newpath) {
+   int err = rename(oldpath, newpath);
+
+   if (err != 0) {
+      report_error("failed to move '%' to '%'", oldpath, newpath);
+      return false;
+   }
+
+   return true;
 }
 
 String file_basename(Fixed_Allocator *allocator, const String *path) {
@@ -145,7 +176,7 @@ Directory open_dir(const char *dir_path) {
    if (dir == NULL) fatal_error("failed to open directory: %", dir_path);
 
    return Directory {
-      .dir = dir,
+      .fd = dir,
       .path = dir_path,
    };
 }

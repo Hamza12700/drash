@@ -32,13 +32,24 @@ struct Drash {
    Drash() {
       const char *home_env = getenv("HOME");
       assert_err(home_env == NULL, "failed to get HOME environment variable");
+      const u8 home_len = 30;
 
-      // @Personal: I'm not gona have the HOME env greater than 25 chars!
-      if (strlen(home_env) > 25) {
-         fprintf(stderr, "HOME environment variable too long or malformed, length: %zu\n", strlen(home_env));
-         printf("max length 25 characters\n");
-         exit(-1);
+      // @Personal: I'm not gona have the HOME env greater than 'home_len' chars!
+      if (strlen(home_env) > home_len) {
+         fprintf(stderr, "HOME environment variable too long: %zu\n", strlen(home_env));
+         printf("max length %u characters\n", home_len);
+         STOP;
       }
+
+      //
+      // @Speed:
+      //
+      // We know the length of the 'HOME' env variable which won't be larger than 'home_len'
+      // but we're treating it as dynamic variable because we want the lifetime of this struct of the entire program.
+      // We can't use a custom allocator because other part of the program could reset the memory at any time.
+      //
+      // - Hamza, 29 March 2025
+      //
 
       auto drash_dir = format_string("%/%", home_env, (const char *)".local/share/Drash");
 
@@ -89,7 +100,7 @@ struct Drash {
       assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
       struct dirent *rdir;
-      while ((rdir = readdir(*dir)) != NULL) {
+      while ((rdir = readdir(dir.fd)) != NULL) {
          if (rdir->d_name[0] == '.') continue;
 
          auto path = format_string("%/%", metadata.buf, rdir->d_name);
@@ -146,18 +157,25 @@ struct Drash {
       return drash_info;
    }
 
+   bool is_empty() const {
+      auto dir = open_dir(metadata.buf);
+
+      if (dir.is_empty()) return true;
+      return false;
+   }
+
    // List drashd files
    void list_files(Fixed_Allocator *allocator) const {
-      auto dir = open_dir(metadata.buf);
-      if (dir.is_empty()) {
+      if (this->is_empty()) {
          printf("Drashcan is empty!\n");
          return;
       }
 
+      auto dir = open_dir(metadata.buf);
       printf("\nDrash'd Files:\n\n");
 
       struct dirent *rdir;
-      while ((rdir = readdir(*dir)) != NULL) {
+      while ((rdir = readdir(dir.fd)) != NULL) {
          if (rdir->d_name[0] == '.') continue;
 
          auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
@@ -172,6 +190,58 @@ struct Drash {
             printf("- %s/\n", info.path);
 
          allocator->reset();
+      }
+   }
+
+   void restore(Fixed_Allocator *allocator, const uint argc, const char **argv) const {
+      if (this->is_empty()) {
+         printf("Drashcan is empty!\n");
+         return;
+      }
+
+      if (argc == 0) {
+         fprintf(stderr, "Missing argment 'file|directory' name\n");
+         return;
+      }
+
+      for (uint i = 0; i < argc; i++) {
+
+         // Reset the allocator so that I don't have to do it again and again.
+         allocator->reset();
+
+         const char *file = argv[i];
+         auto path = format_string(allocator, "%/%.info", metadata.buf, (char *)file);
+
+         if (!file_exists(path.buf)) {
+            printf("No file or directory named: %s\n", file);
+            continue;
+         }
+
+         auto info_file = open_file(path.buf, "r");
+         auto content = info_file.read_into_string(allocator);
+         auto info = parse_info(allocator, &content);
+
+         if (info.type == Drash_Info::Directory &&
+            dir_exists(info.path))
+         {
+            printf("Directory already exists: %s\n", info.path);
+            continue;
+         }
+
+         if (file_exists(info.path)) {
+            printf("File already exists: %s\n", info.path);
+            continue;
+         }
+
+         auto stored_path = format_string(allocator, "%/%", files.buf, (char *)file);
+         int err = rename(stored_path.buf, info.path);
+
+         if (err != 0) {
+            report_error("failed to move '%' to '%'", stored_path.buf, info.path);
+            continue;
+         }
+
+         remove_file(path.buf);
       }
    }
 };

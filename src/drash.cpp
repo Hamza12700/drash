@@ -221,6 +221,12 @@ struct Drash {
 
          auto info = parse_info(allocator, &file_info_content);
 
+         ex_res = exists(info.path);
+         if (ex_res.found) {
+            printf("File already exists: %s\n", info.path);
+            return;
+         }
+
          move_file(old_path.buf, info.path);
          remove_file(info_path.buf);
          remove_file(last.buf);

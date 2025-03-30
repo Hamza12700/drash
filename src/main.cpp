@@ -30,34 +30,32 @@ int main(int argc, char *argv[]) {
    }
 
    // Save the last filename
-   {
-      const char *file = argv[argc-1];
-      auto ex_res = exists(file);
-      const uint path_len = strlen(file);
+   const char *file = argv[argc-1];
+   auto ex_res = exists(file);
+   const uint file_len = strlen(file);
 
-      if (path_len > MAX_ARGLEN) {
-         fprintf(stderr, "path is too long: %u", path_len);
-         fprintf(stderr, "max length is %d", MAX_ARGLEN);
-         argc -= 1;
+   if (file_len > MAX_ARGLEN) {
+      fprintf(stderr, "path is too long: %u", file_len);
+      fprintf(stderr, "max length is %d", MAX_ARGLEN);
+      argc -= 1;
 
-      } else if (!ex_res.found) {
-         fprintf(stderr, "file not found: %s\n", file);
-         argc -= 1;
+   } else if (!ex_res.found) {
+      fprintf(stderr, "file not found: %s\n", file);
+      argc -= 1;
 
-      } else if (ex_res.type == lnk) {
-         remove_file(file);
-         printf("Remove symlink: %s\n", file);
-         argc -= 1;
+   } else if (ex_res.type == lnk) {
+      remove_file(file);
+      printf("Remove symlink: %s\n", file);
+      argc -= 1;
 
-      } else {
-         auto fpath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
-         auto ofile = open_file(fpath.buf, "w");
+   } else {
+      auto fpath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
+      auto ofile = open_file(fpath.buf, "w");
 
-         auto spath = string_with_size(&scratch_allocator, file);
+      auto spath = string_with_size(&scratch_allocator, file);
 
-         auto filename = file_basename(&scratch_allocator, &spath);
-         ofile.write(filename.buf);
-      }
+      auto filename = file_basename(&scratch_allocator, &spath);
+      ofile.write(filename.buf);
    }
 
    for (int i = 0; i < argc; i++) {
@@ -65,7 +63,7 @@ int main(int argc, char *argv[]) {
       scratch_allocator.reset();
 
       const char *arg = argv[i];
-      auto ex_res = exists(arg);
+      ex_res = exists(arg);
 
       if (ex_res.type == lnk) {
          remove_file(arg);

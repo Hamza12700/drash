@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
    assert(current_dir == NULL, "PWD envirnoment not found");
 
    auto scratch_allocator = fixed_allocator(getpagesize());
-   Drash drash;
+   auto drash = init_drash();
 
    // Handle commands
    if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) {

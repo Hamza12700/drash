@@ -47,11 +47,6 @@ drash list
 
 #### Restore
 
-Restore files by searching for them:
-```
-drash restore
-```
-
 Restore the last removed file:
 ```
 drash restore -
@@ -62,19 +57,9 @@ Restore a file matching the file name:
 drash restore <FILE_NAME>
 ```
 
-Pass `--overwrite/-o` flag to overwrite the existing file:
-```
-drash restore <FILE_NAME> --overwrite
-```
-
 #### Empty
 
 Empty the drashcan:
 ```
 drash empty
-```
-
-Pass `--yes/-y` pass to not show the confirm prompt:
-```
-drash empty -y
 ```

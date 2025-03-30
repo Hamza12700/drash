@@ -195,7 +195,7 @@ bool handle_commands(const char **argv, uint argc, const Drash *drash, Fixed_All
             }
 
             case Command::Remove: {
-               printf("TODO: Remove");
+               drash->remove(allocator, argc, argv);
                return true;
             }
          }

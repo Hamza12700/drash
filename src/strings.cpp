@@ -18,128 +18,134 @@ struct String {
       if (!with_allocator) free(buf);
    }
 
-   void take_reference(String *string) {
-      if (!with_allocator) free(buf); // Free the already allocated buffer if malloc'd
+   // Take a reference to another string
+   void take_reference(String *string);
 
-      capacity = string->capacity;
-      buf = string->buf;
+   // Compare a null-terminated string
+   bool cmp(const char *s);
 
-      //
-      // @Hack | @Temporary:
-      //
-      // We want the string buffer to live outside the scope because we take a reference to it.
-      // The string buffer only gets deallocated when it's malloc'd so, here we are abusing the variable 'with_allocator'
-      // so it doesn't get deallocated and instead the variable taking the reference should deallocate the memory.
-      //
-      // We should think about doing this in a better way, but for now it's fine.
-      //
+   // Remove a character from the buffer
+   void remove(const uint idx);
 
-      string->with_allocator = true;
-   }
+   // Concat a null-terminated string
+   void concat(const char *s);
 
-   bool cmp(const char *s) {
-      for (uint i = 0; i < strlen(s); i++) {
-         if (s[i] != buf[i]) return false;
-      }
+   // Concat a single character
+   void concat(const char s);
 
-      return true;
-   }
-
-   void remove(const uint idx) {
-      if (idx >= capacity) {
-         fprintf(stderr, "string - attempted to remove a character in index '%u' which is out of bounds.\n", idx);
-         fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP;
-      }
-
-      buf[idx] = '\0'; // @Robustness: Check if the character in the string buffer is null or not for safety reasons?
-   }
+   // Skip the string 'idx' amount of times
+   void skip(const uint num);
 
    // Return the length of the string and excluding the null-byte
-   uint len() const {
-      uint idx = 0;
-      while (buf[idx] != '\0')  idx += 1;
+   uint len() const;
 
-      return idx;
-   }
+   char& operator[] (const uint idx);
+   const char& operator[] (const uint idx) const;
 
-   // Return the length of the string including the null-byte
-   uint nlen() const {
-      uint idx = 0;
-      while (buf[idx] != '\0')  idx += 1;
-
-      return idx + 1;
-   }
-
-   char& operator[] (const uint idx) {
-      if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
-         fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP;
-      }
-
-      return buf[idx];
-   }
-
-   const char& operator[] (const uint idx) const {
-      if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
-         fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
-         fprintf(stderr, "max size is '%u'.\n", capacity);
-         STOP;
-      }
-
-      return buf[idx];
-   }
-
-   void operator= (const char *string) {
-      memset(buf, 0, len());
-
-      for (uint i = 0; string[i] != '\0'; i++) buf[i] = string[i];
-   }
-
-   void concat(const char *s) {
-      const uint s_len = strlen(s);
-
-      if (nlen() + s_len >= capacity) {
-         fprintf(stderr, "string - can't concat strings because not enought space\n");
-         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, nlen() + s_len);
-         STOP;
-      }
-
-      strcat(buf, s);
-   }
-
-   void concat(const String *s) {
-      if (s->nlen() + len() > capacity) {
-         fprintf(stderr, "string - can't concat strings because not enought space\n");
-         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, s->nlen() + len());
-         STOP;
-      }
-
-      strcat(buf, s->buf);
-   }
-
-   void concat(const char s) {
-      if (nlen() >= capacity) {
-         fprintf(stderr, "string - can't concat strings because not enought space\n");
-         fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, 1 + nlen());
-         STOP;
-      }
-
-      buf[len()] = s;
-   }
-
-   void skip(const uint idx) {
-      if (idx >= capacity) {
-         fprintf(stderr, "string - can't index into '%u' because it's out of bounds\n", idx);
-         fprintf(stderr, "max size is: %u\n", len());
-         STOP;
-      }
-
-      buf += idx;
-      capacity -= idx;
-   }
+   void operator= (const char *string);
 };
+
+void String::take_reference(String *other) {
+   if (!with_allocator) free(buf); // Free the already allocated buffer if malloc'd
+
+   capacity = other->capacity;
+   buf = other->buf;
+
+   //
+   // @Hack | @Temporary:
+   //
+   // We want the string buffer to live outside the scope because we take a reference to it.
+   // The string buffer only gets deallocated when it's malloc'd so, here we are abusing the variable 'with_allocator'
+   // so it doesn't get deallocated and instead the variable taking the reference should deallocate the memory.
+   //
+   // We should think about doing this in a better way, but for now it's fine.
+   //
+
+   other->with_allocator = true;
+}
+
+bool String::cmp(const char *s) {
+   for (uint i = 0; i < strlen(s); i++) {
+      if (s[i] != buf[i]) return false;
+   }
+
+   return true;
+}
+
+void String::remove(const uint idx) {
+   if (idx >= capacity) {
+      fprintf(stderr, "string - attempted to remove a character in index '%u' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%u'.\n", capacity);
+      STOP;
+   }
+
+   buf[idx] = '\0'; // @Robustness: Check if the character in the string buffer is null or not for safety reasons?
+}
+
+uint String::len() const {
+   uint idx = 0;
+   while (buf[idx] != '\0')  idx += 1;
+
+   return idx;
+}
+
+void String::concat(const char *other) {
+   const uint s_len = strlen(other);
+
+   if (len() + s_len+1 >= capacity) {
+      fprintf(stderr, "string - can't concat strings because not enought space\n");
+      fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, len() + s_len+1);
+      STOP;
+   }
+
+   strcat(buf, other);
+}
+
+void String::concat(const char s) {
+   if (len()+1 >= capacity) {
+      fprintf(stderr, "string - can't concat strings because not enought space\n");
+      fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, 1 + len()+1);
+      STOP;
+   }
+
+   buf[len()] = s;
+}
+
+void String::skip(const uint num) {
+   if (num >= capacity) {
+      fprintf(stderr, "string - can't index into '%u' because it's out of bounds\n", num);
+      fprintf(stderr, "max size is: %u\n", len());
+      STOP;
+   }
+
+   buf += num;
+   capacity -= num;
+}
+
+char& String::operator[] (const uint idx) {
+   if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
+      fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%u'.\n", capacity);
+      STOP;
+   }
+
+   return buf[idx];
+}
+
+const char& String::operator[] (const uint idx) const {
+   if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
+      fprintf(stderr, "string - attempted to index into position '%u' which is out of bounds.\n", idx);
+      fprintf(stderr, "max size is '%u'.\n", capacity);
+      STOP;
+   }
+
+   return buf[idx];
+}
+
+void String::operator= (const char *other) {
+   memset(buf, 0, len());
+   for (uint i = 0; other[i] != '\0'; i++) buf[i] = other[i];
+}
 
 String string_with_size(Fixed_Allocator *allocator, const uint size) {
    return String {

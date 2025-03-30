@@ -5,7 +5,6 @@
 #include <sys/stat.h>
 
 #include "strings.cpp"
-#include "array.cpp"
 
 struct File {
    FILE *fd;

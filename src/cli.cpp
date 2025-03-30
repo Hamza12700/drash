@@ -1,6 +1,3 @@
-#include <sys/stat.h>
-#include <dirent.h>
-
 #include "drash.cpp"
 
 struct Command {

@@ -1,11 +1,6 @@
 #ifndef DRASH_H
 #define DRASH_H
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <dirent.h>
-
 #include "strings.cpp"
 #include "file_system.cpp"
 

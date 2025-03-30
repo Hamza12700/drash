@@ -31,7 +31,7 @@ struct String {
       // The string buffer only gets deallocated when it's malloc'd so, here we are abusing the variable 'with_allocator'
       // so it doesn't get deallocated and instead the variable taking the reference should deallocate the memory.
       //
-      // We should think about doing this in a better way, but for now it's fine here because 'this' struct lives the entirety of the program.
+      // We should think about doing this in a better way, but for now it's fine.
       //
 
       string->with_allocator = true;

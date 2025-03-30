@@ -49,13 +49,13 @@ int main(int argc, char *argv[]) {
       argc -= 1;
 
    } else {
-      auto fpath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
-      auto ofile = open_file(fpath.buf, "w");
+      auto filepath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
+      auto lastfile = open_file(filepath.buf, "w");
 
-      auto spath = string_with_size(&scratch_allocator, file);
+      auto current_file = string_with_size(&scratch_allocator, file);
 
-      auto filename = file_basename(&scratch_allocator, &spath);
-      ofile.write(filename.buf);
+      auto filename = file_basename(&scratch_allocator, &current_file);
+      lastfile.write(filename.buf);
    }
 
    for (int i = 0; i < argc; i++) {

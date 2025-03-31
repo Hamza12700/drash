@@ -86,20 +86,21 @@ int main(int argc, char *argv[]) {
       auto path = string_with_size(&scratch_allocator, arg);
 
       auto filename = file_basename(&scratch_allocator, &path);
-      auto file_metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
+      auto metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
 
-      if (file_exists(file_metadata_path.buf)) {
+      ex_res = exists(metadata_path.buf);
+      if (ex_res.found) {
          fprintf(stderr, "Error: file '%s' already exists in the drashcan\n", arg);
          fprintf(stderr, "Can't overwrite it\n");
          continue;
       }
 
-      if (is_symlink(file_metadata_path.buf)) {
+      if (ex_res.type == lnk) {
          fprintf(stderr, "Error: metadata file is a symlink-file\n");
          continue;
       }
 
-      auto file_info = open_file(file_metadata_path.buf, "a");
+      auto file_info = open_file(metadata_path.buf, "a");
 
       // @Hack: I know this is stupid to allocate memory for a static variable but
       // this way I don't have to do pedantic work of assigning a null-terminated string to another string.

@@ -6,7 +6,7 @@
 
 #include "assert.cpp"
 
-#define VERSION "0.1.0"
+#define VERSION "1.0.0"
 
 typedef unsigned int uint;
 

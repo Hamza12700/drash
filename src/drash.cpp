@@ -158,7 +158,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
-   auto command = format_string(allocator, "rm -rf '%'", files.buf);
+   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf);
    assert_err(system(command.buf) != 0, "failed to remove drashd files");
    assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 

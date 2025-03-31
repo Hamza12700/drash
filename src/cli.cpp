@@ -130,7 +130,7 @@ static void force_remove_files(uint argc, const char **argv) {
 
       if (is_dir(path)) {
          // @Incomplete: Implement a function that will delete files and directories recursively
-         auto string = format_string("rm -rf '%'", path);
+         auto string = format_string("/bin/rm -rf '%'", path);
 
          int err = system(string.buf);
          if (err != 0) {

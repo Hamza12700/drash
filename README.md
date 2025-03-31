@@ -14,13 +14,15 @@ Clone the repo into your local machine:
 git clone https://github.com/hamza12700/drash
 ```
 
-There's only two dependencies: `g++` and `make`:
+Compile the binary
 ```bsah
 cd drash
 
 # 'opt' for release build
 make opt
 ```
+
+This binary gets put into the `build` directory.
 
 ## Usage
 

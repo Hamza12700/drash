@@ -119,8 +119,7 @@ static void force_remove_files(uint argc, const char **argv) {
       return;
    }
 
-   // Skip the current argument
-   for (uint i = 1; i < argc; i++) {
+   for (uint i = 1; i < argc; i++) { // Skip the current argument
       const char *path = argv[i];
 
       if (!file_exists(path)) {
@@ -130,9 +129,9 @@ static void force_remove_files(uint argc, const char **argv) {
 
       if (is_dir(path)) {
          // @Incomplete: Implement a function that will delete files and directories recursively
-         auto string = format_string("/bin/rm -rf '%'", path);
+         auto buffer = format_string("/bin/rm -rf '%'", path);
 
-         int err = system(string.buf);
+         int err = system(buffer.buf);
          if (err != 0) {
             report_error("failed to remove directory: '%'", path);
             continue;

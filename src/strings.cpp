@@ -15,7 +15,11 @@ struct String {
    bool with_allocator = false;
 
    ~String() {
-      if (!with_allocator) free(buf);
+      if (!with_allocator) {
+         free(buf);
+         capacity = 0;
+         buf = NULL;
+      }
    }
 
    // Take a reference to another string
@@ -157,7 +161,7 @@ String string_with_size(Fixed_Allocator *allocator, const uint size) {
 
 String string_with_size(const uint size) {
    return String {
-      .buf = static_cast <char *>(xmalloc(size+1)),
+      .buf = static_cast <char *>(xcalloc(size+1, 1)),
       .capacity = size+1,
    };
 }
@@ -166,7 +170,7 @@ String string_with_size(const char *s) {
    const uint size = strlen(s);
 
    auto ret = String {
-      .buf = static_cast <char *>(xmalloc(size+1)),
+      .buf = static_cast <char *>(xcalloc(size+1, 1)),
       .capacity = size+1,
    };
 
@@ -202,11 +206,10 @@ String format_string(Fixed_Allocator *allocator, const char *fmt_string, const A
    const uint format_len = strlen(fmt_string);
    uint total_size = 0;
 
-   for (const auto arg : arg_list) {
+   for (const auto arg : arg_list)
       total_size += strlen(arg);
-   }
 
-   auto dyn_string = string_with_size(allocator, format_len + total_size);
+   auto dyn_string = string_with_size(allocator, format_len + total_size+1);
    uint arg_idx = 0;
 
    for (uint i = 0; i < format_len; i++) {
@@ -225,9 +228,10 @@ String format_string(const char *fmt_string, const Args ...args) {
    const uint format_len = strlen(fmt_string);
    uint total_size = 0;
 
-   for (const auto arg : arg_list) total_size += strlen(arg);
+   for (const auto arg : arg_list)
+      total_size += strlen(arg);
 
-   auto dyn_string = string_with_size(format_len + total_size);
+   auto dyn_string = string_with_size(format_len + total_size+1);
    uint arg_idx = 0;
 
    for (uint i = 0; i < format_len; i++) {

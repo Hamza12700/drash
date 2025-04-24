@@ -194,11 +194,27 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
 
       auto info = parse_info(allocator, &content);
 
-      if (info.type == File_Type::file)
-         printf("- %s\n", info.path);
-      else
-         printf("- %s/\n", info.path);
+      if (info.type == File_Type::file) {
+         auto filename = file_basename(allocator, info.path);
+         auto path = format_string("%/%", files.buf, filename.buf);
 
+         auto file = open_file(path.buf, "r");
+         auto file_len = file.file_length();
+
+         const int kilobyte = 1000;
+         const int megabyte = kilobyte*kilobyte;
+         const int gigabyte = megabyte*1000;
+
+         if (file_len > gigabyte)
+            printf("- %s | %d Gb\n", info.path, file_len);
+         else if (file_len > megabyte)
+            printf("- %s | %d Mb\n", info.path, file_len);
+         else if (file_len > kilobyte)
+            printf("- %s | %d Kb\n", info.path, file_len);
+         else
+            printf("- %s | %d Bytes\n", info.path, file_len);
+
+      } else printf("- %s/\n", info.path);
       allocator->reset();
    }
 }
@@ -312,7 +328,8 @@ void Drash::remove(Fixed_Allocator *allocator, uint argc, const char **argv) con
          continue;
       }
 
-      remove_file(drashfile.buf);
+      if (ex_res.type == dir) remove_dir(drashfile.buf);
+      else remove_file(drashfile.buf);
 
       auto infopath = format_string(allocator, "%/%.info", metadata.buf, (char *)filename);
       remove_file(infopath.buf);

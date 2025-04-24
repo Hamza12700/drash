@@ -174,6 +174,11 @@ String file_basename(Fixed_Allocator *allocator, String *path) {
    return buffer;
 }
 
+String file_basename(Fixed_Allocator *allocator, char *path) {
+   auto tmp = string_with_size(allocator, path);
+   return file_basename(allocator, &tmp);
+}
+
 Directory open_dir(const char *dir_path) {
    DIR *dir = opendir(dir_path);
    if (dir == NULL) fatal_error("failed to open directory: %", dir_path);
@@ -226,6 +231,11 @@ Ex_Res exists(const char *path) {
    }
 
    return ret;
+}
+
+// @Hack | @Fixme: Recursively remove files inside a directory and sub-directroies!
+void remove_dir(char *path) {
+   auto command = format_string("/bin/rm -rf '%'", path);
 }
 
 #endif // FILE_SYS

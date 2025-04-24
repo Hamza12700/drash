@@ -1,6 +1,6 @@
 #include "cli.cpp"
 
-#define MAX_ARGLEN 1000 // Reasonable default length for file-path argument
+#define MAX_ARGLEN 1000 // Reasonable max length for file-path argument
 
 int main(int argc, char *argv[]) {
    if (argc == 1) {
@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
    }
 
    for (int i = 0; i < argc; i++) {
-
       scratch_allocator.reset();
 
       const char *arg = argv[i];

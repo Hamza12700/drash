@@ -148,6 +148,15 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
+   struct dirent *rdir;
+   int count = 0;
+   while ((rdir = readdir(dir.fd))) {
+      if (rdir->d_name[0] == '.') continue;
+      if (strcmp(rdir->d_name, "last") == 0) continue;
+      count += 1;
+   }
+
+   printf("\nTotal entries: %d\n", count);
    printf("Empty drash directory? [Y/n]: ");
 
    char input[5];
@@ -158,11 +167,11 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
-   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf);
+   rewinddir(dir.fd); // Reset the position of the directory back to start.
+   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf); // @Temporary | @Fixme: Recursively remove files inside a directory and sub-directories
    assert_err(system(command.buf) != 0, "failed to remove drashd files");
    assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
-   struct dirent *rdir;
    while ((rdir = readdir(dir.fd)) != NULL) {
       if (rdir->d_name[0] == '.') continue;
 

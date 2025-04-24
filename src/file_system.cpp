@@ -238,4 +238,15 @@ void remove_dir(char *path) {
    auto command = format_string("/bin/rm -rf '%'", path);
 }
 
+int dir_entries(DIR *dir) {
+   int count = 0;
+   struct dirent *rdir;
+   while ((rdir = readdir(dir))) {
+      if (rdir->d_name[0] == '.') continue;
+      count += 1;
+   }
+
+   return count;
+}
+
 #endif // FILE_SYS

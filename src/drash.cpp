@@ -88,7 +88,21 @@ Drash init_drash() {
 
 bool Drash::drash_empty() const {
    auto dir = open_dir(metadata.buf);
-   return dir.is_empty();
+   struct dirent *rdir;
+   int count = 0;
+
+   while ((rdir = readdir(dir.fd))) {
+      count += 1;
+
+      if (strcmp(rdir->d_name, ".") == 0 || strcmp(rdir->d_name, "..") == 0) continue;
+      if (strcmp(rdir->d_name, "last") == 0) {
+         count -= 1;
+         continue;
+      }
+   }
+
+   if (count > 2) return false;
+   return true;
 }
 
 Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) const {
@@ -168,7 +182,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
    }
 
    rewinddir(dir.fd); // Reset the position of the directory back to start.
-   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf); // @Temporary | @Fixme: Recursively remove files inside a directory and sub-directories
+   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf); // @Temporary | @Fixme: Recursively remove files inside directories and sub-directories
    assert_err(system(command.buf) != 0, "failed to remove drashd files");
    assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
@@ -194,7 +208,12 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd)) != NULL) {
 
-      if (rdir->d_name[0] == '.') continue;
+      // We can't simply compare the first character of 'd_name' because if a file starts with a '.' it gets skipped.
+      // That's because 'd_name[256]' holds every file names with some sort-of padding between them.
+      //
+      // Call to 'readdir' mutates the 'd_name' pointer to point to next filename null-terminated string.
+
+      if (strcmp(rdir->d_name, ".") == 0 || strcmp(rdir->d_name, "..") == 0) continue;
       if (strcmp(rdir->d_name, "last") == 0) continue;
 
       auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
@@ -342,6 +361,18 @@ void Drash::remove(Fixed_Allocator *allocator, uint argc, const char **argv) con
 
       auto infopath = format_string(allocator, "%/%.info", metadata.buf, (char *)filename);
       remove_file(infopath.buf);
+
+      auto lastfile_path = format_string(allocator, "%/%", metadata.buf, (char *)"last");
+      auto lastfile = fopen(lastfile_path.buf, "r");
+      if (!lastfile) return;
+
+      auto last_file = File {
+         .fd = lastfile,
+         .path = lastfile_path.buf
+      };
+
+      auto content = last_file.read_into_string(allocator);
+      if (content.cmp(filename)) remove_file(lastfile_path.buf);
    }
 }
 

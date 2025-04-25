@@ -122,7 +122,11 @@ static void force_remove_files(uint argc, const char **argv) {
    for (uint i = 1; i < argc; i++) { // Skip the current argument
       const char *path = argv[i];
 
-      if (!file_exists(path)) {
+      auto file = exists(path);
+      if (file.type == lnk) {
+         remove_file(path);
+         continue;
+      } else if (!file.found) {
          fprintf(stderr, "file not found: %s\n", path);
          continue;
       }

@@ -233,11 +233,6 @@ Ex_Res exists(const char *path) {
    return ret;
 }
 
-// @Hack | @Fixme: Recursively remove files inside a directory and sub-directroies!
-void remove_dir(char *path) {
-   auto command = format_string("/bin/rm -rf '%'", path);
-}
-
 int dir_entries(DIR *dir) {
    int count = 0;
    struct dirent *rdir;
@@ -247,6 +242,54 @@ int dir_entries(DIR *dir) {
    }
 
    return count;
+}
+
+bool remove_all(const char *dirpath) {
+   auto filestats = exists(dirpath);
+   if (!filestats.found) return false;
+
+   if (filestats.type != dir) {
+      fprintf(stderr, "Expected a directory path\n");
+      return false;
+   }
+
+   auto dir = open_dir(dirpath);
+   struct dirent *rdir;
+
+   while ((rdir = readdir(dir.fd))) {
+      if (strcmp(rdir->d_name, ".") == 0
+         || strcmp(rdir->d_name, "..") == 0) continue; // @Speed: There are better ways of doing this!
+
+      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto filestat = exists(fullpath.buf);
+      if (filestat.type == file) {
+         if (!remove_file(fullpath.buf)) continue;
+      } else remove_all(fullpath.buf);
+   }
+
+   rewinddir(dir.fd);
+   while ((rdir = readdir(dir.fd))) {
+      if (strcmp(rdir->d_name, ".") == 0
+         || strcmp(rdir->d_name, "..") == 0) continue; // @Speed: There are better ways of doing this!
+
+      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+
+      if (rmdir(fullpath.buf) != 0) {
+         fprintf(stderr, "failed to remove directory\n");
+         perror("rmdir -");
+         continue;
+      }
+
+      remove_all(fullpath.buf);
+   }
+
+   if (rmdir(dirpath) != 0) { // Lastly, remove the parent directory
+      fprintf(stderr, "failed to remove directory\n");
+      perror("rmdir -");
+      return false;
+   }
+
+   return true;
 }
 
 #endif // FILE_SYS

@@ -22,25 +22,13 @@ struct String {
       }
    }
 
-   // Take a reference to another string
    void take_reference(String *string);
-
-   // Compare a null-terminated string
    bool cmp(const char *s);
-
-   // Remove a character from the buffer
    void remove(const uint idx);
 
-   // Concat a null-terminated string
    void concat(const char *s);
-
-   // Concat a single character
    void concat(const char s);
-
-   // Skip the string 'idx' amount of times
    void skip(const uint num);
-
-   // Return the length of the string and excluding the null-byte
    uint len() const;
 
    char& operator[] (const uint idx);
@@ -160,6 +148,16 @@ String string_with_size(Fixed_Allocator *allocator, const uint size) {
 }
 
 String string_with_size(const uint size) {
+
+   // @Speed:
+   //
+   // 'mmap' returns memory that is already zero-initialized
+   // We need to have memory be zero-initialized because we are dealing with null-terminated strings here!
+   // Because I don't wanna go throught the hassle of creating my own version of 'printf' that takes a non-null terminated strings
+   // we have to zero-initialized the memory to avoid nasty bugs! :NullString
+   //
+   // - Hamza 26 April 2025
+
    return String {
       .buf = static_cast <char *>(xcalloc(size+1, 1)),
       .capacity = size+1,
@@ -170,7 +168,7 @@ String string_with_size(const char *s) {
    const uint size = strlen(s);
 
    auto ret = String {
-      .buf = static_cast <char *>(xcalloc(size+1, 1)),
+      .buf = static_cast <char *>(xcalloc(size+1, 1)), // Avoid using 'calloc/malloc' instead use 'mmap'. See :NullString
       .capacity = size+1,
    };
 

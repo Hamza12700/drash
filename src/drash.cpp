@@ -181,11 +181,10 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
-   rewinddir(dir.fd); // Reset the position of the directory back to start.
-   auto command = format_string(allocator, "/bin/rm -rf '%'", files.buf); // @Temporary | @Fixme: Recursively remove files inside directories and sub-directories
-   assert_err(system(command.buf) != 0, "failed to remove drashd files");
+   assert(!remove_all(files.buf), "failed to remove 'drash' directory when init 'Drash' (struct)");
    assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
 
+   rewinddir(dir.fd); // Reset the position of the directory back to start.
    while ((rdir = readdir(dir.fd)) != NULL) {
       if (rdir->d_name[0] == '.') continue;
 
@@ -356,8 +355,9 @@ void Drash::remove(Fixed_Allocator *allocator, uint argc, const char **argv) con
          continue;
       }
 
-      if (ex_res.type == dir) remove_dir(drashfile.buf);
-      else remove_file(drashfile.buf);
+      if (ex_res.type == dir) {
+         if (!remove_all(drashfile.buf)) continue;
+      } else remove_file(drashfile.buf);
 
       auto infopath = format_string(allocator, "%/%.info", metadata.buf, (char *)filename);
       remove_file(infopath.buf);

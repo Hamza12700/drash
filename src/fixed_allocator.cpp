@@ -5,37 +5,15 @@
 
 #include "types.cpp"
 
-
-//
-// @NOTE:
-//
-// Don't add a deconstructor because the 'sub_allocator' method creates a new
-// allocator of the same type which points to the same region of memory allocated by its parent allocator.
-//
-
 struct Fixed_Allocator {
    uint capacity = 0; // Memory capacity limit
    uint size = 0;     // Used memory
    void *buffer;      // Mapped zero-initialized memory
 
-   Fixed_Allocator sub_allocator(const uint bytes);
-
    void *alloc(const uint bytes);
    void reset();
    void free();
 };
-
-Fixed_Allocator Fixed_Allocator::sub_allocator(const uint bytes) {
-   assert(bytes + size > capacity, "bump_allocator failed to create a sub-allocator because capacity is full");
-
-   int idx = capacity - bytes;
-   capacity -= bytes;
-
-   return Fixed_Allocator {
-      .capacity = bytes,
-      .buffer = (char *)buffer + idx
-   };
-}
 
 void * Fixed_Allocator::alloc(const uint bytes) {
    assert((size + bytes) > capacity, "bump-allocator allocation failed because capacity is full");

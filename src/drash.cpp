@@ -117,7 +117,7 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
    file_content->skip(count+1); // Skip the Path including the newline character.
    file_content->skip(strlen("Type: ")); // Skip the prefix
 
-   if (file_content->len() > type_len) {
+   if (strlen(file_content->buf) > type_len) {
       fprintf(stderr, "Error: 'Type' feild is invalid: %s\n", file_content->buf);
       STOP;
    }
@@ -292,9 +292,7 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       auto content = info_file.read_into_string(allocator);
       auto info = parse_info(allocator, &content);
 
-      if (info.type == File_Type::dir &&
-         dir_exists(info.path))
-      {
+      if (info.type == File_Type::dir && dir_exists(info.path)) {
          printf("Directory already exists: %s\n", info.path);
          continue;
       }
@@ -356,7 +354,7 @@ void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) cons
       };
 
       auto content = last_file.read_into_string(allocator);
-      if (content.cmp(filename)) remove_file(lastfile_path.buf);
+      if (match_string(filename, content.buf)) remove_file(lastfile_path.buf);
    }
 }
 

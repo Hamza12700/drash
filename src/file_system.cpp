@@ -152,12 +152,14 @@ bool move_file(const char *oldpath, const char *newpath) {
 }
 
 String file_basename(Fixed_Allocator *allocator, String *path) {
-   if ((*path)[path->len()-1] == '/') {
-      path->remove(path->len()-1);
+   int pathlen = strlen(path->buf);
+
+   if ((*path)[pathlen-1] == '/') {
+      path->remove(pathlen-1);
    }
 
    bool contain_slash = false;
-   for (int i = 0; i < path->len(); i++) {
+   for (int i = 0; i < pathlen; i++) {
       if ((*path)[i] == '/') {
          contain_slash = true;
          break;
@@ -166,15 +168,15 @@ String file_basename(Fixed_Allocator *allocator, String *path) {
 
    if (!contain_slash) return *path;
 
-   auto buffer = string_with_size(allocator, path->len());
+   auto buffer = string_with_size(allocator, pathlen);
    int file_idx = 0;
 
-   for (int i = path->len(); (*path)[i] != '/'; i--) {
+   for (int i = strlen(path->buf); (*path)[i] != '/'; i--) {
       file_idx++;
    }
 
    buffer = path->buf;
-   buffer.skip(buffer.len() - file_idx+1);
+   buffer.skip(strlen(buffer.buf) - file_idx+1);
 
    return buffer;
 }

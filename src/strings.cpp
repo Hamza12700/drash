@@ -12,12 +12,11 @@
 bool match_string(const char *one, const char *two) {
    int onelen = strlen(one);
    int twolen = strlen(two);
-
    if (onelen != twolen) return false;
+
    for (int i = 0; i < onelen; i++) {
       if (one[i] != two[i]) return false;
    }
-
    return true;
 }
 
@@ -38,13 +37,10 @@ struct String {
    }
 
    void take_reference(String *string);
-   bool cmp(const char *s);
    void remove(const int idx);
 
-   void concat(const char *s);
-   void concat(const char s);
+   int concat(const char *s); // Return the amount of characters written in the buffer
    void skip(const int num);
-   int len() const;
 
    char& operator[] (const int idx);
    const char& operator[] (const int idx) const;
@@ -71,14 +67,6 @@ void String::take_reference(String *other) {
    other->with_allocator = true;
 }
 
-bool String::cmp(const char *s) {
-   for (uint i = 0; i < strlen(s); i++) {
-      if (s[i] != buf[i]) return false;
-   }
-
-   return true;
-}
-
 void String::remove(const int idx) {
    if (idx >= capacity) {
       fprintf(stderr, "string - attempted to remove a character in index '%u' which is out of bounds.\n", idx);
@@ -89,39 +77,28 @@ void String::remove(const int idx) {
    buf[idx] = '\0'; // @Robustness: Check if the character in the string buffer is null or not for safety reasons?
 }
 
-int String::len() const {
-   int idx = 0;
-   while (buf[idx] != '\0')  idx += 1;
+int String::concat(const char *other) {
+   const int slen = strlen(other);
 
-   return idx;
-}
-
-void String::concat(const char *other) {
-   const int s_len = strlen(other);
-
-   if (len() + s_len+1 >= capacity) {
+   if (strlen(buf) + slen+1 >= (uint)capacity) {
       fprintf(stderr, "string - can't concat strings because not enought space\n");
-      fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, len() + s_len+1);
+      fprintf(stderr, "capacity is: '%u' but got: '%lu'.\n", capacity, strlen(buf) + slen+1);
       STOP;
    }
 
-   strcat(buf, other);
-}
-
-void String::concat(const char s) {
-   if (len()+1 >= capacity) {
-      fprintf(stderr, "string - can't concat strings because not enought space\n");
-      fprintf(stderr, "capacity is: '%u' but got: '%u'.\n", capacity, 1 + len()+1);
-      STOP;
+   int count = 0;
+   int buflen = strlen(buf);
+   while (count < slen) {
+      buf[buflen+count] = other[count];
+      count += 1;
    }
-
-   buf[len()] = s;
+   return count;
 }
 
 void String::skip(const int num) {
    if (num >= capacity) {
       fprintf(stderr, "string - can't index into '%u' because it's out of bounds\n", num);
-      fprintf(stderr, "max size is: %u\n", len());
+      fprintf(stderr, "max size is: %lu\n", strlen(buf));
       STOP;
    }
 
@@ -150,7 +127,7 @@ const char& String::operator[] (const int idx) const {
 }
 
 void String::operator= (const char *other) {
-   memset(buf, 0, len());
+   memset(buf, 0, strlen(buf));
    for (int i = 0; other[i] != '\0'; i++) buf[i] = other[i];
 }
 
@@ -224,7 +201,7 @@ struct New_String {
    ~New_String();
 
    void empty();
-   void concat(const char *str);
+   int concat(const char *str);
    New_String sub_string(); // Splits the 'buf' into half (capacity / 2), point the sub-string after that (buf = (capacity / 2)+1) so they don't overlap.
    void take_ref(New_String *ref);
 
@@ -283,7 +260,7 @@ void New_String::empty() {
    memset(buf, 0, strlen(buf)+1);
 }
 
-void New_String::concat(const char *str) {
+int New_String::concat(const char *str) {
    int slen = strlen(str);
    int buflen = strlen(buf);
    int total_size = buflen+slen+1;
@@ -301,7 +278,12 @@ void New_String::concat(const char *str) {
       capacity = page_align_size;
    }
 
-   strcat(buf, str);
+   int count = 0;
+   while (count < slen) {
+      buf[buflen+count] = str[count];
+      count += 1;
+   }
+   return count;
 };
 
 New_String new_string(const int size) {
@@ -327,12 +309,22 @@ String format_string(Fixed_Allocator *allocator, const char *fmt_string, const A
 
    auto dyn_string = string_with_size(allocator, format_len + total_size+1);
    uint arg_idx = 0;
+   int filled_buffer = 0;
 
    for (int i = 0; i < format_len; i++) {
       if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
-         else fprintf(stderr, "format-string - not enough arguments provided for format string");
-      } else dyn_string.concat(fmt_string[i]);
+         if (arg_idx < arg_list.size()) {
+            auto arg = *(std::next(arg_list.begin(), arg_idx++));
+            filled_buffer += dyn_string.concat(arg);
+            continue;
+         }
+
+         fprintf(stderr, "format-string - not enough arguments provided for format string");
+         continue;
+      }
+
+      dyn_string[filled_buffer] = fmt_string[i];
+      filled_buffer += 1;
    }
 
    return dyn_string;
@@ -349,13 +341,22 @@ String format_string(const char *fmt_string, const Args ...args) {
 
    auto dyn_string = string_with_size(format_len + total_size+1);
    uint arg_idx = 0;
+   int filled_buffer = 0;
 
    for (int i = 0; i < format_len; i++) {
       if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
-         else fprintf(stderr, "format-string - not enough arguments provided for format string");
+         if (arg_idx < arg_list.size()) {
+            auto arg = *(std::next(arg_list.begin(), arg_idx++));
+            filled_buffer += dyn_string.concat(arg);
+            continue;
+         }
 
-      } else dyn_string.concat(fmt_string[i]);
+         fprintf(stderr, "format-string - not enough arguments provided for format string");
+         continue;
+      }
+
+      dyn_string[filled_buffer] = fmt_string[i];
+      filled_buffer += 1;
    }
 
    return dyn_string;
@@ -376,17 +377,18 @@ void format_string(char *buffer, const char *fmt_string, const Args ...args) {
       if (fmt_string[i] == '%') {
          if (arg_idx < arg_list.size()) {
             const char *arg = *(std::next(arg_list.begin(), arg_idx++));
-            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) {
+            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) { 
                buffer[filled_buffer] = arg[x];
             }
-         } else {
-            fprintf(stderr, "format-string - not enough arguments provided for format string");
+            continue;
          }
 
-      } else {
-         buffer[filled_buffer] = fmt_string[i];
-         filled_buffer += 1;
+         fprintf(stderr, "format-string - not enough arguments provided for format string");
+         continue;
       }
+
+      buffer[filled_buffer] = fmt_string[i];
+      filled_buffer += 1;
    }
 }
 
@@ -405,17 +407,16 @@ void format_string(New_String *buffer, const char *fmt_string, const Args ...arg
       if (fmt_string[i] == '%') {
          if (arg_idx < arg_list.size()) {
             const char *arg = *(std::next(arg_list.begin(), arg_idx++));
-            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) {
-               (*buffer)[filled_buffer] = arg[x];
-            }
+            filled_buffer += buffer->concat(arg);
             continue;
          }
 
          fprintf(stderr, "format-string - not enough arguments provided for format string");
-      } else {
-         (*buffer)[filled_buffer] = fmt_string[i];
-         filled_buffer += 1;
+         continue;
       }
+
+      (*buffer)[filled_buffer] = fmt_string[i];
+      filled_buffer += 1;
    }
 }
 

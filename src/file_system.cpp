@@ -18,9 +18,9 @@ struct File {
       if (err != 0) report_error("failed to close file: %", path);
    }
 
-   uint file_length() {
+   int file_length() {
       fseek(fd, 0, SEEK_END);
-      uint file_size = ftell(fd);
+      int file_size = ftell(fd);
       rewind(fd);
 
       return file_size;
@@ -32,7 +32,7 @@ struct File {
 
    // Read the entire contents of the file into a string.
    String read_into_string(Fixed_Allocator *allocator) {
-      const uint file_len = file_length();
+      const int file_len = file_length();
 
       auto buf = string_with_size(allocator, file_len);
       fread(buf.buf, sizeof(char), file_len, fd);
@@ -54,7 +54,7 @@ struct Directory {
 
    // Resets the directory stream back to the beginning of the directory.
    bool is_empty() {
-      uint count = 0;
+      int count = 0;
       while (readdir(fd) != NULL) count += 1;
 
       if (count <= 2) {
@@ -152,7 +152,7 @@ String file_basename(Fixed_Allocator *allocator, String *path) {
    }
 
    bool contain_slash = false;
-   for (uint i = 0; i < path->len(); i++) {
+   for (int i = 0; i < path->len(); i++) {
       if ((*path)[i] == '/') {
          contain_slash = true;
          break;
@@ -162,7 +162,7 @@ String file_basename(Fixed_Allocator *allocator, String *path) {
    if (!contain_slash) return *path;
 
    auto buffer = string_with_size(allocator, path->len());
-   uint file_idx = 0;
+   int file_idx = 0;
 
    for (int i = path->len(); (*path)[i] != '/'; i--) {
       file_idx++;

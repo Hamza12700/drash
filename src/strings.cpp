@@ -334,7 +334,7 @@ struct New_String {
 
 New_String::~New_String() {
    if (flags & SubString || flags & Referenced) return;
-   assert_err(munmap(buf, capacity) != 0, "munmap failed");
+   unmap(buf, capacity);
    buf = NULL;
 }
 
@@ -397,9 +397,7 @@ void New_String::concat(const char *str) {
 
       int page_align_size = page_size;
       while (page_align_size < total_size) page_align_size *= 2;
-
-      buf = (char *)mremap(buf, capacity, page_align_size, MREMAP_MAYMOVE);
-      assert_err(buf == MAP_FAILED, "mremap failed");
+      buf = (char *)realloc(buf, capacity, page_align_size);
       capacity = page_align_size;
    }
 
@@ -407,11 +405,13 @@ void New_String::concat(const char *str) {
 };
 
 New_String new_string(const int size) {
-   auto allocator = fixed_allocator(size);
+   int page_align_size = page_size;
+   while (page_align_size < size) page_align_size *= 2;
+   auto mem = allocate(page_align_size);
 
    New_String ret;
-   ret.buf = (char *)allocator.buffer;
-   ret.capacity = allocator.capacity;
+   ret.buf = (char *)mem;
+   ret.capacity = page_align_size;
    ret.index = 0;
    return ret;
 }

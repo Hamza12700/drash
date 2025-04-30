@@ -113,13 +113,13 @@ static void print_help() {
    }
 }
 
-static void force_remove_files(uint argc, const char **argv) {
+static void force_remove_files(int argc, const char **argv) {
    if (argc == 1) {
       fprintf(stderr, "Missing argument file(s)\n");
       return;
    }
 
-   for (uint i = 1; i < argc; i++) { // Skip the current argument
+   for (int i = 1; i < argc; i++) { // Skip the current argument
       const char *path = argv[i];
 
       auto file = exists(path);
@@ -162,8 +162,8 @@ void handle_opts(const char **argv, const int argc) {
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-bool handle_commands(const char **argv, uint argc, const Drash *drash, Fixed_Allocator *allocator) {
-   for (uint i = 0; i < argc; i++) {
+bool handle_commands(const char **argv, int argc, const Drash *drash, Fixed_Allocator *allocator) {
+   for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
       for (auto cmd : commands) {

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #include "assert.cpp"
 
@@ -28,16 +29,50 @@ typedef int64_t i64;
 
 const int page_size = getpagesize();
 
-void *xmalloc(const uint size) {
+void *xmalloc(uint size) {
    void *mem = malloc(size);
    assert_err(mem == NULL, "malloc - failed");
    return mem;
 }
 
-void *xcalloc(const uint number, const uint size) {
+void *xcalloc(uint number, uint size) {
    void *mem = calloc(number, size);
    assert_err(mem == NULL, "calloc - failed");
    return mem;
+}
+
+void *allocate_align(int size) {
+   int page_align_size = page_size;
+   while (page_align_size < size) page_align_size *= 2;
+
+   void *memory = mmap(NULL, page_align_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+   assert_err(memory == MAP_FAILED, "mmap failed");
+   return memory;
+}
+
+void *allocate(const int size) {
+   void *memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+   assert_err(memory == MAP_FAILED, "mmap failed");
+   return memory;
+}
+
+void *realloc_align(void *old_addr, int old_size, int new_size) {
+   int page_align_size = page_size;
+   while (page_align_size < new_size) page_align_size *= 2;
+
+   auto mem = mremap(old_addr, old_size, page_align_size, MREMAP_MAYMOVE); // This unmap's the old memory
+   assert_err(mem == MAP_FAILED, "mremap failed");
+   return mem;
+}
+
+void *realloc(void *old_addr, int old_size, int new_size) {
+   auto mem = mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE); // This unmap's the old memory
+   assert_err(mem == MAP_FAILED, "mremap failed");
+   return mem;
+}
+
+void unmap(void *addr, int length) {
+   assert_err(munmap(addr, length) != 0, "munmap failed");
 }
 
 #ifdef DEBUG

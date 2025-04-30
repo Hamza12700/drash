@@ -7,16 +7,13 @@
 #define DIR_PERM 0740
 
 struct Drash_Info {
-   // @Temporary: We should be using the 'String' type but thanks to C++ then
-   // we have to deal with copy constructor, assignment and other shit.
    char *path = NULL;
-
    File_Type type = unknown;
 };
 
 struct Drash {
-   String files;    // Path to drash files directory
-   String metadata; // Path to metadata about the drash files
+   New_String files;    // Path to drash files directory
+   New_String metadata; // Path to metadata about the drash files
 
    // Checks if metadata directory is empty or not
    bool drash_empty() const;
@@ -31,10 +28,10 @@ struct Drash {
    void list_files(Fixed_Allocator *allocator) const;
 
    // Restore drash'd files
-   void restore(Fixed_Allocator *allocator, const uint argc, const char **argv) const;
+   void restore(Fixed_Allocator *allocator, const int argc, const char **argv) const;
 
    // Remove files in the drashcan
-   void remove(Fixed_Allocator *allocator, uint argc, const char **argv) const;
+   void remove(Fixed_Allocator *allocator, int argc, const char **argv) const;
 };
 
 Drash init_drash() {
@@ -48,42 +45,36 @@ Drash init_drash() {
       STOP;
    }
 
-   //
-   // @Speed:
-   //
-   // We know the length of the 'HOME' env variable which won't be larger than 'home_len'
-   // but we're treating it as dynamic variable because we want the lifetime of this struct of the entire program.
-   // We can't use a custom allocator because other part of the program could reset the memory at any time.
-   //
-   // - Hamza, 29 March 2025
-   //
-
-   auto drash_dir = format_string("%/%", home_env, (const char *)".local/share/Drash");
+   char drash_dir[home_len+100] = {0};
+   format_string(drash_dir, "%/%", home_env, (const char *)".local/share/Drash");
 
    int err = 0;
-   err = mkdir(drash_dir.buf, DIR_PERM);
+   err = mkdir(drash_dir, DIR_PERM);
 
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   auto tmp_files = format_string("%/files", drash_dir.buf);
-   err = mkdir(tmp_files.buf, DIR_PERM);
+   auto files = new_string(page_size);
+   auto metadata = files.sub_string();
+
+   format_string(files.buf, "%/files", drash_dir);
+   err = mkdir(files.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   auto tmp_metadata = format_string("%/metadata", drash_dir.buf);
-   err = mkdir(tmp_metadata.buf, DIR_PERM);
+   format_string(metadata.buf, "%/metadata", drash_dir);
+   err = mkdir(metadata.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   Drash ret;
-   ret.files.take_reference(&tmp_files);
-   ret.metadata.take_reference(&tmp_metadata);
-
-   return ret;
+   // Freaking C++ can't just simply assign a variable to a return value because of some wired implicit operator overloading
+   Drash drash;
+   drash.files.take_ref(&files);
+   drash.metadata.take_ref(&metadata);
+   return drash;
 }
 
 bool Drash::drash_empty() const {
@@ -109,7 +100,7 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
    Drash_Info drash_info;
    file_content->skip(strlen("Path: ")); // Skip the prefix
 
-   uint count = 0;
+   int count = 0;
    while ((*file_content)[count] != '\n') count += 1;
 
    drash_info.path = static_cast <char *>(allocator->alloc(count+1));
@@ -131,14 +122,9 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
       STOP;
    }
 
-   count = 0;
    char type[type_len] = {0};
-
-   while ((*file_content)[count] != '\n') {
-      char line_char = (*file_content)[count];
-
-      type[count] = line_char;
-      count += 1;
+   for (int i = 0; (*file_content)[i] != '\n'; i++) {
+      type[i] = (*file_content)[i];
    }
 
    if (strcmp(type, "file") != 0 && strcmp(type, "directory") != 0) {
@@ -146,10 +132,8 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
       STOP;
    }
 
-   if (strcmp("file", type) == 0)
-      drash_info.type = file;
-   else
-      drash_info.type = dir;
+   if (strcmp("file", type) == 0) drash_info.type = file;
+   else drash_info.type = dir;
 
    return drash_info;
 }
@@ -246,7 +230,7 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
    }
 }
 
-void Drash::restore(Fixed_Allocator *allocator, const uint argc, const char **argv) const {
+void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **argv) const {
    if (this->drash_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -291,7 +275,7 @@ void Drash::restore(Fixed_Allocator *allocator, const uint argc, const char **ar
       return;
    }
 
-   for (uint i = 0; i < argc; i++) {
+   for (int i = 0; i < argc; i++) {
 
       // Reset the allocator so that I don't have to do it again and again.
       allocator->reset();
@@ -332,7 +316,7 @@ void Drash::restore(Fixed_Allocator *allocator, const uint argc, const char **ar
    }
 }
 
-void Drash::remove(Fixed_Allocator *allocator, uint argc, const char **argv) const {
+void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) const {
    if (this->drash_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -343,7 +327,7 @@ void Drash::remove(Fixed_Allocator *allocator, uint argc, const char **argv) con
       return;
    }
 
-   for (uint i = 0; i < argc; i++) {
+   for (int i = 0; i < argc; i++) {
       allocator->reset();
 
       const char *filename = argv[i];

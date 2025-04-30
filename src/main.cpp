@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
    const char *current_dir = getenv("PWD");
    assert(current_dir == NULL, "PWD envirnoment not found");
 
-   auto scratch_allocator = fixed_allocator(getpagesize());
+   auto scratch_allocator = fixed_allocator(page_size);
    auto drash = init_drash();
 
    // Handle commands

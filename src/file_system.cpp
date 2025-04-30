@@ -65,6 +65,11 @@ struct Directory {
       rewinddir(fd);
       return false;
    }
+
+   void skip_default_dirs() {
+      readdir(fd);
+      readdir(fd);
+   }
 };
 
 File open_file(const char *file_path, const char *modes) {
@@ -255,23 +260,20 @@ bool remove_all(const char *dirpath) {
 
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
+   dir.skip_default_dirs();
 
    while ((rdir = readdir(dir.fd))) {
-      if (strcmp(rdir->d_name, ".") == 0
-         || strcmp(rdir->d_name, "..") == 0) continue; // @Speed: There are better ways of doing this!
-
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(fullpath.buf);
       if (filestat.type == file) {
-         if (!remove_file(fullpath.buf)) continue;
+         remove_file(fullpath.buf);
       } else remove_all(fullpath.buf);
    }
 
    rewinddir(dir.fd);
-   while ((rdir = readdir(dir.fd))) {
-      if (strcmp(rdir->d_name, ".") == 0
-         || strcmp(rdir->d_name, "..") == 0) continue; // @Speed: There are better ways of doing this!
+   dir.skip_default_dirs();
 
+   while ((rdir = readdir(dir.fd))) {
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
 
       if (rmdir(fullpath.buf) != 0) {

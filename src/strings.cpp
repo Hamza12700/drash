@@ -207,106 +207,6 @@ String string_with_size(Fixed_Allocator *allocator, const char *s) {
    return ret;
 }
 
-//
-// NOTE:
-//
-// This only works if the 'Args' are the same type include constant values.
-// I would like to fix this but for now this gets the job done.
-//
-// - Hamza, 12 March 2025
-//
-
-template<typename ...Args>
-String format_string(Fixed_Allocator *allocator, const char *fmt_string, const Args ...args) {
-   const auto arg_list = { args... }; 
-   const int format_len = strlen(fmt_string);
-   int total_size = 0;
-
-   for (const auto arg : arg_list)
-      total_size += strlen(arg);
-
-   auto dyn_string = string_with_size(allocator, format_len + total_size+1);
-   uint arg_idx = 0;
-
-   for (int i = 0; i < format_len; i++) {
-      if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
-         else fprintf(stderr, "format-string - not enough arguments provided for format string");
-      } else dyn_string.concat(fmt_string[i]);
-   }
-
-   return dyn_string;
-}
-
-template<typename ...Args>
-String format_string(const char *fmt_string, const Args ...args) {
-   const auto arg_list = { args... }; 
-   const int format_len = strlen(fmt_string);
-   int total_size = 0;
-
-   for (const auto arg : arg_list)
-      total_size += strlen(arg);
-
-   auto dyn_string = string_with_size(format_len + total_size+1);
-   uint arg_idx = 0;
-
-   for (int i = 0; i < format_len; i++) {
-      if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
-         else fprintf(stderr, "format-string - not enough arguments provided for format string");
-
-      } else dyn_string.concat(fmt_string[i]);
-   }
-
-   return dyn_string;
-}
-
-template<typename ...Args>
-void format_string(char *buffer, const char *fmt_string, const Args ...args) {
-   const auto arg_list = { args... }; 
-   const int format_len = strlen(fmt_string);
-   int total_size = 0;
-
-   for (const auto arg : arg_list)
-      total_size += strlen(arg);
-
-   uint arg_idx = 0;
-   int filled_buffer = 0;
-   for (int i = 0; i < format_len; i++) {
-      if (fmt_string[i] == '%') {
-         if (arg_idx < arg_list.size()) {
-            const char *arg = *(std::next(arg_list.begin(), arg_idx++));
-            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) {
-               buffer[filled_buffer] = arg[x];
-            }
-         } else {
-            fprintf(stderr, "format-string - not enough arguments provided for format string");
-         }
-
-      } else {
-         buffer[filled_buffer] = fmt_string[i];
-         filled_buffer += 1;
-      }
-   }
-}
-
-template<typename ...Args>
-void fatal_error(const char *fmt, Args ...args) {
-   auto err = format_string(fmt, args...);
-
-   fprintf(stderr, "[ERROR]: %s\n", err.buf);
-   fprintf(stderr, "- %s\n", strerror(errno));
-   exit(errno);
-}
-
-template<typename ...Args>
-void report_error(const char *fmt, Args ...args) {
-   auto err = format_string(fmt, args...);
-
-   fprintf(stderr, "[ERROR]: %s\n", err.buf);
-   fprintf(stderr, "- %s\n", strerror(errno));
-}
-
 enum String_Flags {
    Default,
    SubString,
@@ -414,6 +314,126 @@ New_String new_string(const int size) {
    ret.capacity = page_align_size;
    ret.index = 0;
    return ret;
+}
+
+template<typename ...Args>
+String format_string(Fixed_Allocator *allocator, const char *fmt_string, const Args ...args) {
+   const auto arg_list = { args... };
+   const int format_len = strlen(fmt_string);
+   int total_size = 0;
+
+   for (const auto arg : arg_list)
+      total_size += strlen(arg);
+
+   auto dyn_string = string_with_size(allocator, format_len + total_size+1);
+   uint arg_idx = 0;
+
+   for (int i = 0; i < format_len; i++) {
+      if (fmt_string[i] == '%') {
+         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
+         else fprintf(stderr, "format-string - not enough arguments provided for format string");
+      } else dyn_string.concat(fmt_string[i]);
+   }
+
+   return dyn_string;
+}
+
+template<typename ...Args>
+String format_string(const char *fmt_string, const Args ...args) {
+   const auto arg_list = { args... };
+   const int format_len = strlen(fmt_string);
+   int total_size = 0;
+
+   for (const auto arg : arg_list)
+      total_size += strlen(arg);
+
+   auto dyn_string = string_with_size(format_len + total_size+1);
+   uint arg_idx = 0;
+
+   for (int i = 0; i < format_len; i++) {
+      if (fmt_string[i] == '%') {
+         if (arg_idx < arg_list.size()) dyn_string.concat(*(std::next(arg_list.begin(), arg_idx++)));
+         else fprintf(stderr, "format-string - not enough arguments provided for format string");
+
+      } else dyn_string.concat(fmt_string[i]);
+   }
+
+   return dyn_string;
+}
+
+template<typename ...Args>
+void format_string(char *buffer, const char *fmt_string, const Args ...args) {
+   const auto arg_list = { args... };
+   const int format_len = strlen(fmt_string);
+   int total_size = 0;
+
+   for (const auto arg : arg_list)
+      total_size += strlen(arg);
+
+   uint arg_idx = 0;
+   int filled_buffer = 0;
+   for (int i = 0; i < format_len; i++) {
+      if (fmt_string[i] == '%') {
+         if (arg_idx < arg_list.size()) {
+            const char *arg = *(std::next(arg_list.begin(), arg_idx++));
+            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) {
+               buffer[filled_buffer] = arg[x];
+            }
+         } else {
+            fprintf(stderr, "format-string - not enough arguments provided for format string");
+         }
+
+      } else {
+         buffer[filled_buffer] = fmt_string[i];
+         filled_buffer += 1;
+      }
+   }
+}
+
+template<typename ...Args>
+void format_string(New_String *buffer, const char *fmt_string, const Args ...args) {
+   const auto arg_list = { args... };
+   const int format_len = strlen(fmt_string);
+   int total_size = 0;
+
+   for (const auto arg : arg_list)
+      total_size += strlen(arg);
+
+   uint arg_idx = 0;
+   int filled_buffer = 0;
+   for (int i = 0; i < format_len; i++) {
+      if (fmt_string[i] == '%') {
+         if (arg_idx < arg_list.size()) {
+            const char *arg = *(std::next(arg_list.begin(), arg_idx++));
+            for (uint x = 0; x < strlen(arg); x++, filled_buffer++) {
+               (*buffer)[filled_buffer] = arg[x];
+            }
+            continue;
+         }
+
+         fprintf(stderr, "format-string - not enough arguments provided for format string");
+      } else {
+         (*buffer)[filled_buffer] = fmt_string[i];
+         filled_buffer += 1;
+      }
+   }
+}
+
+template<typename ...Args>
+void fatal_error(const char *fmt, Args ...args) {
+   auto err = format_string(fmt, args...);
+
+   fprintf(stderr, "[ERROR]: %s\n", err.buf);
+   fprintf(stderr, "- %s\n", strerror(errno));
+   exit(errno);
+}
+
+template<typename ...Args>
+void report_error(const char *fmt, Args ...args) {
+   auto err = format_string(fmt, args...);
+
+   fprintf(stderr, "[ERROR]: %s\n", err.buf);
+   fprintf(stderr, "- %s\n", strerror(errno));
 }
 
 #endif // STRINGS_H

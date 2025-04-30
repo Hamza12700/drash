@@ -58,13 +58,13 @@ Drash init_drash() {
    auto files = new_string(page_size);
    auto metadata = files.sub_string();
 
-   format_string(files.buf, "%/files", drash_dir);
+   format_string(&files, "%/files", drash_dir);
    err = mkdir(files.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   format_string(metadata.buf, "%/metadata", drash_dir);
+   format_string(&metadata, "%/metadata", drash_dir);
    err = mkdir(metadata.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");

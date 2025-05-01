@@ -187,7 +187,7 @@ enum String_Flags {
    Referenced,
 };
 
-// Dynamic-String that works with relative pointers (only)
+// An implemention of dynamically growable string that works with relative pointers
 struct New_String {
    char *buf = NULL; // We have to hold a pointer to the buffer beacuse we want to compute the address relative to the buffer pointer.
    int flags = Default;
@@ -203,7 +203,6 @@ struct New_String {
    void take_ref(New_String *ref);
 
    char& operator[] (const int idx);
-   const char& operator[] (const int idx) const;
 };
 
 New_String::~New_String() {
@@ -214,19 +213,16 @@ New_String::~New_String() {
 
 char &New_String::operator[] (const int idx) {
    if (idx >= capacity) {
-      fprintf(stderr, "(new_string) - attempted to index into position '%d' which is out of bounds.\n", idx);
-      fprintf(stderr, "max size is '%u'.\n", capacity);
-      STOP;
-   }
+      if (flags & SubString) {
+         fprintf(stderr, "(sub_string) - attempted to index into position '%d' which is out of bounds.\n", idx);
+         fprintf(stderr, "max size is '%u'.\n", capacity);
+         STOP;
+      }
 
-   return buf[idx];
-}
-
-const char& New_String::operator[] (const int idx) const {
-   if (idx >= capacity) {
-      fprintf(stderr, "(new_string) - attempted to index into position '%d' which is out of bounds.\n", idx);
-      fprintf(stderr, "max size is '%u'.\n", capacity);
-      STOP;
+      int page_align_size = page_size;
+      while (page_align_size < idx) page_align_size *= 2;
+      buf = (char *)realloc(buf, capacity, page_align_size);
+      capacity = page_align_size;
    }
 
    return buf[idx];

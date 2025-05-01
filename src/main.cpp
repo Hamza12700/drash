@@ -100,15 +100,11 @@ int main(int argc, char *argv[]) {
       }
 
       auto file_info = open_file(metadata_path.buf, "a");
+      char type[20] = {0};
+      if (is_file(path.buf)) sprintf(type, "file");
+      else sprintf(type, "directory");
 
-      // @Hack: I know this is stupid to allocate memory for a static variable but
-      // this way I don't have to do pedantic work of assigning a null-terminated string to another string.
-      auto type = string_with_size(&scratch_allocator, 20);
-
-      if (is_file(path.buf)) type = "file";
-      else type = "directory";
-
-      auto data = format_string(&scratch_allocator, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type.buf);
+      auto data = format_string(&scratch_allocator, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type);
       file_info.write(data.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);

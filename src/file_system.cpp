@@ -251,7 +251,7 @@ bool remove_all(const char *dirpath) {
 
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(fullpath.buf);
-      if (filestat.type == file) {
+      if (filestat.type == file || filestat.type == lnk) {
          remove_file(fullpath.buf);
       } else remove_all(fullpath.buf);
    }

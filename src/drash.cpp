@@ -149,7 +149,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
    struct dirent *rdir;
    int count = 0;
    while ((rdir = readdir(dir.fd))) {
-      if (rdir->d_name[0] == '.') continue;
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
       if (strcmp(rdir->d_name, "last") == 0) continue;
       count += 1;
    }
@@ -170,8 +170,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
 
    rewinddir(dir.fd); // Reset the position of the directory back to start.
    while ((rdir = readdir(dir.fd)) != NULL) {
-      if (rdir->d_name[0] == '.') continue;
-
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
       auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
       unlink(path.buf);
 

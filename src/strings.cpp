@@ -1,9 +1,6 @@
 #ifndef STRINGS_H
 #define STRINGS_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <signal.h>
 #include <iterator> // Get rid-of this
 

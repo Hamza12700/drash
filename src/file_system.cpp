@@ -65,11 +65,6 @@ struct Directory {
       rewinddir(fd);
       return false;
    }
-
-   void skip_default_dirs() {
-      readdir(fd);
-      readdir(fd);
-   }
 };
 
 File open_file(const char *file_path, const char *modes) {
@@ -240,17 +235,6 @@ Ex_Res exists(const char *path) {
    return ret;
 }
 
-int dir_entries(DIR *dir) {
-   int count = 0;
-   struct dirent *rdir;
-   while ((rdir = readdir(dir))) {
-      if (rdir->d_name[0] == '.') continue;
-      count += 1;
-   }
-
-   return count;
-}
-
 bool remove_all(const char *dirpath) {
    auto filestats = exists(dirpath);
    if (!filestats.found) return false;
@@ -262,9 +246,9 @@ bool remove_all(const char *dirpath) {
 
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
-   dir.skip_default_dirs();
-
    while ((rdir = readdir(dir.fd))) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(fullpath.buf);
       if (filestat.type == file) {
@@ -273,9 +257,8 @@ bool remove_all(const char *dirpath) {
    }
 
    rewinddir(dir.fd);
-   dir.skip_default_dirs();
-
    while ((rdir = readdir(dir.fd))) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
 
       if (rmdir(fullpath.buf) != 0) {

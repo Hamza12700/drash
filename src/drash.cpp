@@ -8,7 +8,7 @@
 
 struct Drash_Info {
    char *path = NULL;
-   File_Type type = unknown;
+   File_Type type = ft_unknown;
 };
 
 struct Drash {
@@ -132,8 +132,8 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
       STOP;
    }
 
-   if (strcmp("file", type) == 0) drash_info.type = file;
-   else drash_info.type = dir;
+   if (strcmp("file", type) == 0) drash_info.type = ft_file;
+   else drash_info.type = ft_dir;
 
    return drash_info;
 }
@@ -204,7 +204,7 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
 
       auto info = parse_info(allocator, &content);
 
-      if (info.type == File_Type::file) {
+      if (info.type == ft_file) {
          auto filename = file_basename(allocator, info.path);
          auto path = format_string("%/%", files.buf, filename.buf);
 
@@ -291,7 +291,7 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       auto content = info_file.read_into_string(allocator);
       auto info = parse_info(allocator, &content);
 
-      if (info.type == File_Type::dir && dir_exists(info.path)) {
+      if (info.type == ft_dir && dir_exists(info.path)) {
          printf("Directory already exists: %s\n", info.path);
          continue;
       }
@@ -336,7 +336,7 @@ void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) cons
          continue;
       }
 
-      if (ex_res.type == dir) {
+      if (ex_res.type == ft_dir) {
          if (!remove_all(drashfile.buf)) continue;
       } else remove_file(drashfile.buf);
 

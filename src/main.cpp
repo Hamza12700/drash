@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "file not found: %s\n", file);
       argc -= 1;
 
-   } else if (ex_res.type == lnk) {
+   } else if (ex_res.type == ft_lnk) {
       remove_file(file);
       printf("Remove symlink: %s\n", file);
       argc -= 1;
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
       const char *arg = argv[i];
       ex_res = exists(arg);
 
-      if (ex_res.type == lnk) {
+      if (ex_res.type == ft_lnk) {
          remove_file(arg);
          printf("Removed symlink: %s\n", arg);
          continue;
@@ -83,7 +83,6 @@ int main(int argc, char *argv[]) {
       }
 
       auto path = string_with_size(&scratch_allocator, arg);
-
       auto filename = file_basename(&scratch_allocator, &path);
       auto metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
 
@@ -94,7 +93,7 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      if (ex_res.type == lnk) {
+      if (ex_res.type == ft_lnk) {
          fprintf(stderr, "Error: metadata file is a symlink-file\n");
          continue;
       }

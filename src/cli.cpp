@@ -123,7 +123,7 @@ static void force_remove_files(int argc, const char **argv) {
       const char *path = argv[i];
 
       auto file = exists(path);
-      if (file.type == lnk) {
+      if (file.type == ft_lnk) {
          remove_file(path);
          continue;
       } else if (!file.found) {

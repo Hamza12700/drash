@@ -187,7 +187,7 @@ enum String_Flags {
    Referenced,
 };
 
-// An implemention of dynamically growable string that works with relative pointers
+// Dynamically growable string that works with relative pointers
 struct New_String {
    char *buf = NULL; // We have to hold a pointer to the buffer beacuse we want to compute the address relative to the buffer pointer.
    int flags = Default;
@@ -199,8 +199,8 @@ struct New_String {
 
    void empty();
    int concat(const char *str);
-   New_String sub_string(); // Splits the 'buf' into half (capacity / 2), point the sub-string after that (buf = (capacity / 2)+1) so they don't overlap.
    void take_ref(New_String *ref);
+   New_String sub_string(); // Splits the 'buf' into half (capacity / 2), point the sub-string after that (buf = (capacity / 2)+1) so they don't overlap.
 
    char& operator[] (const int idx);
 };

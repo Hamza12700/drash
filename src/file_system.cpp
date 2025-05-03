@@ -192,15 +192,15 @@ Directory open_dir(const char *dir_path) {
 }
 
 enum File_Type : u8 {
-   file = 0,
-   dir,
-   lnk,
-   unknown,
+   ft_file = 0,
+   ft_dir,
+   ft_lnk,
+   ft_unknown,
 };
 
 struct Ex_Res {
    bool found = false;
-   File_Type type = unknown;
+   File_Type type = ft_unknown;
 };
 
 // Check if file|directory exists
@@ -214,19 +214,19 @@ Ex_Res exists(const char *path) {
 
    switch (st_mode) {
       case S_IFREG: {
-         ret.type = file;
+         ret.type = ft_file;
          ret.found = true;
          return ret;
       }
 
       case S_IFDIR: {
-         ret.type = dir;
+         ret.type = ft_dir;
          ret.found = true;
          return ret;
       }
 
       case S_IFLNK: {
-         ret.type = lnk;
+         ret.type = ft_lnk;
          ret.found = true;
          return ret;
       }
@@ -239,7 +239,7 @@ bool remove_all(const char *dirpath) {
    auto filestats = exists(dirpath);
    if (!filestats.found) return false;
 
-   if (filestats.type != dir) {
+   if (filestats.type != ft_dir) {
       fprintf(stderr, "Expected a directory path\n");
       return false;
    }
@@ -251,7 +251,7 @@ bool remove_all(const char *dirpath) {
 
       auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(fullpath.buf);
-      if (filestat.type == file || filestat.type == lnk) {
+      if (filestat.type == ft_file || filestat.type == ft_lnk) {
          remove_file(fullpath.buf);
       } else remove_all(fullpath.buf);
    }

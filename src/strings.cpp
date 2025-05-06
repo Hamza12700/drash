@@ -2,7 +2,7 @@
 #define STRINGS_H
 
 #include <signal.h>
-#include <iterator> // Get rid-of this
+#include <iterator> // Can't remove this, because we are using variadic arguments in templates that gets turned into a list or whatever
 
 #include "fixed_allocator.cpp"
 

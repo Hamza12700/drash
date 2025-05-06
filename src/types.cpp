@@ -56,7 +56,7 @@ void *allocate(const int size) {
    return memory;
 }
 
-void *realloc_align(void *old_addr, int old_size, int new_size) {
+void *reallocate_align(void *old_addr, int old_size, int new_size) {
    int page_align_size = page_size;
    while (page_align_size < new_size) page_align_size *= 2;
 
@@ -65,7 +65,7 @@ void *realloc_align(void *old_addr, int old_size, int new_size) {
    return mem;
 }
 
-void *realloc(void *old_addr, int old_size, int new_size) {
+void *reallocate(void *old_addr, int old_size, int new_size) {
    auto mem = mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE); // This unmap's the old memory
    assert_err(mem == MAP_FAILED, "mremap failed");
    return mem;
@@ -73,6 +73,7 @@ void *realloc(void *old_addr, int old_size, int new_size) {
 
 void unmap(void *addr, int length) {
    assert_err(munmap(addr, length) != 0, "munmap failed");
+   addr = NULL; // Because the mapped memory is no longer available the address is invalid, so it is better to set it to null.
 }
 
 #ifdef DEBUG

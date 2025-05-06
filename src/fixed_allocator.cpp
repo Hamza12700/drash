@@ -31,10 +31,7 @@ void Fixed_Allocator::reset() {
 }
 
 void Fixed_Allocator::free() {
-   assert_err(munmap(buffer, capacity) != 0, "munmap failed");
-   size = 0;
-   capacity = 0;
-   buffer = NULL;
+   unmap(buffer, capacity);
 }
 
 Fixed_Allocator fixed_allocator(const int size) {

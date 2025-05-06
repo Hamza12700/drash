@@ -7,7 +7,7 @@
 #define DIR_PERM 0740
 
 struct Drash_Info {
-   char *path = NULL;
+   char *path = NULL; // @Temporary: We should be using the 'New_String' type here
    File_Type type = ft_unknown;
 };
 
@@ -37,15 +37,15 @@ struct Drash {
 Drash init_drash() {
    const char *home_env = getenv("HOME");
    assert_err(home_env == NULL, "failed to get HOME environment variable");
-   const u8 home_len = 30; // @Personal: I'm not gona have the HOME env greater than this.
 
+   const u8 home_len = 30; // @Personal: I'm not gona have the HOME env greater than this.
    if (strlen(home_env) > home_len) {
       fprintf(stderr, "HOME environment variable too long: %zu\n", strlen(home_env));
       printf("max length %u characters\n", home_len);
       STOP;
    }
 
-   char drash_dir[home_len+100] = {0};
+   char drash_dir[150] = {0};
    format_string(drash_dir, "%/%", home_env, (const char *)".local/share/Drash");
 
    int err = 0;
@@ -55,8 +55,8 @@ Drash init_drash() {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   auto files = new_string(page_size);
-   auto metadata = files.sub_string();
+   auto files = malloc_new_string(sizeof(drash_dir)+50);
+   auto metadata = malloc_new_string(sizeof(drash_dir)+50);
 
    format_string(&files, "%/files", drash_dir);
    err = mkdir(files.buf, DIR_PERM);

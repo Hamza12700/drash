@@ -129,37 +129,27 @@ void String::operator= (const char *other) {
 }
 
 String string_with_size(Fixed_Allocator *allocator, const int size) {
-   return String {
-      .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
-      .capacity = size+1,
-      .with_allocator = true,
-   };
+   String ret;
+   ret.buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1));
+   ret.capacity = size+1;
+   ret.with_allocator = true;
+   return ret;
 }
 
 String string_with_size(const int size) {
+   String ret;
+   ret.buf = (char *)xcalloc(size+1, 1);
+   ret.capacity = size+1;
 
-   // @Speed:
-   //
-   // 'mmap' returns memory that is already zero-initialized
-   // We need to have memory be zero-initialized because we are dealing with null-terminated strings here!
-   // Because I don't wanna go throught the hassle of creating my own version of 'printf' that takes a non-null terminated strings
-   // we have to zero-initialized the memory to avoid nasty bugs! :NullString
-   //
-   // - Hamza 26 April 2025
-
-   return String {
-      .buf = static_cast <char *>(xcalloc(size+1, 1)),
-      .capacity = size+1,
-   };
+   return ret;
 }
 
 String string_with_size(const char *s) {
    const int size = strlen(s);
 
-   auto ret = String {
-      .buf = static_cast <char *>(xcalloc(size+1, 1)), // Avoid using 'calloc/malloc' instead use 'mmap'. See :NullString
-      .capacity = size+1,
-   };
+   String ret;
+   ret.buf = static_cast <char *>(xcalloc(size+1, 1));
+   ret.capacity = size+1;
 
    ret = s;
    return ret;
@@ -168,11 +158,10 @@ String string_with_size(const char *s) {
 String string_with_size(Fixed_Allocator *allocator, const char *s) {
    const int size = strlen(s);
 
-   auto ret = String {
-      .buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1)),
-      .capacity = size+1,
-      .with_allocator = true,
-   };
+   String ret;
+   ret.buf = static_cast <char *>(allocator->alloc(sizeof(char) * size+1));
+   ret.capacity = size+1;
+   ret.with_allocator = true;
 
    ret = s;
    return ret;

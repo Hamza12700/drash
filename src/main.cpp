@@ -24,9 +24,14 @@ int main(int argc, char *argv[]) {
    auto scratch_allocator = fixed_allocator(page_size);
    auto drash = init_drash();
 
-   // Handle commands
-   if (handle_commands((const char **)argv, argc, &drash, &scratch_allocator)) {
-      return 0;
+   auto filestat = exists(argv[0]);
+   if (!filestat.found) {
+      for (auto cmd : commands) {
+         if (match_string(argv[0], cmd.name)) {
+            handle_commands((const char **)argv, argc, &drash, &scratch_allocator);
+            return 0;
+         }
+      }
    }
 
    // Save the last filename
@@ -40,6 +45,13 @@ int main(int argc, char *argv[]) {
       argc -= 1;
 
    } else if (!ex_res.found) {
+      for (auto cmd : commands) {
+         if (match_string(file, cmd.name)) {
+            handle_commands((const char **)argv, argc, &drash, &scratch_allocator);
+            return 0;
+         }
+      }
+
       fprintf(stderr, "file not found: %s\n", file);
       argc -= 1;
 
@@ -59,10 +71,8 @@ int main(int argc, char *argv[]) {
    }
 
    for (int i = 0; i < argc; i++) {
-      scratch_allocator.reset();
-
       const char *arg = argv[i];
-      ex_res = exists(arg);
+      auto ex_res = exists(arg);
 
       if (ex_res.type == ft_lnk) {
          remove_file(arg);
@@ -108,6 +118,8 @@ int main(int argc, char *argv[]) {
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
       move_file(arg, drash_file.buf);
+
+      scratch_allocator.reset();
    }
 
    scratch_allocator.free();

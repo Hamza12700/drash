@@ -209,20 +209,27 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
          auto path = format_string("%/%", files.buf, filename.buf);
 
          auto file = open_file(path.buf, "r");
-         auto file_len = file.file_length();
+         auto filelen = file.file_length();
 
          const int kilobyte = 1000;
          const int megabyte = kilobyte*kilobyte;
          const int gigabyte = megabyte*1000;
 
-         if (file_len > gigabyte)
-            printf("- %s | %d Gb\n", info.path, file_len);
-         else if (file_len > megabyte)
-            printf("- %s | %d Mb\n", info.path, file_len);
-         else if (file_len > kilobyte)
-            printf("- %s | %d Kb\n", info.path, file_len);
-         else
-            printf("- %s | %d Bytes\n", info.path, file_len);
+         if (filelen > gigabyte) {
+            float size = (float)filelen/gigabyte;
+            printf("- %s | %.1fG\n", info.path, size);
+
+         } else if (filelen > megabyte) {
+            float size = (float)filelen/megabyte;
+            printf("- %s | %.1fM\n", info.path, size);
+
+         } else if (filelen > kilobyte) {
+            float size = (float)filelen/kilobyte;
+            printf("- %s | %.1fK\n", info.path, size);
+
+         } else {
+            printf("- %s | %d\n", info.path, filelen);
+         }
 
       } else printf("- %s/\n", info.path);
       allocator->reset();

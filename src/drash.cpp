@@ -250,9 +250,8 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
    // Restore the last drash'd file/directory
    if (argv[0][0] == '-') {
       auto last = format_string(allocator, "%/last", metadata.buf);
-      auto ex_res = exists(last.buf);
-
-      if (!ex_res.found) {
+      auto last_filestat = exists(last.buf);
+      if (!last_filestat.found) {
          printf("Nothing to restore!\n");
          return;
       }
@@ -260,32 +259,56 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       auto file = open_file(last.buf, "r");
       auto filename = file.read_into_string(allocator);
 
-      auto old_path = format_string(allocator, "%/%", files.buf, filename.buf);
+      auto oldpath = format_string(allocator, "%/%", files.buf, filename.buf);
       auto info_path = format_string(allocator, "%/%.info", metadata.buf, filename.buf);
 
       auto file_info = open_file(info_path.buf, "r");
       auto file_info_content = file_info.read_into_string(allocator);
 
       auto info = parse_info(allocator, &file_info_content);
+      auto filestat = exists(info.path);
 
-      ex_res = exists(info.path);
-      if (ex_res.found) {
-         printf("File already exists: %s\n", info.path);
+      if (filestat.found) {
+         if (filestat.type == ft_dir) {
+            printf("Directory already exists: %s\n", info.path);
+         } else if (filestat.type == ft_file) {
+            printf("File already exists: %s\n", info.path);
+         } else {
+            fprintf(stderr, "Unknown filetype encounter: %s\n", info.path);
+            return;
+         }
+
+         printf("Would like to overwrite it? [Y/n]: ");
+
+         char input[5];
+         fgets(input, sizeof(input), stdin);
+         if (strcmp(input, "n\n") == 0) {
+            printf("Canceled\n");
+            return;
+         }
+
+         if (filestat.type == ft_dir) remove_all(info.path);
+         else remove_file(info.path);
+
+         auto drashfile = format_string(allocator, "%/%", files.buf, (char *)filename.buf);
+         if (filestat.type == ft_file) move_file(drashfile.buf, info.path);
+         else move_directory(drashfile.buf, info.path);
+
+         remove_file(info_path.buf);
+         remove_file(last.buf);
          return;
       }
 
-      move_file(old_path.buf, info.path);
+      auto drashfile = format_string(allocator, "%/%", files.buf, (char *)filename.buf);
+      if (filestat.type == ft_file) move_file(drashfile.buf, info.path);
+      else move_directory(drashfile.buf, info.path);
       remove_file(info_path.buf);
       remove_file(last.buf);
-
       return;
    }
 
    for (int i = 0; i < argc; i++) {
-
-      // Reset the allocator so that I don't have to do it again and again.
       allocator->reset();
-
       const char *file = argv[i];
       auto path = format_string(allocator, "%/%.info", metadata.buf, (char *)file);
 
@@ -297,24 +320,45 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       auto info_file = open_file(path.buf, "r");
       auto content = info_file.read_into_string(allocator);
       auto info = parse_info(allocator, &content);
+      auto filestat = exists(info.path);
 
-      if (info.type == ft_dir && dir_exists(info.path)) {
-         printf("Directory already exists: %s\n", info.path);
+      if (filestat.found) {
+         if (filestat.type == ft_dir) {
+            printf("Directory already exists: %s\n", info.path);
+         } else if (filestat.type == ft_file) {
+            printf("File already exists: %s\n", info.path);
+         } else {
+            fprintf(stderr, "Unknown filetype encounter: %s\n", file);
+            continue;
+         }
+
+         printf("Would you like to overwrite it? [Y/n]: ");
+
+         char input[5];
+         fgets(input, sizeof(input), stdin);
+         if (strcmp(input, "n\n") == 0) {
+            printf("Canceled\n");
+            continue;
+         }
+
+         if (filestat.type == ft_dir) remove_all(info.path);
+         else remove_file(info.path);
+
+         auto drashpath = format_string(allocator, "%/%", files.buf, (char *)file);
+         auto drash_filestat = exists(drashpath.buf);
+         if (drash_filestat.type == ft_dir) {
+            if (!move_directory(drashpath.buf, info.path)) continue;
+         } else if (!move_file(drashpath.buf, info.path)) continue;
+
+         remove_file(path.buf);
          continue;
       }
 
-      if (file_exists(info.path)) {
-         printf("File already exists: %s\n", info.path);
-         continue;
-      }
-
-      auto stored_path = format_string(allocator, "%/%", files.buf, (char *)file);
-      int err = rename(stored_path.buf, info.path);
-
-      if (err != 0) {
-         report_error("failed to move '%' to '%'", stored_path.buf, info.path);
-         continue;
-      }
+      auto drashpath = format_string(allocator, "%/%", files.buf, (char *)file);
+      auto drash_filestat = exists(drashpath.buf);
+      if (drash_filestat.type == ft_dir) {
+         if (!move_directory(drashpath.buf, info.path)) continue;
+      } else if (!move_file(drashpath.buf, info.path)) continue;
 
       remove_file(path.buf);
    }

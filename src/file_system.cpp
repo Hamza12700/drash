@@ -39,6 +39,15 @@ struct File {
 
       return buf;
    }
+
+   String read_into_string() {
+      const int file_len = file_length();
+
+      auto buf = string_with_size(file_len);
+      fread(buf.buf, sizeof(char), file_len, fd);
+
+      return buf;
+   }
 };
 
 struct Directory {
@@ -134,13 +143,24 @@ bool remove_file(const char *path) {
    return true;
 }
 
+bool copy_move_file(const char *oldpath, const char *newpath) {
+   auto file = open_file(oldpath, "rb");
+   auto file_content = file.read_into_string();
+
+   auto newfile = open_file(newpath, "wb");
+   newfile.write(file_content.buf);
+   return remove_file(oldpath);
+}
+
 // Return's true on success otherwise false
 bool move_file(const char *oldpath, const char *newpath) {
-   int err = rename(oldpath, newpath);
+   if (rename(oldpath, newpath) != 0) {
+      if (errno != EXDEV) {
+         report_error("failed to move '%' to '%'", oldpath, newpath);
+         return false;
+      }
 
-   if (err != 0) {
-      report_error("failed to move '%' to '%'", oldpath, newpath);
-      return false;
+      return copy_move_file(oldpath, newpath);
    }
 
    return true;
@@ -199,6 +219,9 @@ enum File_Type : u8 {
 };
 
 struct Ex_Res {
+   // Should be 16 bits wide? [en.wikipedia.org/wiki/Unix_file_types#Numeric]
+   u16 perms = 0; // @Robustness: Validate if this is correct.
+
    bool found = false;
    File_Type type = ft_unknown;
 };
@@ -210,6 +233,7 @@ Ex_Res exists(const char *path) {
 
    if (lstat(path, &st) != 0) return ret;
 
+   ret.perms = st.st_mode & 07777; // Masks out the file-type upper bits and only store file-permission bits
    auto st_mode = st.st_mode & S_IFMT;
 
    switch (st_mode) {
@@ -235,15 +259,16 @@ Ex_Res exists(const char *path) {
    return ret;
 }
 
-bool remove_all(const char *dirpath) {
-   auto filestats = exists(dirpath);
-   if (!filestats.found) return false;
-
-   if (filestats.type != ft_dir) {
-      fprintf(stderr, "Expected a directory path\n");
+bool makedir(const char *dirpath, uint modes) {
+   if (mkdir(dirpath, modes) != 0) {
+      report_error("failed to create directory at %", dirpath);
       return false;
    }
 
+   return true;
+}
+
+bool remove_all(const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
@@ -274,6 +299,59 @@ bool remove_all(const char *dirpath) {
       fprintf(stderr, "failed to remove directory\n");
       perror("rmdir -");
       return false;
+   }
+
+   return true;
+}
+
+bool move_directory_copy(const char *oldpath, const char *newpath) {
+   auto dir = open_dir(oldpath);
+   struct dirent *rdir;
+   while ((rdir = readdir(dir.fd))) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+
+      auto old_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto new_filepath = format_string("%/%", (char *)newpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto filestat = exists(old_filepath.buf);
+
+      if (filestat.type == ft_file || filestat.type == ft_lnk) {
+         move_file(old_filepath.buf, new_filepath.buf);
+      } else {
+         makedir(new_filepath.buf, filestat.perms); // Create the new directory with same file-perms of the old-directory
+         move_directory_copy(old_filepath.buf, new_filepath.buf);
+      }
+   }
+
+   rewinddir(dir.fd);
+   while ((rdir = readdir(dir.fd))) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+      auto new_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+
+      if (rmdir(new_filepath.buf) != 0) {
+         fprintf(stderr, "failed to remove directory\n");
+         perror("rmdir -");
+         continue;
+      }
+
+      remove_all(new_filepath.buf);
+   }
+
+   if (rmdir(oldpath) != 0) { // Lastly, remove the parent directory
+      fprintf(stderr, "failed to remove directory\n");
+      perror("rmdir -");
+      return false;
+   }
+
+   return true;
+}
+
+bool move_directory(const char *oldpath, const char *newpath) {
+   if (rename(oldpath, newpath) != 0) {
+      if (errno != EXDEV) report_error("failed to move '%' to '%'\n", oldpath, newpath);
+
+      auto dirstat = exists(oldpath);
+      makedir(newpath, dirstat.perms);
+      return move_directory_copy(oldpath, newpath);
    }
 
    return true;

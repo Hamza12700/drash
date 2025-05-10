@@ -72,15 +72,15 @@ int main(int argc, char *argv[]) {
 
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
-      auto ex_res = exists(arg);
+      auto filestat = exists(arg);
 
-      if (ex_res.type == ft_lnk) {
+      if (filestat.type == ft_lnk) {
          remove_file(arg);
          printf("Removed symlink: %s\n", arg);
          continue;
       }
 
-      if (!ex_res.found) {
+      if (!filestat.found) {
          fprintf(stderr, "file not found: %s\n", arg);
          continue;
       }
@@ -117,8 +117,8 @@ int main(int argc, char *argv[]) {
       file_info.write(data.buf);
 
       auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
-      move_file(arg, drash_file.buf);
-
+      if (filestat.type == ft_dir) move_directory(arg, drash_file.buf);
+      else move_file(arg, drash_file.buf);
       scratch_allocator.reset();
    }
 

@@ -40,7 +40,6 @@ struct String {
    void skip(const int num);
 
    char& operator[] (const int idx);
-   const char& operator[] (const int idx) const;
 
    void operator= (const char *string);
 };
@@ -78,9 +77,17 @@ int String::concat(const char *other) {
    const int slen = strlen(other);
 
    if (strlen(buf) + slen+1 >= (uint)capacity) {
-      fprintf(stderr, "string - can't concat strings because not enought space\n");
-      fprintf(stderr, "capacity is: '%u' but got: '%lu'.\n", capacity, strlen(buf) + slen+1);
-      STOP;
+      if (with_allocator) {
+         fprintf(stderr, "string - can't concat strings because not enought space\n");
+         fprintf(stderr, "capacity is: '%u' but got: '%lu'.\n", capacity, strlen(buf) + slen+1);
+         STOP;
+      }
+
+      free(buf);
+      int new_size = capacity;
+      while (new_size <= slen+capacity) new_size *= 2;
+      buf = (char *)xcalloc(new_size, 1);
+      capacity = new_size;
    }
 
    int count = 0;
@@ -104,20 +111,16 @@ void String::skip(const int num) {
 }
 
 char& String::operator[] (const int idx) {
-   if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
-      fprintf(stderr, "string - attempted to index into position '%d' which is out of bounds.\n", idx);
-      fprintf(stderr, "max size is '%u'.\n", capacity);
-      STOP;
-   }
+   if (idx >= capacity) {
+      if (with_allocator) {
+         fprintf(stderr, "string - attempted to index into position '%d' which is out of bounds.\n", idx);
+         fprintf(stderr, "max size is '%u'.\n", capacity);
+         STOP;
+      }
 
-   return buf[idx];
-}
-
-const char& String::operator[] (const int idx) const {
-   if (idx >= capacity) { // NOTE: The reason we've to check for '>=' is because we don't wana overwrite the null-byte
-      fprintf(stderr, "string - attempted to index into position '%d' which is out of bounds.\n", idx);
-      fprintf(stderr, "max size is '%u'.\n", capacity);
-      STOP;
+      free(buf);
+      buf = (char *)xcalloc(capacity*2, 1);
+      capacity += capacity*2;
    }
 
    return buf[idx];

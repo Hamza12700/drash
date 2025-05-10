@@ -1,6 +1,5 @@
+#include <limits.h>
 #include "cli.cpp"
-
-#define MAX_ARGLEN 1000 // Reasonable max length for file-path argument
 
 int main(int argc, char *argv[]) {
    if (argc == 1) {
@@ -39,9 +38,9 @@ int main(int argc, char *argv[]) {
    auto ex_res = exists(file);
    const uint file_len = strlen(file);
 
-   if (file_len > MAX_ARGLEN) {
+   if (file_len > PATH_MAX) {
       fprintf(stderr, "path is too long: %u", file_len);
-      fprintf(stderr, "max length is %d", MAX_ARGLEN);
+      fprintf(stderr, "max path-length is %d", PATH_MAX);
       argc -= 1;
 
    } else if (!ex_res.found) {
@@ -86,9 +85,9 @@ int main(int argc, char *argv[]) {
       }
 
       const int path_len = strlen(arg);
-      if (path_len > MAX_ARGLEN) {
+      if (path_len > PATH_MAX) {
          fprintf(stderr, "path is too long: %d", path_len);
-         fprintf(stderr, "max length is %d", MAX_ARGLEN);
+         fprintf(stderr, "max path-length is %d", PATH_MAX);
          continue;
       }
 

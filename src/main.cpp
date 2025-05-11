@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
    auto ex_res = exists(file);
    const uint file_len = strlen(file);
 
-   if (file_len > PATH_MAX) {
+   if (file_len >= PATH_MAX) {
       fprintf(stderr, "path is too long: %u", file_len);
       fprintf(stderr, "max path-length is %d", PATH_MAX);
       argc -= 1;
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
       }
 
       const int path_len = strlen(arg);
-      if (path_len > PATH_MAX) {
+      if (path_len >= PATH_MAX) {
          fprintf(stderr, "path is too long: %d", path_len);
          fprintf(stderr, "max path-length is %d", PATH_MAX);
          continue;

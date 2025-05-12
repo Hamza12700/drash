@@ -356,9 +356,31 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
 
       auto drashpath = format_string(allocator, "%/%", files.buf, (char *)file);
       auto drash_filestat = exists(drashpath.buf);
+
+      //
+      // @Todo: Highlight the missing directories, and ask the user if they want to create those directories or provide an alternative path
+      //
       if (drash_filestat.type == ft_dir) {
-         if (!move_directory(drashpath.buf, info.path)) continue;
-      } else if (!move_file(drashpath.buf, info.path)) continue;
+         if (!move_directory(drashpath.buf, info.path, false)) {
+            if (errno == ENOENT) {
+               fprintf(stderr, "Can't restore '%s' to its original location because a directory doesn't exists in:\n", file);
+               fprintf(stderr, "- '%s'\n", info.path);
+               continue;
+            }
+
+            report_error("Failed to restore '%'", file);
+            continue;
+         }
+      } else if (!move_file(drashpath.buf, info.path, false)) {
+         if (errno == ENOENT) {
+            fprintf(stderr, "Can't restore '%s' to its original location because a directory doesn't exists in:\n", file);
+            fprintf(stderr, "- '%s'\n", info.path);
+            continue;
+         }
+
+         report_error("Failed to restore '%'", file);
+         continue;
+      }
 
       remove_file(path.buf);
    }

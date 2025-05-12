@@ -10,71 +10,80 @@ struct File {
    FILE *fd;
    const char *path;
 
-   ~File() {
-      int err = fclose(fd);
-
-      // Closing the file shouldn't fail and if it does then it's not a big deal.
-      // Just report the error.
-      if (err != 0) report_error("failed to close file: %", path);
-   }
-
-   int file_length() {
-      fseek(fd, 0, SEEK_END);
-      int file_size = ftell(fd);
-      rewind(fd);
-
-      return file_size;
-   }
-
-   int write(const char *string) {
-      return fprintf(fd, "%s", string);
-   }
+   ~File();
+   int file_length();
+   int write(const char *string);
 
    // Read the entire contents of the file into a string.
-   String read_into_string(Fixed_Allocator *allocator) {
-      const int file_len = file_length();
-
-      auto buf = string_with_size(allocator, file_len);
-      fread(buf.buf, sizeof(char), file_len, fd);
-
-      return buf;
-   }
-
-   String read_into_string() {
-      const int file_len = file_length();
-
-      auto buf = string_with_size(file_len);
-      fread(buf.buf, sizeof(char), file_len, fd);
-
-      return buf;
-   }
+   String read_into_string(Fixed_Allocator *allocator);
+   String read_into_string();
 };
+
+File::~File() {
+   int err = fclose(fd);
+
+   // Closing the file shouldn't fail and if it does then it's not a big deal.
+   // Just report the error.
+   if (err != 0) report_error("failed to close file: %", path);
+}
+
+int File::file_length() {
+   fseek(fd, 0, SEEK_END);
+   int file_size = ftell(fd);
+   rewind(fd);
+
+   return file_size;
+}
+
+int File::write(const char *string) {
+   return fprintf(fd, "%s", string);
+}
+
+
+String File::read_into_string(Fixed_Allocator *allocator) {
+   const int file_len = file_length();
+   auto buf = string_with_size(allocator, file_len);
+   fread(buf.buf, sizeof(char), file_len, fd);
+
+   return buf;
+}
+
+String File::read_into_string() {
+   const int file_len = file_length();
+
+   auto buf = string_with_size(file_len);
+   fread(buf.buf, sizeof(char), file_len, fd);
+
+   return buf;
+}
 
 struct Directory {
    DIR *fd;
    const char *path;
 
-   ~Directory() {
-      int err = closedir(fd);
-
-      // Closing the directory also shouldn't fail and if does then report the error.
-      if (err != 0) report_error("failed to close directory: %", path);
-   }
-
-   // Resets the directory stream back to the beginning of the directory.
-   bool is_empty() {
-      int count = 0;
-      while (readdir(fd) != NULL) count += 1;
-
-      if (count <= 2) {
-         rewinddir(fd);
-         return true;
-      }
-
-      rewinddir(fd);
-      return false;
-   }
+   ~Directory();
+   bool is_empty();
 };
+
+Directory::~Directory() {
+   int err = closedir(fd);
+
+   // Closing the directory also shouldn't fail and if does then report the error.
+   if (err != 0) report_error("failed to close directory: %", path);
+}
+
+bool Directory::is_empty() {
+   int count = 0;
+   while (readdir(fd) != NULL) count += 1;
+
+   if (count <= 2) {
+      rewinddir(fd);
+      return true;
+   }
+
+   rewinddir(fd);
+   return false;
+}
 
 File open_file(const char *file_path, const char *modes) {
    FILE *file = fopen(file_path, modes);
@@ -153,10 +162,13 @@ bool copy_move_file(const char *oldpath, const char *newpath) {
 }
 
 // Return's true on success otherwise false
-bool move_file(const char *oldpath, const char *newpath) {
+bool move_file(const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
-         report_error("failed to move '%' to '%'", oldpath, newpath);
+         if (display_err) {
+            report_error("failed to move '%' to '%'", oldpath, newpath);
+            return false;
+         }
          return false;
       }
 
@@ -345,9 +357,15 @@ bool move_directory_copy(const char *oldpath, const char *newpath) {
    return true;
 }
 
-bool move_directory(const char *oldpath, const char *newpath) {
+bool move_directory(const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
-      if (errno != EXDEV) report_error("failed to move '%' to '%'\n", oldpath, newpath);
+      if (errno != EXDEV) {
+         if (display_err) {
+            report_error("failed to move '%' to '%'\n", oldpath, newpath);
+            return false;
+         }
+         return false;
+      }
 
       auto dirstat = exists(oldpath);
       makedir(newpath, dirstat.perms);

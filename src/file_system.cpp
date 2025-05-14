@@ -161,7 +161,8 @@ bool copy_move_file(const char *oldpath, const char *newpath) {
    return remove_file(oldpath);
 }
 
-// Return's true on success otherwise false
+// Move file and handle different filesystems.
+// The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
 bool move_file(const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
@@ -280,31 +281,48 @@ bool makedir(const char *dirpath, uint modes) {
    return true;
 }
 
+// Remove all files inside a directory
+bool remove_files(const char *dirpath) {
+   auto dir = open_dir(dirpath);
+   struct dirent *rdir;
+   while ((rdir = readdir(dir.fd))) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+
+      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto filestat = exists(fullpath.buf);
+      if (filestat.type == ft_file || filestat.type == ft_lnk) {
+         if (!remove_file(fullpath.buf)) return false;
+      } else if (!remove_files(fullpath.buf)) return false;
+   }
+
+   return true;
+}
+
 bool remove_all(const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
-         remove_file(fullpath.buf);
-      } else remove_all(fullpath.buf);
+         if (!remove_file(fullpath.buf)) return false;
+      } else if (!remove_all(fullpath.buf)) return false;
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
 
       if (rmdir(fullpath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
          perror("rmdir -");
-         continue;
+         return false;
       }
 
-      remove_all(fullpath.buf);
+      if (!remove_all(fullpath.buf)) return false;
    }
 
    if (rmdir(dirpath) != 0) { // Lastly, remove the parent directory
@@ -322,30 +340,30 @@ bool move_directory_copy(const char *oldpath, const char *newpath) {
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto old_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
-      auto new_filepath = format_string("%/%", (char *)newpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto old_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto new_filepath = format_string("%/%", (char *)newpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
       auto filestat = exists(old_filepath.buf);
 
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
-         move_file(old_filepath.buf, new_filepath.buf);
+         if (!move_file(old_filepath.buf, new_filepath.buf)) return false;
       } else {
-         makedir(new_filepath.buf, filestat.perms); // Create the new directory with same file-perms of the old-directory
-         move_directory_copy(old_filepath.buf, new_filepath.buf);
+         if (!makedir(new_filepath.buf, filestat.perms)) return false; // Create the new directory with same file-perms of the old-directory
+         if (!move_directory_copy(old_filepath.buf, new_filepath.buf)) return false;
       }
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto new_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary | @Speed: We should be using a temporary or custom allocator here!
+      auto new_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
 
       if (rmdir(new_filepath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
          perror("rmdir -");
-         continue;
+         return false;
       }
 
-      remove_all(new_filepath.buf);
+      if (!remove_all(new_filepath.buf)) return false;
    }
 
    if (rmdir(oldpath) != 0) { // Lastly, remove the parent directory
@@ -357,6 +375,8 @@ bool move_directory_copy(const char *oldpath, const char *newpath) {
    return true;
 }
 
+// Move direcotry and handle different filesystems.
+// The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
 bool move_directory(const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {

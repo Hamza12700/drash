@@ -15,23 +15,15 @@ struct Drash {
    New_String files;    // Path to drash files directory
    New_String metadata; // Path to metadata about the drash files
 
-   // Checks if metadata directory is empty or not
-   bool drash_empty() const;
-
-   // Parse the metadata for a single file
    Drash_Info parse_info(Fixed_Allocator *allocator, String *file_content) const;
 
-   // Wipe out the drash directory
    void empty_drash(Fixed_Allocator *allocator) const;
-
-   // List drash'd files
    void list_files(Fixed_Allocator *allocator) const;
-
-   // Restore drash'd files
    void restore(Fixed_Allocator *allocator, const int argc, const char **argv) const;
-
-   // Remove files in the drashcan
    void remove(Fixed_Allocator *allocator, int argc, const char **argv) const;
+
+private:
+   bool is_empty() const;
 };
 
 Drash init_drash() {
@@ -55,8 +47,8 @@ Drash init_drash() {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   auto files = malloc_new_string(sizeof(drash_dir)+50);
-   auto metadata = malloc_new_string(sizeof(drash_dir)+50);
+   auto files = malloc_string(sizeof(drash_dir)+50);
+   auto metadata = malloc_string(sizeof(drash_dir)+50);
 
    format_string(&files, "%/files", drash_dir);
    err = mkdir(files.buf, DIR_PERM);
@@ -77,7 +69,7 @@ Drash init_drash() {
    return drash;
 }
 
-bool Drash::drash_empty() const {
+bool Drash::is_empty() const {
    auto dir = open_dir(metadata.buf);
    struct dirent *rdir;
    int count = 0;
@@ -140,7 +132,6 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
 
 void Drash::empty_drash(Fixed_Allocator *allocator) const {
    auto dir = open_dir(metadata.buf);
-
    if (dir.is_empty()) {
       printf("Drashcan is already empty\n");
       return;
@@ -153,6 +144,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       if (strcmp(rdir->d_name, "last") == 0) continue;
       count += 1;
    }
+   rewinddir(dir.fd); // Reset the position of the directory back to start.
 
    printf("\nTotal entries: %d\n", count);
    printf("Empty drash directory? [Y/n]: ");
@@ -165,10 +157,8 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
-   assert(!remove_all(files.buf), "failed to remove 'drash' directory when init 'Drash' (struct)");
-   assert_err(mkdir(files.buf, DIR_PERM) != 0, "failed to create drashd files directory");
+   if (!remove_files(files.buf)) return;
 
-   rewinddir(dir.fd); // Reset the position of the directory back to start.
    while ((rdir = readdir(dir.fd)) != NULL) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
       auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
@@ -179,7 +169,7 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
 }
 
 void Drash::list_files(Fixed_Allocator *allocator) const {
-   if (this->drash_empty()) {
+   if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
    }
@@ -237,7 +227,7 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
 }
 
 void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **argv) const {
-   if (this->drash_empty()) {
+   if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
    }
@@ -387,7 +377,7 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
 }
 
 void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) const {
-   if (this->drash_empty()) {
+   if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
    }

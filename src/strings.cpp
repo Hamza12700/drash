@@ -17,9 +17,6 @@ bool match_string(const char *one, const char *two) {
    return true;
 }
 
-// Convert relative pointer to an absolute pointer
-#define rtap(type, buf, index) ((type *)buf+index)
-
 struct String {
    char *buf = NULL; // Null-terminated buffer
    int capacity = 0;
@@ -178,13 +175,11 @@ enum String_Flags {
    Custom_Allocator = 0x8,
 };
 
-// Dynamically growable string that works with relative pointers
+// Dynamically growable String
 struct New_String {
    char *buf = NULL;
-   int flags = Default;
-
+   i32 flags = Default;
    i32 capacity = 0;
-   i32 index = 0;
 
    ~New_String();
 
@@ -192,7 +187,8 @@ struct New_String {
    int concat(const char *str);
    void skip(int idx);
    void take_ref(New_String *ref);
-   New_String sub_string(int idx); // Splits the 'buf' into half (capacity / 2), point the sub-string after that (buf = (capacity / 2)+1) so they don't overlap.
+   void assign_string(const char *str);
+   New_String sub_string(int idx);
 
    char& operator[] (const int idx);
 };
@@ -209,6 +205,37 @@ New_String::~New_String() {
    unmap(buf, capacity);
 }
 
+void New_String::assign_string(const char *str) {
+   uint slen = strlen(str);
+   if (slen >= capacity) {
+      if (flags & SubString) {
+         fprintf(stderr, "(new_string) - can't concat because not enough space (sub-string)\n");
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         STOP;
+      }
+
+      if (flags & Custom_Allocator) { // @Temporary: Find a way to grow the string with any custom-allocator
+         fprintf(stderr, "(new_string) - can't concat because not enough space (custom-allocator)\n");
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         STOP;
+      }
+
+      if (flags & Malloced) {
+         int new_size = capacity*2;
+         while (new_size <= slen) new_size *= 2;
+
+         auto new_buffer = (char *)xcalloc(new_size, 1);
+         memcpy(new_buffer, buf, capacity);
+         auto old_buffer = buf;
+         buf = new_buffer;
+         free(old_buffer);
+         capacity = new_size;
+      }
+   }
+
+   for (uint i = 0; i < slen; i++) buf[i] = str[i];
+}
+
 void New_String::skip(int idx) {
    if (idx >= capacity) {
       fprintf(stderr, "(new_string) - can't index into '%d' because it's out of bounds\n", idx);
@@ -216,13 +243,12 @@ void New_String::skip(int idx) {
       STOP;
    }
 
-   index += idx;
+   buf = (char *)buf+idx;
 }
 
 void New_String::take_ref(New_String *ref) {
    buf = ref->buf;
    capacity = ref->capacity;
-   index = ref->index;
    flags = ref->flags;
    ref->flags |= Referenced;
 }
@@ -233,7 +259,7 @@ New_String New_String::sub_string(int idx) {
 
    New_String ret;
    ret.capacity = capacity;
-   ret.buf = rtap(char, buf, idx);
+   ret.buf = (char *)buf+idx;
    ret.flags  |= SubString;
    return ret;
 }
@@ -244,31 +270,31 @@ void New_String::empty() {
 
 char &New_String::operator[] (const int idx) {
    if (idx >= capacity) {
-      if (flags & SubString) { // Sub-String can not grow the memory buffer because it doesn't have reference to the mapped memory, only the offset.
+      if (flags & SubString) {
          fprintf(stderr, "(new_string) - can't grow the string because not enough space (sub-string)\n");
          fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, idx);
          STOP;
       }
 
-      if (flags & Malloced) { // We could use 'realloc' to grow the buffer, but it has wired error reporting that I don't understand
-         fprintf(stderr, "(new_string) - can't grow the string because not enough space (malloc'd string)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, idx);
-         STOP;
-      }
-
-      if (flags & Custom_Allocator) {
+      if (flags & Custom_Allocator) { // @Temporary: Find a way to grow the string with any custom-allocator
          fprintf(stderr, "(new_string) - can't grow the string because not enough space (custom-allocator)\n");
          fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, idx);
          STOP;
       }
 
-      int page_align_size = page_size;
-      while (page_align_size < idx) page_align_size *= 2;
-      buf = (char *)reallocate(buf, capacity, page_align_size);
-      capacity = page_align_size;
+      if (flags & Malloced) {
+         int new_size = capacity*2;
+         auto new_buffer = (char *)xcalloc(new_size, 1);
+
+         memcpy(new_buffer, buf, capacity);
+         auto old_buffer = buf;
+         buf = new_buffer;
+         free(old_buffer);
+         capacity = new_size;
+      }
    }
 
-   return buf[index+idx]; // Move relative to 'index'
+   return buf[idx];
 }
 
 int New_String::concat(const char *str) {
@@ -277,28 +303,29 @@ int New_String::concat(const char *str) {
    int total_size = buflen+slen+1;
 
    if (total_size >= capacity) {
-      if (flags & SubString) { // Sub-String can not grow the memory buffer because it doesn't have reference to the mapped memory, only the offset.
+      if (flags & SubString) {
          fprintf(stderr, "(new_string) - can't concat because not enough space (sub-string)\n");
          fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
          STOP;
       }
 
-      if (flags & Malloced) { // We could use 'realloc' to grow the buffer, but it has wired error reporting that I don't understand
-         fprintf(stderr, "(new_string) - can't concat because not enough space (malloc'd string)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
-         STOP;
-      }
-
-      if (flags & Custom_Allocator) {
+      if (flags & Custom_Allocator) { // @Temporary: Find a way to grow the string with any custom-allocator
          fprintf(stderr, "(new_string) - can't concat because not enough space (custom-allocator)\n");
          fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
          STOP;
       }
 
-      int page_align_size = page_size;
-      while (page_align_size < total_size) page_align_size *= 2;
-      buf = (char *)reallocate(buf, capacity, page_align_size);
-      capacity = page_align_size;
+      if (flags & Malloced) {
+         int new_size = capacity*2;
+         while (new_size <= total_size) new_size *= 2;
+
+         auto new_buffer = (char *)xcalloc(new_size, 1);
+         memcpy(new_buffer, buf, capacity);
+         auto old_buffer = buf;
+         buf = new_buffer;
+         free(old_buffer);
+         capacity = new_size;
+      }
    }
 
    int count = 0;
@@ -306,24 +333,12 @@ int New_String::concat(const char *str) {
       buf[buflen+count] = str[count];
       count += 1;
    }
+
    return count;
 };
 
-New_String new_string(const int size) {
-   int page_align_size = page_size;
-   while (page_align_size < size) page_align_size *= 2;
-   auto mem = allocate(page_align_size);
-
+New_String malloc_string(int size) {
    New_String ret;
-   ret.buf = (char *)mem;
-   ret.capacity = page_align_size;
-   ret.index = 0;
-   return ret;
-}
-
-New_String malloc_new_string(int size) {
-   New_String ret;
-
    ret.buf = (char *)xcalloc(size+1, 1); // Effectively, the same thing, it's just we want the memory to be zero-initialized because we use zero-terminated strings.
    ret.capacity = size;
    ret.flags |= Malloced;

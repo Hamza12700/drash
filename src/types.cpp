@@ -35,8 +35,8 @@ void *xmalloc(uint size) {
    return mem;
 }
 
-void *xcalloc(uint number, uint size) {
-   void *mem = calloc(number, size);
+void *xcalloc(int size, int type_size) {
+   void *mem = calloc(size, type_size);
    assert_err(mem == NULL, "calloc - failed");
    return mem;
 }

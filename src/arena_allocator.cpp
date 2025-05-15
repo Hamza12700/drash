@@ -2,31 +2,32 @@
 #define ARENA_ALLOC
 
 #include <sys/mman.h>
-
 #include "types.cpp"
 
-//
-// @Temporary: Each arena is 'page_size' long and it will not handle memory size large than that.
-//
 struct Arena_Allocator {
    void *buffer = NULL;
-   int size = 0;
    Arena_Allocator *next_arena = NULL;
 
+   i32 size = 0;
+   i32 capacity = 0;
+
    void *alloc(int bytes);
-   void reset_with_memset();
-   void free();
+   void free_arena();
 };
 
 void *Arena_Allocator::alloc(int bytes) {
-   assert(bytes > page_size, "(arena-allocator) - requested memory is larger than page_size"); // @Temporary: Reject requested memory size if larger than 'page_size'
-
    if (!next_arena) {
-      if (size + bytes > page_size) {
-         auto mem = allocate(page_size);
-         next_arena->buffer = mem;
-         next_arena->size += bytes;
-         return next_arena->buffer;
+      if (size+bytes > capacity) {
+         int page_align = page_size;
+         while (page_align < bytes) page_align *= 2;
+         auto mem = allocate(page_align);
+         auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+
+         new_arena->buffer = mem;
+         new_arena->size += bytes;
+         new_arena->capacity = page_align;
+         next_arena = new_arena;
+         return mem;
       }
 
       void *mem = (char *)buffer+size;
@@ -34,14 +35,24 @@ void *Arena_Allocator::alloc(int bytes) {
       return mem;
    }
 
-   Arena_Allocator *next;
-   while ((next = next_arena) != NULL);
+   Arena_Allocator *next = next_arena;
+   while (true) {
+      if (next->next_arena == NULL) break;
+      next = next->next_arena;
+   }
 
-   if (next->size + bytes > page_size) {
-      auto mem = allocate(page_size);
-      next->next_arena->buffer = mem;
-      next->next_arena->size += bytes;
-      return next->next_arena->buffer;
+   if (next->size+bytes > next->capacity) {
+      int page_align = page_size;
+      while (page_align < bytes) page_align *= 2;
+      auto mem = allocate(page_align);
+      auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+
+      new_arena->buffer = mem;
+      new_arena->size += bytes;
+      new_arena->capacity = page_align;
+
+      next->next_arena = new_arena;
+      return mem;
    }
 
    void *mem = (char *)next->buffer+size;
@@ -49,24 +60,22 @@ void *Arena_Allocator::alloc(int bytes) {
    return mem;
 }
 
-void Arena_Allocator::reset_with_memset() {
-   memset(buffer, 0, page_size);
-   size = 0;
+void Arena_Allocator::free_arena() {
+   unmap(buffer, capacity);
 
-   Arena_Allocator *next;
-   while ((next = next_arena) != NULL) {
-      memset(next->buffer, 0, page_size);
-      next->size = 0;
+   for (auto next = next_arena; next;) { // @Leak: Not free'ing the malloc'd arena struct
+      unmap(next->buffer, next->capacity);
+      next = next->next_arena;
    }
 }
 
-void Arena_Allocator::free() {
-   unmap(buffer, page_size);
-
-   Arena_Allocator *next;
-   while ((next = next_arena) != NULL) {
-      unmap(next->buffer, page_size);
-   }
+Arena_Allocator make_arena(int size) {
+   Arena_Allocator ret;
+   int page_align = page_size;
+   while (page_align < size) page_align *= 2;
+   ret.buffer = allocate(page_align);
+   ret.capacity = page_align;
+   return ret;
 }
 
 #endif // ARENA_ALLOC

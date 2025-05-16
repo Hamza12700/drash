@@ -18,14 +18,13 @@ struct Arena_Allocator {
 void *Arena_Allocator::alloc(int bytes) {
    if (!next_arena) {
       if (size+bytes > capacity) {
-         int page_align = page_size;
-         while (page_align < bytes) page_align *= 2;
-         auto mem = allocate(page_align);
-         auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+         int new_size = capacity*2;
+         auto mem = allocate(new_size);
+         auto new_arena = (Arena_Allocator *)xcalloc(sizeof(Arena_Allocator), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
 
          new_arena->buffer = mem;
+         new_arena->capacity = new_size;
          new_arena->size += bytes;
-         new_arena->capacity = page_align;
          next_arena = new_arena;
          return mem;
       }
@@ -41,21 +40,20 @@ void *Arena_Allocator::alloc(int bytes) {
       next = next->next_arena;
    }
 
+   int new_size = next->capacity*2;
    if (next->size+bytes > next->capacity) {
-      int page_align = page_size;
-      while (page_align < bytes) page_align *= 2;
-      auto mem = allocate(page_align);
+      auto mem = allocate(new_size);
       auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
 
       new_arena->buffer = mem;
       new_arena->size += bytes;
-      new_arena->capacity = page_align;
+      new_arena->capacity = new_size;
 
       next->next_arena = new_arena;
       return mem;
    }
 
-   void *mem = (char *)next->buffer+size;
+   void *mem = (char *)next->buffer+next->size;
    next->size += bytes;
    return mem;
 }

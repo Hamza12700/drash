@@ -113,7 +113,7 @@ static void print_help() {
    }
 }
 
-static void force_remove_files(int argc, const char **argv) {
+static void force_remove_files(Arena_Allocator *arena, int argc, char **argv) {
    if (argc == 1) {
       fprintf(stderr, "Missing argument file(s)\n");
       return;
@@ -123,24 +123,24 @@ static void force_remove_files(int argc, const char **argv) {
       const char *path = argv[i];
 
       auto file = exists(path);
-      if (file.type == ft_lnk) {
-         remove_file(path);
-         continue;
-      } else if (!file.found) {
+      if (!file.found) {
          fprintf(stderr, "file not found: %s\n", path);
          continue;
       }
 
-      if (is_dir(path)) {
-         remove_all(path);
+      if (file.type == ft_lnk || file.type == ft_file) {
+         remove_file(path);
          continue;
       }
 
-      remove_file(path);
+      if (is_dir(path)) {
+         remove_dir(arena, path);
+         continue;
+      }
    }
 }
 
-void handle_opts(const char **argv, const int argc) {
+void handle_opts(Arena_Allocator *arena, char **argv, const int argc) {
    const char *arg = argv[0] += 1;
    if (arg[0] == '-') arg += 1;
 
@@ -155,19 +155,19 @@ void handle_opts(const char **argv, const int argc) {
             return;
          }
 
-         case Option::Force: return force_remove_files(argc, argv);
+         case Option::Force: return force_remove_files(arena, argc, argv);
       }
    }
 
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-bool handle_commands(const char **argv, int argc, const Drash *drash, Fixed_Allocator *allocator) {
+bool handle_commands(char **argv, int argc, const Drash *drash, Arena_Allocator *arena) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
       for (auto cmd : commands) {
-         if (strcmp(arg, cmd.name) != 0) continue;
+         if (!match_string(arg, cmd.name)) continue;
 
          // Skip the command name
          argv += 1;
@@ -175,22 +175,22 @@ bool handle_commands(const char **argv, int argc, const Drash *drash, Fixed_Allo
 
          switch (cmd.action) {
             case Command::List: {
-               drash->list_files(allocator);
+               drash->list_files(arena);
                return true;
             }
 
             case Command::Restore: {
-               drash->restore(allocator, argc, argv);
+               drash->restore(arena, argc, argv);
                return true;
             }
 
             case Command::Empty: {
-               drash->empty_drash(allocator);
+               drash->empty_drash(arena);
                return true;
             }
 
             case Command::Remove: {
-               drash->remove(allocator, argc, argv);
+               drash->remove(arena, argc, argv);
                return true;
             }
          }

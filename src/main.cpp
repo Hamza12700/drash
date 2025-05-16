@@ -11,23 +11,24 @@ int main(int argc, char *argv[]) {
    argv += 1;
    argc -= 1;
 
+   auto arena = make_arena(page_size*2);
+
    // Handle option arguments
    if (argv[0][0] == '-') {
-      handle_opts((const char **)argv, argc);
+      handle_opts(&arena, argv, argc);
       return 0;
    }
 
    const char *current_dir = getenv("PWD");
    assert(current_dir == NULL, "PWD envirnoment not found");
 
-   auto scratch_allocator = fixed_allocator(page_size);
-   auto drash = init_drash();
+   auto drash = init_drash(&arena);
 
    auto filestat = exists(argv[0]);
    if (!filestat.found) {
       for (auto cmd : commands) {
          if (match_string(argv[0], cmd.name)) {
-            handle_commands((const char **)argv, argc, &drash, &scratch_allocator);
+            handle_commands(argv, argc, &drash, &arena);
             return 0;
          }
       }
@@ -46,7 +47,7 @@ int main(int argc, char *argv[]) {
    } else if (!ex_res.found) {
       for (auto cmd : commands) {
          if (match_string(file, cmd.name)) {
-            handle_commands((const char **)argv, argc, &drash, &scratch_allocator);
+            handle_commands(argv, argc, &drash, &arena);
             return 0;
          }
       }
@@ -60,13 +61,15 @@ int main(int argc, char *argv[]) {
       argc -= 1;
 
    } else {
-      auto filepath = format_string(&scratch_allocator, "%/last", drash.metadata.buf);
+      auto filepath = format_string(&arena, "%/last", drash.metadata.buf);
       auto lastfile = open_file(filepath.buf, "w");
 
-      auto current_file = string_with_size(&scratch_allocator, file);
+      auto current_file = alloc_string(&arena, file);
 
-      auto filename = file_basename(&scratch_allocator, &current_file);
-      lastfile.write(filename.buf);
+      if (current_file[0] == '/') {
+         auto filename = file_basename(&arena, &current_file);
+         lastfile.write(filename.buf);
+      } else lastfile.write(current_file.buf);
    }
 
    for (int i = 0; i < argc; i++) {
@@ -91,9 +94,9 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      auto path = string_with_size(&scratch_allocator, arg);
-      auto filename = file_basename(&scratch_allocator, &path);
-      auto metadata_path = format_string(&scratch_allocator, "%/%.info", drash.metadata.buf, filename.buf);
+      auto path = alloc_string(&arena, arg);
+      auto filename = file_basename(&arena, &path);
+      auto metadata_path = format_string(&arena, "%/%.info", drash.metadata.buf, filename.buf);
 
       ex_res = exists(metadata_path.buf);
       if (ex_res.found) {
@@ -112,14 +115,13 @@ int main(int argc, char *argv[]) {
       if (is_file(path.buf)) sprintf(type, "file");
       else sprintf(type, "directory");
 
-      auto data = format_string(&scratch_allocator, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type);
+      auto data = format_string(&arena, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type);
       file_info.write(data.buf);
 
-      auto drash_file = format_string(&scratch_allocator, "%/%", drash.files.buf, filename.buf);
-      if (filestat.type == ft_dir) move_directory(arg, drash_file.buf);
-      else move_file(arg, drash_file.buf);
-      scratch_allocator.reset();
+      auto drash_file = format_string(&arena, "%/%", drash.files.buf, filename.buf);
+      if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);
+      else move_file(&arena, arg, drash_file.buf);
    }
 
-   scratch_allocator.free();
+   arena.free_arena();
 }

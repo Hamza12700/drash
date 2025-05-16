@@ -15,16 +15,12 @@ struct File {
    int write(const char *string);
 
    // Read the entire contents of the file into a string.
-   String read_into_string(Fixed_Allocator *allocator);
-   String read_into_string();
+   New_String read_into_string(Arena_Allocator *arena);
+   New_String read_into_string();
 };
 
-File::~File() {
+File::~File() { // @Temporary: Not checking the error-code
    int err = fclose(fd);
-
-   // Closing the file shouldn't fail and if it does then it's not a big deal.
-   // Just report the error.
-   if (err != 0) report_error("failed to close file: %", path);
 }
 
 int File::file_length() {
@@ -40,18 +36,18 @@ int File::write(const char *string) {
 }
 
 
-String File::read_into_string(Fixed_Allocator *allocator) {
+New_String File::read_into_string(Arena_Allocator *arena) {
    const int file_len = file_length();
-   auto buf = string_with_size(allocator, file_len);
+   auto buf = alloc_string(arena, file_len);
    fread(buf.buf, sizeof(char), file_len, fd);
 
    return buf;
 }
 
-String File::read_into_string() {
+New_String File::read_into_string() {
    const int file_len = file_length();
 
-   auto buf = string_with_size(file_len);
+   auto buf = malloc_string(file_len);
    fread(buf.buf, sizeof(char), file_len, fd);
 
    return buf;
@@ -65,11 +61,8 @@ struct Directory {
    bool is_empty();
 };
 
-Directory::~Directory() {
+Directory::~Directory() { // @Temporary: Not checking the error-code
    int err = closedir(fd);
-
-   // Closing the directory also shouldn't fail and if does then report the error.
-   if (err != 0) report_error("failed to close directory: %", path);
 }
 
 bool Directory::is_empty() {
@@ -88,7 +81,10 @@ bool Directory::is_empty() {
 File open_file(const char *file_path, const char *modes) {
    FILE *file = fopen(file_path, modes);
 
-   if (file == NULL) fatal_error("failed to open file: %", file_path);
+   if (file == NULL) {
+      fprintf(stderr, "failed to open file: %s\n", file_path);
+      STOP;
+   }
 
    return File {
       .fd = file,
@@ -145,16 +141,17 @@ bool remove_file(const char *path) {
    int err = unlink(path);
 
    if (err != 0) {
-      report_error("failed to remove file '%'", path);
+      fprintf(stderr, "failed to remove file '%s'\n", path);
       return false;
    }
 
    return true;
 }
 
-bool copy_move_file(const char *oldpath, const char *newpath) {
+// Copies the (oldpath) file to file (newpath) and removes the oldpath
+bool copy_move_file(Arena_Allocator *arena, const char *oldpath, const char *newpath) {
    auto file = open_file(oldpath, "rb");
-   auto file_content = file.read_into_string();
+   auto file_content = file.read_into_string(arena);
 
    auto newfile = open_file(newpath, "wb");
    newfile.write(file_content.buf);
@@ -163,24 +160,24 @@ bool copy_move_file(const char *oldpath, const char *newpath) {
 
 // Move file and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_file(const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_file(Arena_Allocator *arena, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {
-            report_error("failed to move '%' to '%'", oldpath, newpath);
+            fprintf(stderr, "failed to move '%s' to '%s'\n", oldpath, newpath);
             return false;
          }
          return false;
       }
 
-      return copy_move_file(oldpath, newpath);
+      return copy_move_file(arena, oldpath, newpath);
    }
 
    return true;
 }
 
-String file_basename(Fixed_Allocator *allocator, String *path) {
-   int pathlen = strlen(path->buf);
+New_String file_basename(Arena_Allocator *arena, New_String *path) {
+   const int pathlen = path->len();
 
    if ((*path)[pathlen-1] == '/') {
       path->remove(pathlen-1);
@@ -196,27 +193,34 @@ String file_basename(Fixed_Allocator *allocator, String *path) {
 
    if (!contain_slash) return *path;
 
-   auto buffer = string_with_size(allocator, pathlen);
+   auto buffer = alloc_string(arena, pathlen+1);
    int file_idx = 0;
 
    for (int i = strlen(path->buf); (*path)[i] != '/'; i--) {
       file_idx++;
    }
 
-   buffer = path->buf;
+   buffer.assign_string(path->buf);
    buffer.skip(strlen(buffer.buf) - file_idx+1);
 
    return buffer;
 }
 
-String file_basename(Fixed_Allocator *allocator, char *path) {
-   auto tmp = string_with_size(allocator, path);
-   return file_basename(allocator, &tmp);
+New_String file_basename(Arena_Allocator *arena, char *path) {
+   New_String tmp = {0};
+   tmp.buf = path;
+   tmp.capacity = strlen(path)+1;
+   tmp.arena = arena;
+   tmp.flags |= Referenced;
+   return file_basename(arena, &tmp);
 }
 
 Directory open_dir(const char *dir_path) {
    DIR *dir = opendir(dir_path);
-   if (dir == NULL) fatal_error("failed to open directory: %", dir_path);
+   if (dir == NULL) {
+      fprintf(stderr, "failed to open directory: %s\n", dir_path);
+      STOP;
+   }
 
    return Directory {
       .fd = dir,
@@ -274,7 +278,7 @@ Ex_Res exists(const char *path) {
 
 bool makedir(const char *dirpath, uint modes) {
    if (mkdir(dirpath, modes) != 0) {
-      report_error("failed to create directory at %", dirpath);
+      fprintf(stderr, "failed to create directory at %s\n", dirpath);
       return false;
    }
 
@@ -282,39 +286,39 @@ bool makedir(const char *dirpath, uint modes) {
 }
 
 // Remove all files inside a directory
-bool remove_files(const char *dirpath) {
+bool remove_files(Arena_Allocator *arena, const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
-      } else if (!remove_files(fullpath.buf)) return false;
+      } else if (!remove_files(arena, fullpath.buf)) return false;
    }
 
    return true;
 }
 
-bool remove_all(const char *dirpath) {
+bool remove_dir(Arena_Allocator *arena, const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
-      } else if (!remove_all(fullpath.buf)) return false;
+      } else if (!remove_dir(arena, fullpath.buf)) return false;
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string("%/%", (char *)dirpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
 
       if (rmdir(fullpath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -322,7 +326,7 @@ bool remove_all(const char *dirpath) {
          return false;
       }
 
-      if (!remove_all(fullpath.buf)) return false;
+      if (!remove_dir(arena, fullpath.buf)) return false;
    }
 
    if (rmdir(dirpath) != 0) { // Lastly, remove the parent directory
@@ -334,28 +338,28 @@ bool remove_all(const char *dirpath) {
    return true;
 }
 
-bool move_directory_copy(const char *oldpath, const char *newpath) {
+bool move_directory_copy(Arena_Allocator *arena, const char *oldpath, const char *newpath) {
    auto dir = open_dir(oldpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto old_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
-      auto new_filepath = format_string("%/%", (char *)newpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto old_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = format_string(arena, "%/%", (char *)newpath, rdir->d_name);
       auto filestat = exists(old_filepath.buf);
 
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
-         if (!move_file(old_filepath.buf, new_filepath.buf)) return false;
+         if (!move_file(arena, old_filepath.buf, new_filepath.buf)) return false;
       } else {
          if (!makedir(new_filepath.buf, filestat.perms)) return false; // Create the new directory with same file-perms of the old-directory
-         if (!move_directory_copy(old_filepath.buf, new_filepath.buf)) return false;
+         if (!move_directory_copy(arena, old_filepath.buf, new_filepath.buf)) return false;
       }
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto new_filepath = format_string("%/%", (char *)oldpath, rdir->d_name); // @Temporary @Speed: We should be using a temporary or custom allocator here!
+      auto new_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
 
       if (rmdir(new_filepath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -363,7 +367,7 @@ bool move_directory_copy(const char *oldpath, const char *newpath) {
          return false;
       }
 
-      if (!remove_all(new_filepath.buf)) return false;
+      if (!remove_dir(arena, new_filepath.buf)) return false;
    }
 
    if (rmdir(oldpath) != 0) { // Lastly, remove the parent directory
@@ -377,11 +381,11 @@ bool move_directory_copy(const char *oldpath, const char *newpath) {
 
 // Move direcotry and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_directory(const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_directory(Arena_Allocator *arena, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {
-            report_error("failed to move '%' to '%'\n", oldpath, newpath);
+            report_error(arena, "failed to move '%' to '%'\n", oldpath, newpath);
             return false;
          }
          return false;
@@ -389,7 +393,7 @@ bool move_directory(const char *oldpath, const char *newpath, bool display_err =
 
       auto dirstat = exists(oldpath);
       makedir(newpath, dirstat.perms);
-      return move_directory_copy(oldpath, newpath);
+      return move_directory_copy(arena, oldpath, newpath);
    }
 
    return true;

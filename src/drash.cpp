@@ -15,18 +15,18 @@ struct Drash {
    New_String files;    // Path to drash files directory
    New_String metadata; // Path to metadata about the drash files
 
-   Drash_Info parse_info(Fixed_Allocator *allocator, String *file_content) const;
+   Drash_Info parse_info(Arena_Allocator *arena, New_String *file_content) const;
 
-   void empty_drash(Fixed_Allocator *allocator) const;
-   void list_files(Fixed_Allocator *allocator) const;
-   void restore(Fixed_Allocator *allocator, const int argc, const char **argv) const;
-   void remove(Fixed_Allocator *allocator, int argc, const char **argv) const;
+   void empty_drash(Arena_Allocator *arena) const;
+   void list_files(Arena_Allocator *arena) const;
+   void restore(Arena_Allocator *arena, const int argc, char **argv) const;
+   void remove(Arena_Allocator *arena, int argc, char **argv) const;
 
 private:
    bool is_empty() const;
 };
 
-Drash init_drash() {
+Drash init_drash(Arena_Allocator *arena) {
    const char *home_env = getenv("HOME");
    assert_err(home_env == NULL, "failed to get HOME environment variable");
 
@@ -47,25 +47,22 @@ Drash init_drash() {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   auto files = malloc_string(sizeof(drash_dir)+50);
-   auto metadata = malloc_string(sizeof(drash_dir)+50);
-
-   format_string(&files, "%/files", drash_dir);
-   err = mkdir(files.buf, DIR_PERM);
-   if (errno != EEXIST) {
-      assert_err(err != 0, "mkdir failed to creaet drash directory");
-   }
-
-   format_string(&metadata, "%/metadata", drash_dir);
-   err = mkdir(metadata.buf, DIR_PERM);
-   if (errno != EEXIST) {
-      assert_err(err != 0, "mkdir failed to creaet drash directory");
-   }
-
-   // Freaking C++ can't just simply assign a variable to a return value because of some wired implicit operator overloading
    Drash drash;
-   drash.files.take_ref(&files);
-   drash.metadata.take_ref(&metadata);
+   drash.files = alloc_string(arena, sizeof(drash_dir)+50);
+   drash.metadata = alloc_string(arena, sizeof(drash_dir)+50);
+
+   format_string(&drash.files, "%/files", drash_dir);
+   err = mkdir(drash.files.buf, DIR_PERM);
+   if (errno != EEXIST) {
+      assert_err(err != 0, "mkdir failed to creaet drash directory");
+   }
+
+   format_string(&drash.metadata, "%/metadata", drash_dir);
+   err = mkdir(drash.metadata.buf, DIR_PERM);
+   if (errno != EEXIST) {
+      assert_err(err != 0, "mkdir failed to creaet drash directory");
+   }
+
    return drash;
 }
 
@@ -88,14 +85,14 @@ bool Drash::is_empty() const {
    return true;
 }
 
-Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) const {
+Drash_Info Drash::parse_info(Arena_Allocator *arena, New_String *file_content) const {
    Drash_Info drash_info;
    file_content->skip(strlen("Path: ")); // Skip the prefix
 
    int count = 0;
    while ((*file_content)[count] != '\n') count += 1;
 
-   drash_info.path = static_cast <char *>(allocator->alloc(count+1));
+   drash_info.path = (char *)arena->alloc(count+1);
    const u8 type_len = strlen("directory")+1; // Max that 'Type' can hold.
 
    count = 0;
@@ -119,18 +116,18 @@ Drash_Info Drash::parse_info(Fixed_Allocator *allocator, String *file_content) c
       type[i] = (*file_content)[i];
    }
 
-   if (strcmp(type, "file") != 0 && strcmp(type, "directory") != 0) {
+   if (match_string(type, "file") && match_string(type, "directory")) {
       fprintf(stderr, "Error: Unknown 'Type' value: %s\n", type);
       STOP;
    }
 
-   if (strcmp("file", type) == 0) drash_info.type = ft_file;
+   if (match_string("file", type)) drash_info.type = ft_file;
    else drash_info.type = ft_dir;
 
    return drash_info;
 }
 
-void Drash::empty_drash(Fixed_Allocator *allocator) const {
+void Drash::empty_drash(Arena_Allocator *arena) const {
    auto dir = open_dir(metadata.buf);
    if (dir.is_empty()) {
       printf("Drashcan is already empty\n");
@@ -157,18 +154,16 @@ void Drash::empty_drash(Fixed_Allocator *allocator) const {
       return;
    }
 
-   if (!remove_files(files.buf)) return;
+   if (!remove_files(arena, files.buf)) return;
 
    while ((rdir = readdir(dir.fd)) != NULL) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
+      auto path = format_string(arena, "%/%", metadata.buf, rdir->d_name);
       unlink(path.buf);
-
-      allocator->reset();
    }
 }
 
-void Drash::list_files(Fixed_Allocator *allocator) const {
+void Drash::list_files(Arena_Allocator *arena) const {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -188,17 +183,17 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
       if (strcmp(rdir->d_name, ".") == 0 || strcmp(rdir->d_name, "..") == 0) continue;
       if (strcmp(rdir->d_name, "last") == 0) continue;
 
-      auto path = format_string(allocator, "%/%", metadata.buf, rdir->d_name);
+      auto path = format_string(arena, "%/%", metadata.buf, rdir->d_name);
       auto file = open_file(path.buf, "r");
-      auto content = file.read_into_string(allocator);
+      auto content = file.read_into_string(arena);
 
-      auto info = parse_info(allocator, &content);
+      auto info = parse_info(arena, &content);
 
       if (info.type == ft_file) {
-         auto filename = file_basename(allocator, info.path);
-         auto path = format_string("%/%", files.buf, filename.buf);
+         auto filename = file_basename(arena, info.path);
+         auto drashpath = format_string(arena, "%/%", files.buf, filename.buf);
 
-         auto file = open_file(path.buf, "r");
+         auto file = open_file(drashpath.buf, "r");
          auto filelen = file.file_length();
 
          const int kilobyte = 1000;
@@ -222,11 +217,10 @@ void Drash::list_files(Fixed_Allocator *allocator) const {
          }
 
       } else printf("- %s/\n", info.path);
-      allocator->reset();
    }
 }
 
-void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **argv) const {
+void Drash::restore(Arena_Allocator *arena, const int argc, char **argv) const {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -239,7 +233,7 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
 
    // Restore the last drash'd file/directory
    if (argv[0][0] == '-') {
-      auto last = format_string(allocator, "%/last", metadata.buf);
+      auto last = format_string(arena, "%/last", metadata.buf);
       auto last_filestat = exists(last.buf);
       if (!last_filestat.found) {
          printf("Nothing to restore!\n");
@@ -247,15 +241,15 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       }
 
       auto file = open_file(last.buf, "r");
-      auto filename = file.read_into_string(allocator);
+      auto filename = file.read_into_string(arena);
 
-      auto oldpath = format_string(allocator, "%/%", files.buf, filename.buf);
-      auto info_path = format_string(allocator, "%/%.info", metadata.buf, filename.buf);
+      auto oldpath = format_string(arena, "%/%", files.buf, filename.buf);
+      auto info_path = format_string(arena, "%/%.info", metadata.buf, filename.buf);
 
       auto file_info = open_file(info_path.buf, "r");
-      auto file_info_content = file_info.read_into_string(allocator);
+      auto file_info_content = file_info.read_into_string(arena);
 
-      auto info = parse_info(allocator, &file_info_content);
+      auto info = parse_info(arena, &file_info_content);
       auto filestat = exists(info.path);
 
       if (filestat.found) {
@@ -277,30 +271,29 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
             return;
          }
 
-         if (filestat.type == ft_dir) remove_all(info.path);
+         if (filestat.type == ft_dir) remove_dir(arena, info.path);
          else remove_file(info.path);
 
-         auto drashfile = format_string(allocator, "%/%", files.buf, (char *)filename.buf);
-         if (filestat.type == ft_file) move_file(drashfile.buf, info.path);
-         else move_directory(drashfile.buf, info.path);
+         auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename.buf);
+         if (filestat.type == ft_file) move_file(arena, drashfile.buf, info.path);
+         else move_directory(arena, drashfile.buf, info.path);
 
          remove_file(info_path.buf);
          remove_file(last.buf);
          return;
       }
 
-      auto drashfile = format_string(allocator, "%/%", files.buf, (char *)filename.buf);
-      if (filestat.type == ft_file) move_file(drashfile.buf, info.path);
-      else move_directory(drashfile.buf, info.path);
+      auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename.buf);
+      if (filestat.type == ft_file) move_file(arena, drashfile.buf, info.path);
+      else move_directory(arena, drashfile.buf, info.path);
       remove_file(info_path.buf);
       remove_file(last.buf);
       return;
    }
 
    for (int i = 0; i < argc; i++) {
-      allocator->reset();
       const char *file = argv[i];
-      auto path = format_string(allocator, "%/%.info", metadata.buf, (char *)file);
+      auto path = format_string(arena, "%/%.info", metadata.buf, (char *)file);
 
       if (!file_exists(path.buf)) {
          printf("No file or directory named: %s\n", file);
@@ -308,8 +301,8 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
       }
 
       auto info_file = open_file(path.buf, "r");
-      auto content = info_file.read_into_string(allocator);
-      auto info = parse_info(allocator, &content);
+      auto content = info_file.read_into_string(arena);
+      auto info = parse_info(arena, &content);
       auto filestat = exists(info.path);
 
       if (filestat.found) {
@@ -331,44 +324,44 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
             continue;
          }
 
-         if (filestat.type == ft_dir) remove_all(info.path);
+         if (filestat.type == ft_dir) remove_dir(arena, info.path);
          else remove_file(info.path);
 
-         auto drashpath = format_string(allocator, "%/%", files.buf, (char *)file);
+         auto drashpath = format_string(arena, "%/%", files.buf, (char *)file);
          auto drash_filestat = exists(drashpath.buf);
          if (drash_filestat.type == ft_dir) {
-            if (!move_directory(drashpath.buf, info.path)) continue;
-         } else if (!move_file(drashpath.buf, info.path)) continue;
+            if (!move_directory(arena, drashpath.buf, info.path)) continue;
+         } else if (!move_file(arena, drashpath.buf, info.path)) continue;
 
          remove_file(path.buf);
          continue;
       }
 
-      auto drashpath = format_string(allocator, "%/%", files.buf, (char *)file);
+      auto drashpath = format_string(arena, "%/%", files.buf, (char *)file);
       auto drash_filestat = exists(drashpath.buf);
 
       //
       // @Todo: Highlight the missing directories, and ask the user if they want to create those directories or provide an alternative path
       //
       if (drash_filestat.type == ft_dir) {
-         if (!move_directory(drashpath.buf, info.path, false)) {
+         if (!move_directory(arena, drashpath.buf, info.path, false)) {
             if (errno == ENOENT) {
                fprintf(stderr, "Can't restore '%s' to its original location because a directory doesn't exists in:\n", file);
                fprintf(stderr, "- '%s'\n", info.path);
                continue;
             }
 
-            report_error("Failed to restore '%'", file);
+            report_error(arena, "Failed to restore '%'", file);
             continue;
          }
-      } else if (!move_file(drashpath.buf, info.path, false)) {
+      } else if (!move_file(arena, drashpath.buf, info.path, false)) {
          if (errno == ENOENT) {
             fprintf(stderr, "Can't restore '%s' to its original location because a directory doesn't exists in:\n", file);
             fprintf(stderr, "- '%s'\n", info.path);
             continue;
          }
 
-         report_error("Failed to restore '%'", file);
+         report_error(arena, "Failed to restore '%'", file);
          continue;
       }
 
@@ -376,7 +369,7 @@ void Drash::restore(Fixed_Allocator *allocator, const int argc, const char **arg
    }
 }
 
-void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) const {
+void Drash::remove(Arena_Allocator *arena, int argc, char **argv) const {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -388,10 +381,8 @@ void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) cons
    }
 
    for (int i = 0; i < argc; i++) {
-      allocator->reset();
-
       const char *filename = argv[i];
-      auto drashfile = format_string(allocator, "%/%", files.buf, (char *)filename);
+      auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename);
       auto ex_res = exists(drashfile.buf);
 
       if (!ex_res.found) {
@@ -400,13 +391,13 @@ void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) cons
       }
 
       if (ex_res.type == ft_dir) {
-         if (!remove_all(drashfile.buf)) continue;
+         if (!remove_dir(arena, drashfile.buf)) continue;
       } else remove_file(drashfile.buf);
 
-      auto infopath = format_string(allocator, "%/%.info", metadata.buf, (char *)filename);
+      auto infopath = format_string(arena, "%/%.info", metadata.buf, (char *)filename);
       remove_file(infopath.buf);
 
-      auto lastfile_path = format_string(allocator, "%/%", metadata.buf, (char *)"last");
+      auto lastfile_path = format_string(arena, "%/%", metadata.buf, (char *)"last");
       auto lastfile = fopen(lastfile_path.buf, "r");
       if (!lastfile) return;
 
@@ -415,7 +406,7 @@ void Drash::remove(Fixed_Allocator *allocator, int argc, const char **argv) cons
          .path = lastfile_path.buf
       };
 
-      auto content = last_file.read_into_string(allocator);
+      auto content = last_file.read_into_string(arena);
       if (match_string(filename, content.buf)) remove_file(lastfile_path.buf);
    }
 }

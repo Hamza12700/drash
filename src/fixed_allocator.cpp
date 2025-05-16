@@ -2,7 +2,6 @@
 #define FIXED_ALLOC_H
 
 #include <sys/mman.h>
-
 #include "types.cpp"
 
 struct Fixed_Allocator {

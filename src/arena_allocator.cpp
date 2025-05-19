@@ -19,6 +19,7 @@ void *Arena_Allocator::alloc(int bytes) {
    if (!next_arena) {
       if (size+bytes > capacity) {
          int new_size = capacity*2;
+         while (new_size < bytes) new_size *= 2;
          auto mem = allocate(new_size);
          auto new_arena = (Arena_Allocator *)xcalloc(sizeof(Arena_Allocator), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
 
@@ -42,6 +43,7 @@ void *Arena_Allocator::alloc(int bytes) {
 
    int new_size = next->capacity*2;
    if (next->size+bytes > next->capacity) {
+      while (new_size < bytes) new_size *= 2;
       auto mem = allocate(new_size);
       auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
 

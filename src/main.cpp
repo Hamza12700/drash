@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
 
       if (current_file[0] == '/') {
          auto filename = file_basename(&arena, &current_file);
-         lastfile.write(filename.buf);
-      } else lastfile.write(current_file.buf);
+         fprintf(lastfile.fd, "%s", filename.buf);
+      } else fprintf(lastfile.fd, "%s", current_file.buf);
    }
 
    for (int i = 0; i < argc; i++) {
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
       else sprintf(type, "directory");
 
       auto data = format_string(&arena, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type);
-      file_info.write(data.buf);
+      fprintf(file_info.fd, "%s", data.buf);
 
       auto drash_file = format_string(&arena, "%/%", drash.files.buf, filename.buf);
       if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);

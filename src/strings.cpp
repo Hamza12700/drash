@@ -239,7 +239,7 @@ New_String alloc_string(void *buffer, int size) {
 New_String alloc_string(Arena_Allocator *arena, int size) {
    New_String ret;
    ret.buf = (char *)arena->alloc(size+1);
-   ret.capacity = size;
+   ret.capacity = size+1;
    ret.flags |= Custom_Allocator;
    ret.flags |= Arena;
    ret.arena = arena;

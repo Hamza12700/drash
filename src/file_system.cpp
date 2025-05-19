@@ -12,7 +12,6 @@ struct File {
 
    ~File();
    int file_length();
-   int write(const char *string);
 
    // Read the entire contents of the file into a string.
    New_String read_into_string(Arena_Allocator *arena);
@@ -31,25 +30,17 @@ int File::file_length() {
    return file_size;
 }
 
-int File::write(const char *string) {
-   return fprintf(fd, "%s", string);
-}
-
-
 New_String File::read_into_string(Arena_Allocator *arena) {
-   const int file_len = file_length();
-   auto buf = alloc_string(arena, file_len);
-   fread(buf.buf, sizeof(char), file_len, fd);
-
+   const int filelen = file_length();
+   auto buf = alloc_string(arena, filelen);
+   fread(buf.buf, 1, filelen, fd);
    return buf;
 }
 
 New_String File::read_into_string() {
-   const int file_len = file_length();
-
-   auto buf = malloc_string(file_len);
-   fread(buf.buf, sizeof(char), file_len, fd);
-
+   const int filelen = file_length();
+   auto buf = malloc_string(filelen);
+   fread(buf.buf, 1, filelen, fd);
    return buf;
 }
 
@@ -138,9 +129,7 @@ bool is_dir(const char *path) {
 
 // Return's true on success otherwise false
 bool remove_file(const char *path) {
-   int err = unlink(path);
-
-   if (err != 0) {
+   if (unlink(path) != 0) {
       fprintf(stderr, "failed to remove file '%s'\n", path);
       return false;
    }
@@ -154,7 +143,7 @@ bool copy_move_file(Arena_Allocator *arena, const char *oldpath, const char *new
    auto file_content = file.read_into_string(arena);
 
    auto newfile = open_file(newpath, "wb");
-   newfile.write(file_content.buf);
+   write(fileno(newfile.fd), file_content.buf, file_content.capacity); // @Speed @Memory: After writing the file contents, the allocated space becomes garbage.
    return remove_file(oldpath);
 }
 

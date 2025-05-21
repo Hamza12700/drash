@@ -16,48 +16,49 @@ struct Arena_Allocator {
 };
 
 void *Arena_Allocator::alloc(int bytes) {
-   if (!next_arena) {
-      if (size+bytes > capacity) {
-         int new_size = capacity*2;
-         while (new_size < bytes) new_size *= 2;
-         auto mem = allocate(new_size);
-         auto new_arena = (Arena_Allocator *)xcalloc(sizeof(Arena_Allocator), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
-
-         new_arena->buffer = mem;
-         new_arena->capacity = new_size;
-         new_arena->size += bytes;
-         next_arena = new_arena;
-         return mem;
-      }
-
+   if (size+bytes <= capacity) {
       void *mem = (char *)buffer+size;
       size += bytes;
       return mem;
    }
 
+   if (!next_arena) {
+      int new_size = capacity*2;
+      while (new_size < bytes) new_size *= 2;
+      auto mem = allocate(new_size);
+      auto new_arena = (Arena_Allocator *)xcalloc(sizeof(Arena_Allocator), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+
+      new_arena->buffer = mem;
+      new_arena->capacity = new_size;
+      new_arena->size += bytes;
+      next_arena = new_arena;
+      return mem;
+   }
+
    Arena_Allocator *next = next_arena;
    while (true) {
-      if (next->next_arena == NULL) break;
+      if (!next->next_arena) break;
+      if (next->size+bytes <= next->capacity) break;
       next = next->next_arena;
    }
 
-   int new_size = next->capacity*2;
    if (next->size+bytes > next->capacity) {
+      int new_size = next->capacity*2;
       while (new_size < bytes) new_size *= 2;
+
       auto mem = allocate(new_size);
-      auto new_arena = (Arena_Allocator *)xmalloc(sizeof(Arena_Allocator)); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+      auto new_arena = (Arena_Allocator *)xcalloc(sizeof(Arena_Allocator), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
 
       new_arena->buffer = mem;
       new_arena->size += bytes;
       new_arena->capacity = new_size;
-
       next->next_arena = new_arena;
       return mem;
+   } else {
+      void *mem = (char *)next->buffer+next->size;
+      next->size += bytes;
+      return mem;
    }
-
-   void *mem = (char *)next->buffer+next->size;
-   next->size += bytes;
-   return mem;
 }
 
 void Arena_Allocator::free_arena() {

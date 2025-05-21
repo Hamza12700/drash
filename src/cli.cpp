@@ -162,7 +162,7 @@ void handle_opts(Arena_Allocator *arena, char **argv, const int argc) {
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-bool handle_commands(char **argv, int argc, const Drash *drash, Arena_Allocator *arena) {
+void handle_commands(char **argv, int argc, const Drash *drash, Arena_Allocator *arena) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
@@ -174,28 +174,11 @@ bool handle_commands(char **argv, int argc, const Drash *drash, Arena_Allocator 
          argc -= 1;
 
          switch (cmd.action) {
-            case Command::List: {
-               drash->list_files(arena);
-               return true;
-            }
-
-            case Command::Restore: {
-               drash->restore(arena, argc, argv);
-               return true;
-            }
-
-            case Command::Empty: {
-               drash->empty_drash(arena);
-               return true;
-            }
-
-            case Command::Remove: {
-               drash->remove(arena, argc, argv);
-               return true;
-            }
+            case Command::List:    return drash->list_files(arena);
+            case Command::Empty:   return drash->empty_drash(arena);
+            case Command::Restore: return drash->restore(arena, argc, argv);
+            case Command::Remove:  return drash->remove(arena, argc, argv);
          }
       }
    }
-
-   return false;
 }

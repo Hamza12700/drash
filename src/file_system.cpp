@@ -14,7 +14,7 @@ struct File {
    int file_length();
 
    // Read the entire contents of the file into a string.
-   New_String read_into_string(Arena_Allocator *arena);
+   New_String read_into_string(Arena *arena);
    New_String read_into_string();
 };
 
@@ -30,7 +30,7 @@ int File::file_length() {
    return file_size;
 }
 
-New_String File::read_into_string(Arena_Allocator *arena) {
+New_String File::read_into_string(Arena *arena) {
    const int filelen = file_length();
    auto buf = alloc_string(arena, filelen);
    fread(buf.buf, 1, filelen, fd);
@@ -138,18 +138,18 @@ bool remove_file(const char *path) {
 }
 
 // Copies the (oldpath) file to file (newpath) and removes the oldpath
-bool copy_move_file(Arena_Allocator *arena, const char *oldpath, const char *newpath) {
+bool copy_move_file(Arena *arena, const char *oldpath, const char *newpath) {
    auto file = open_file(oldpath, "rb");
    auto file_content = file.read_into_string(arena);
 
    auto newfile = open_file(newpath, "wb");
-   write(fileno(newfile.fd), file_content.buf, file_content.capacity); // @Speed @Memory: After writing the file contents, the allocated space becomes garbage.
+   write(fileno(newfile.fd), file_content.buf, file_content.cap); // @Speed @Memory: After writing the file contents, the allocated space becomes garbage.
    return remove_file(oldpath);
 }
 
 // Move file and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_file(Arena_Allocator *arena, const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_file(Arena *arena, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {
@@ -165,7 +165,7 @@ bool move_file(Arena_Allocator *arena, const char *oldpath, const char *newpath,
    return true;
 }
 
-New_String file_basename(Arena_Allocator *arena, New_String *path) {
+New_String file_basename(Arena *arena, New_String *path) {
    const int pathlen = path->len();
 
    if ((*path)[pathlen-1] == '/') {
@@ -195,10 +195,10 @@ New_String file_basename(Arena_Allocator *arena, New_String *path) {
    return buffer;
 }
 
-New_String file_basename(Arena_Allocator *arena, char *path) {
+New_String file_basename(Arena *arena, char *path) {
    New_String tmp = {0};
    tmp.buf = path;
-   tmp.capacity = strlen(path)+1;
+   tmp.cap = strlen(path)+1;
    tmp.arena = arena;
    tmp.flags |= Referenced;
    return file_basename(arena, &tmp);
@@ -275,7 +275,7 @@ bool makedir(const char *dirpath, uint modes) {
 }
 
 // Remove all files inside a directory
-bool remove_files(Arena_Allocator *arena, const char *dirpath) {
+bool remove_files(Arena *arena, const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
@@ -291,7 +291,7 @@ bool remove_files(Arena_Allocator *arena, const char *dirpath) {
    return true;
 }
 
-bool remove_dir(Arena_Allocator *arena, const char *dirpath) {
+bool remove_dir(Arena *arena, const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
@@ -327,7 +327,7 @@ bool remove_dir(Arena_Allocator *arena, const char *dirpath) {
    return true;
 }
 
-bool move_directory_copy(Arena_Allocator *arena, const char *oldpath, const char *newpath) {
+bool move_directory_copy(Arena *arena, const char *oldpath, const char *newpath) {
    auto dir = open_dir(oldpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
@@ -370,7 +370,7 @@ bool move_directory_copy(Arena_Allocator *arena, const char *oldpath, const char
 
 // Move direcotry and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_directory(Arena_Allocator *arena, const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_directory(Arena *arena, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {

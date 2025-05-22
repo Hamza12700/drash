@@ -113,7 +113,7 @@ static void print_help() {
    }
 }
 
-static void force_remove_files(Arena_Allocator *arena, int argc, char **argv) {
+static void force_remove_files(Arena *arena, int argc, char **argv) {
    if (argc == 1) {
       fprintf(stderr, "Missing argument file(s)\n");
       return;
@@ -140,7 +140,7 @@ static void force_remove_files(Arena_Allocator *arena, int argc, char **argv) {
    }
 }
 
-void handle_opts(Arena_Allocator *arena, char **argv, const int argc) {
+void handle_opts(Arena *arena, char **argv, const int argc) {
    const char *arg = argv[0] += 1;
    if (arg[0] == '-') arg += 1;
 
@@ -162,7 +162,7 @@ void handle_opts(Arena_Allocator *arena, char **argv, const int argc) {
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-void handle_commands(char **argv, int argc, const Drash *drash, Arena_Allocator *arena) {
+void handle_commands(char **argv, int argc, const Drash *drash, Arena *arena) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 

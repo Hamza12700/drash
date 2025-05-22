@@ -110,13 +110,12 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      auto file_info = open_file(metadata_path.buf, "a");
+      auto file_info = open_file(metadata_path.buf, "w");
       char type[20] = {0};
       if (is_file(path.buf)) sprintf(type, "file");
       else sprintf(type, "directory");
 
-      auto data = format_string(&arena, "Path: %/%\nType: %\n", (char *)current_dir, path.buf, type);
-      fprintf(file_info.fd, "%s", data.buf);
+      fprintf(file_info.fd, "Path: %s/%s\nType: %s", current_dir, path.buf, type);
 
       auto drash_file = format_string(&arena, "%/%", drash.files.buf, filename.buf);
       if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);

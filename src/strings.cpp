@@ -24,16 +24,16 @@ enum String_Flags {
    Malloced = 0x4,
 
    Custom_Allocator = 0x8, // Need this for the de-constructor
-   Arena = 0x10,
+   ARENA = 0x10,
 };
 
 // Dynamically growable String
 struct New_String {
    char *buf = NULL;
-   Arena_Allocator *arena = NULL;
+   Arena *arena = NULL;
 
    i32 flags = Default;
-   i32 capacity = 0;
+   i32 cap = 0;
 
    ~New_String();
 
@@ -46,6 +46,7 @@ struct New_String {
    void skip(int idx);
    void take_ref(New_String *ref);
    void assign_string(const char *str);
+   void assign_string(New_String *str);
    New_String sub_string(int idx);
 
    char& operator[] (const int idx);
@@ -67,30 +68,30 @@ New_String::~New_String() {
 }
 
 void New_String::arena_grow() {
-   int new_size = capacity*2;
+   int new_size = cap*2;
    auto new_buffer = arena->alloc(new_size);
-   memcpy(new_buffer, buf, capacity);
+   memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
-   capacity = new_size;
+   cap = new_size;
 }
 
 
 void New_String::arena_grow(int size) {
-   assert(size < capacity, "(new_string) - new-size is less than to string capacity");
+   assert(size < cap, "(new_string) - new-size is less than to string capacity");
    auto new_buffer = arena->alloc(size);
-   memcpy(new_buffer, buf, capacity);
+   memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
-   capacity = size;
+   cap = size;
 }
 
 void New_String::malloc_grow(int size) {
-   assert(size < capacity, "(new_string) - new-size is less than to string capacity");
+   assert(size < cap, "(new_string) - new-size is less than to string capacity");
    auto new_buffer = (char *)xcalloc(size, 1);
-   memcpy(new_buffer, buf, capacity);
+   memcpy(new_buffer, buf, cap);
    auto old_buffer = buf;
    buf = new_buffer;
    free(old_buffer);
-   capacity = size;
+   cap = size;
 }
 
 int New_String::len() const {
@@ -100,9 +101,9 @@ int New_String::len() const {
 }
 
 void New_String::remove(int idx) {
-   if (idx >= capacity) {
+   if (idx >= cap) {
       fprintf(stderr, "(new_string) - attempt to remove a character which is outside of bounds");
-      fprintf(stderr, "idx: %d, capacity: %d\n", idx, capacity);
+      fprintf(stderr, "idx: %d, capacity: %d\n", idx, cap);
       STOP;
    }
 
@@ -111,20 +112,20 @@ void New_String::remove(int idx) {
 
 void New_String::assign_string(const char *str) {
    int slen = strlen(str);
-   if (slen >= capacity) {
+   if (slen >= cap) {
       if (flags & SubString) {
          fprintf(stderr, "(new_string) - can't concat because not enough space (sub-string)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
          STOP;
       }
 
-      if (flags & Arena) arena_grow(slen); // Grow the buffer
+      if (flags & ARENA) arena_grow(slen); // Grow the buffer
       else if (flags & Custom_Allocator) { // @Temporary: Find a way to grow the string with any custom-allocator
          fprintf(stderr, "(new_string) - can't concat because not enough space (custom-allocator)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
          STOP;
       } else if (flags & Malloced) {
-         int new_size = capacity*2;
+         int new_size = cap*2;
          while (new_size <= slen) new_size *= 2;
          malloc_grow(new_size);
       }
@@ -133,10 +134,34 @@ void New_String::assign_string(const char *str) {
    strcat(buf, str);
 }
 
+void New_String::assign_string(New_String *str) {
+   int slen = str->len();
+   if (slen >= cap) {
+      if (flags & SubString) {
+         fprintf(stderr, "(new_string) - can't concat because not enough space (sub-string)\n");
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
+         STOP;
+      }
+
+      if (flags & ARENA) arena_grow(slen); // Grow the buffer
+      else if (flags & Custom_Allocator) { // @Temporary: Find a way to grow the string with any custom-allocator
+         fprintf(stderr, "(new_string) - can't concat because not enough space (custom-allocator)\n");
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
+         STOP;
+      } else if (flags & Malloced) {
+         int new_size = cap*2;
+         while (new_size <= slen) new_size *= 2;
+         malloc_grow(new_size);
+      }
+   }
+
+   strcat(buf, str->buf);
+}
+
 void New_String::skip(int idx) {
-   if (idx >= capacity) {
+   if (idx >= cap) {
       fprintf(stderr, "(new_string) - can't index into '%d' because it's out of bounds\n", idx);
-      fprintf(stderr, "max size is: %d\n", capacity);
+      fprintf(stderr, "max size is: %d\n", cap);
       STOP;
    }
 
@@ -145,7 +170,7 @@ void New_String::skip(int idx) {
 
 void New_String::take_ref(New_String *ref) {
    buf = ref->buf;
-   capacity = ref->capacity;
+   cap = ref->cap;
    flags = ref->flags;
    ref->flags |= Referenced;
 }
@@ -155,7 +180,7 @@ New_String New_String::sub_string(int idx) {
    assert(idx == 0, "(new_string) - create sub-string starting at index 0");
 
    New_String ret;
-   ret.capacity = capacity;
+   ret.cap = cap;
    ret.buf = (char *)buf+idx;
    ret.flags  |= SubString;
    return ret;
@@ -166,20 +191,20 @@ void New_String::empty() {
 }
 
 char &New_String::operator[] (const int idx) {
-   if (idx >= capacity) {
+   if (idx >= cap) {
       if (flags & SubString) {
          fprintf(stderr, "(new_string) - can't grow the string because not enough space (sub-string)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, idx);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, idx);
          STOP;
       }
 
-      if (flags & Arena) this->arena_grow(); // Double the buffer size
+      if (flags & ARENA) this->arena_grow(); // Double the buffer size
       else if (flags & Custom_Allocator) {
          fprintf(stderr, "(new_string) - can't grow the string because not enough space (custom-allocator)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, idx);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, idx);
          STOP;
       } else if (flags & Malloced) {
-         int new_size = capacity*2;
+         int new_size = cap*2;
          malloc_grow(new_size);
       }
    }
@@ -192,20 +217,20 @@ int New_String::concat(const char *str) {
    int buflen = this->len();
    int total_size = buflen+slen+1;
 
-   if (total_size >= capacity) {
+   if (total_size >= cap) {
       if (flags & SubString) {
          fprintf(stderr, "(new_string) - can't concat because not enough space (sub-string)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
          STOP;
       }
 
-      if (flags & Arena) this->arena_grow(total_size); // Increase the buffer size
+      if (flags & ARENA) this->arena_grow(total_size); // Increase the buffer size
       else if (flags & Custom_Allocator) {
          fprintf(stderr, "(new_string) - can't concat because not enough space (custom-allocator)\n");
-         fprintf(stderr, "capacity size is '%u' but got %d.\n", capacity, slen);
+         fprintf(stderr, "capacity size is '%u' but got %d.\n", cap, slen);
          STOP;
       } else if (flags & Malloced) {
-         int new_size = capacity*2;
+         int new_size = cap*2;
          while (new_size <= total_size) new_size *= 2;
          malloc_grow(new_size);
       }
@@ -223,7 +248,7 @@ int New_String::concat(const char *str) {
 New_String malloc_string(int size) {
    New_String ret;
    ret.buf = (char *)xcalloc(size+1, 1); // Effectively, the same thing, it's just we want the memory to be zero-initialized because we use zero-terminated strings.
-   ret.capacity = size;
+   ret.cap = size;
    ret.flags |= Malloced;
    return ret;
 }
@@ -231,36 +256,36 @@ New_String malloc_string(int size) {
 New_String alloc_string(void *buffer, int size) {
    New_String ret;
    ret.buf = (char *)buffer;
-   ret.capacity = size;
+   ret.cap = size;
    ret.flags |= Custom_Allocator;
    return ret;
 }
 
-New_String alloc_string(Arena_Allocator *arena, int size) {
+New_String alloc_string(Arena *arena, int size) {
    New_String ret;
    ret.buf = (char *)arena->alloc(size+1);
-   ret.capacity = size+1;
+   ret.cap = size+1;
    ret.flags |= Custom_Allocator;
-   ret.flags |= Arena;
+   ret.flags |= ARENA;
    ret.arena = arena;
    return ret;
 }
 
-New_String alloc_string(Arena_Allocator *arena, const char *str) {
+New_String alloc_string(Arena *arena, const char *str) {
    New_String ret;
    int size = strlen(str)+1;
 
    ret.buf = (char *)arena->alloc(size);
-   ret.capacity = size;
+   ret.cap = size;
    ret.flags |= Custom_Allocator;
-   ret.flags |= Arena;
+   ret.flags |= ARENA;
    ret.arena = arena;
    ret.assign_string(str);
    return ret;
 }
 
 template<typename ...Args>
-New_String format_string(Arena_Allocator *arena, const char *fmt_string, const Args ...args) {
+New_String format_string(Arena *arena, const char *fmt_string, const Args ...args) {
    const auto arg_list = { args... };
    const int format_len = strlen(fmt_string);
    int total_size = 0;
@@ -382,7 +407,7 @@ void format_string(New_String *buffer, const char *fmt_string, const Args ...arg
 }
 
 template<typename ...Args>
-void fatal_error(Arena_Allocator *arena, const char *fmt, Args ...args) {
+void fatal_error(Arena *arena, const char *fmt, Args ...args) {
    auto err = format_string(arena, fmt, args...);
 
    fprintf(stderr, "[ERROR]: %s\n", err.buf);
@@ -391,7 +416,7 @@ void fatal_error(Arena_Allocator *arena, const char *fmt, Args ...args) {
 }
 
 template<typename ...Args>
-void report_error(Arena_Allocator *arena, const char *fmt, Args ...args) {
+void report_error(Arena *arena, const char *fmt, Args ...args) {
    auto err = format_string(arena, fmt, args...);
 
    fprintf(stderr, "[ERROR]: %s\n", err.buf);

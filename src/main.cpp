@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
       if (is_file(path.buf)) sprintf(type, "file");
       else sprintf(type, "directory");
 
-      fprintf(file_info.fd, "Path: %s/%s\nType: %s", current_dir, path.buf, type);
+      fprintf(file_info.fd, "Path: %s/%s\nType: %s\n", current_dir, path.buf, type);
 
       auto drash_file = format_string(&arena, "%/%", drash.files.buf, filename.buf);
       if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);

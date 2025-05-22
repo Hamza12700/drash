@@ -74,7 +74,7 @@ File open_file(const char *file_path, const char *modes) {
 
    if (file == NULL) {
       fprintf(stderr, "failed to open file: %s\n", file_path);
-      STOP;
+      abort();
    }
 
    return File {
@@ -208,7 +208,7 @@ Directory open_dir(const char *dir_path) {
    DIR *dir = opendir(dir_path);
    if (dir == NULL) {
       fprintf(stderr, "failed to open directory: %s\n", dir_path);
-      STOP;
+      abort();
    }
 
    return Directory {

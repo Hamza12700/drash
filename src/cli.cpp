@@ -162,7 +162,7 @@ void handle_opts(Arena *arena, char **argv, const int argc) {
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-void handle_commands(char **argv, int argc, const Drash *drash, Arena *arena) {
+void handle_commands(char **argv, int argc, Drash *drash, Arena *arena) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 

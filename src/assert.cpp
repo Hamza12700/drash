@@ -12,7 +12,7 @@
 if (bool) { \
    fprintf(stderr, "[ASSERT FAILED] %s:%d\n", __FILE__, __LINE__); \
    fprintf(stderr, "Reason: %s\n", msg); \
-   exit(-1); \
+   abort(); \
 } \
 
 // Assert and display the message with errno string
@@ -22,7 +22,7 @@ if (bool) { \
    fprintf(stderr, "[ASSERT ERROR] %s:%d\n", __FILE__, __LINE__); \
    fprintf(stderr, "Reason: %s\n", msg); \
    fprintf(stderr, "Error: %s\n", strerror(errno)); \
-   exit(errno); \
+   abort(); \
 } \
 
 #endif /* ifndef ASSERT_H */

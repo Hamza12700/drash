@@ -15,15 +15,13 @@ struct Drash {
    New_String files;    // Path to drash files directory
    New_String metadata; // Path to metadata about the drash files
 
-   Drash_Info parse_info(Arena *arena, New_String *file_content) const;
+   Drash_Info parse_info(Arena *arena, New_String *file_content);
 
-   void empty_drash(Arena *arena) const;
-   void list_files(Arena *arena) const;
-   void restore(Arena *arena, const int argc, char **argv) const;
-   void remove(Arena *arena, int argc, char **argv) const;
-
-private:
-   bool is_empty() const;
+   void empty_drash(Arena *arena);
+   void list_files(Arena *arena);
+   void restore(Arena *arena, int argc, char **argv);
+   void remove(Arena *arena, int argc, char **argv);
+   bool is_empty();
 };
 
 Drash init_drash(Arena *arena) {
@@ -34,7 +32,7 @@ Drash init_drash(Arena *arena) {
    if (strlen(home_env) > home_len) {
       fprintf(stderr, "HOME environment variable too long: %zu\n", strlen(home_env));
       printf("max length %u characters\n", home_len);
-      STOP;
+      abort();
    }
 
    char drash_dir[150] = {0};
@@ -66,7 +64,7 @@ Drash init_drash(Arena *arena) {
    return drash;
 }
 
-bool Drash::is_empty() const {
+bool Drash::is_empty() {
    auto dir = open_dir(metadata.buf);
    struct dirent *rdir;
    int count = 0;
@@ -85,7 +83,7 @@ bool Drash::is_empty() const {
    return true;
 }
 
-Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) const {
+Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) {
    Drash_Info drash_info = {};
    file_content->skip(strlen("Path: ")); // Skip the prefix
 
@@ -103,7 +101,7 @@ Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) const {
    const u8 type_len = strlen("directory")+1; // Max that 'Type' can hold.
    if (strlen(file_content->buf) > type_len) {
       fprintf(stderr, "Error: 'Type' feild is invalid: %s\n", file_content->buf);
-      STOP;
+      abort();
    }
 
    char type[type_len] = {0};
@@ -112,7 +110,7 @@ Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) const {
 
    if (!match_string(type, "file") && !match_string(type, "directory")) {
       fprintf(stderr, "Error: Unknown 'Type' value: %s\n", type);
-      STOP;
+      abort();
    }
 
    if (match_string("file", type)) drash_info.type = ft_file;
@@ -120,7 +118,7 @@ Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) const {
    return drash_info;
 }
 
-void Drash::empty_drash(Arena *arena) const {
+void Drash::empty_drash(Arena *arena) {
    auto dir = open_dir(metadata.buf);
    if (dir.is_empty()) {
       printf("Drashcan is already empty\n");
@@ -156,7 +154,7 @@ void Drash::empty_drash(Arena *arena) const {
    }
 }
 
-void Drash::list_files(Arena *arena) const {
+void Drash::list_files(Arena *arena) {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -213,7 +211,7 @@ void Drash::list_files(Arena *arena) const {
    }
 }
 
-void Drash::restore(Arena *arena, const int argc, char **argv) const {
+void Drash::restore(Arena *arena, const int argc, char **argv) {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;
@@ -362,7 +360,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) const {
    }
 }
 
-void Drash::remove(Arena *arena, int argc, char **argv) const {
+void Drash::remove(Arena *arena, int argc, char **argv) {
    if (this->is_empty()) {
       printf("Drashcan is empty!\n");
       return;

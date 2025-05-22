@@ -76,12 +76,4 @@ void unmap(void *addr, int length) {
    addr = NULL; // Because the mapped memory is no longer available the address is invalid, so it is better to set it to null.
 }
 
-#ifdef DEBUG
-#define STOP raise(SIGTRAP)
-
-#else
-#define STOP exit(-1)
-
-#endif // DEBUG
-
 #endif // TYPES_H

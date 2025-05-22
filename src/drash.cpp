@@ -19,6 +19,7 @@ struct Drash {
 
    void empty_drash(Arena *arena);
    void list_files(Arena *arena);
+   void cat(Arena *arena, const char *filename);
    void restore(Arena *arena, int argc, char **argv);
    void remove(Arena *arena, int argc, char **argv);
    bool is_empty();
@@ -118,6 +119,33 @@ Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) {
    return drash_info;
 }
 
+void Drash::cat(Arena *arena, const char *filename) {
+   if (!filename) {
+      fprintf(stderr, "No filename provided!\n");
+      return;
+   }
+   auto file = file_basename(arena, filename);
+   auto fullpath = format_string(arena, "%/%", files.buf, file.buf);
+   auto filestat = exists(fullpath.buf);
+   if (!filestat.found) {
+      fprintf(stderr, "No filename '%s' in the drashcan!\n", file.buf);
+      return;
+   }
+
+   if (filestat.type == ft_dir) {
+      fprintf(stderr, "The provided filename is a directory\n");
+      return;
+   }
+   if (filestat.type != ft_file) {
+      fprintf(stderr, "Unknown filetype: '%s'\n", file.buf);
+      return;
+   }
+
+   auto drashfile = open_file(fullpath.buf, "r");
+   auto content = drashfile.read_into_string(arena);
+   write(STDOUT_FILENO, content.buf, content.cap);
+}
+
 void Drash::empty_drash(Arena *arena) {
    auto dir = open_dir(metadata.buf);
    if (dir.is_empty()) {
@@ -171,8 +199,8 @@ void Drash::list_files(Arena *arena) {
       //
       // Call to 'readdir' mutates the 'd_name' pointer to point to next filename null-terminated string.
 
-      if (strcmp(rdir->d_name, ".") == 0 || strcmp(rdir->d_name, "..") == 0) continue;
-      if (strcmp(rdir->d_name, "last") == 0) continue;
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+      if (match_string(rdir->d_name, "last")) continue;
 
       auto path = format_string(arena, "%/%", metadata.buf, rdir->d_name);
       auto file = open_file(path.buf, "r");
@@ -193,18 +221,18 @@ void Drash::list_files(Arena *arena) {
 
          if (filelen > gigabyte) {
             float size = (float)filelen/gigabyte;
-            printf("- %s | %.1fG\n", info.path.buf, size);
+            printf("- %s | %.0fG\n", info.path.buf, size);
 
          } else if (filelen > megabyte) {
             float size = (float)filelen/megabyte;
-            printf("- %s | %.1fM\n", info.path.buf, size);
+            printf("- %s | %.0fM\n", info.path.buf, size);
 
          } else if (filelen > kilobyte) {
             float size = (float)filelen/kilobyte;
             printf("- %s | %.1fK\n", info.path.buf, size);
 
          } else {
-            printf("- %s | %d\n", info.path.buf, filelen);
+            printf("- %s | %ld\n", info.path.buf, filelen);
          }
 
       } else printf("- %s/\n", info.path.buf);

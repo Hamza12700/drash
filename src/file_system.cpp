@@ -11,7 +11,7 @@ struct File {
    const char *path;
 
    ~File();
-   int file_length();
+   long file_length();
 
    // Read the entire contents of the file into a string.
    New_String read_into_string(Arena *arena);
@@ -22,9 +22,9 @@ File::~File() { // @Temporary: Not checking the error-code
    int err = fclose(fd);
 }
 
-int File::file_length() {
+long File::file_length() {
    fseek(fd, 0, SEEK_END);
-   int file_size = ftell(fd);
+   long file_size = ftell(fd);
    rewind(fd);
 
    return file_size;
@@ -195,9 +195,9 @@ New_String file_basename(Arena *arena, New_String *path) {
    return buffer;
 }
 
-New_String file_basename(Arena *arena, char *path) {
+New_String file_basename(Arena *arena, const char *path) {
    New_String tmp = {0};
-   tmp.buf = path;
+   tmp.buf = (char *)path;
    tmp.cap = strlen(path)+1;
    tmp.arena = arena;
    tmp.flags |= Referenced;

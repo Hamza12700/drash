@@ -9,6 +9,7 @@ struct Command {
       Remove, 
       Empty,
       Restore,
+      Cat,
    };
 
    const CmdAction action;
@@ -19,6 +20,12 @@ static const Command commands[] = {
       .name = "list",
       .desc = "List Drash'd files",
       .action = Command::List
+   },
+
+   {
+      .name = "cat",
+      .desc = "Cat-out a file",
+      .action = Command::Cat
    },
 
    {
@@ -178,6 +185,7 @@ void handle_commands(char **argv, int argc, Drash *drash, Arena *arena) {
             case Command::Empty:   return drash->empty_drash(arena);
             case Command::Restore: return drash->restore(arena, argc, argv);
             case Command::Remove:  return drash->remove(arena, argc, argv);
+            case Command::Cat:     return drash->cat(arena, *(argv));
          }
       }
    }

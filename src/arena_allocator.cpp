@@ -8,8 +8,8 @@ struct Arena {
    void *buffer = NULL;
    Arena *next = NULL;
 
-   i32 pos = 0;
-   i32 cap = 0;
+   uint pos = 0;
+   uint cap = 0;
 
    void *alloc(int bytes);
    void free_arena();

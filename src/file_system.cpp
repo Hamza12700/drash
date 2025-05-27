@@ -3,6 +3,7 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #include "strings.cpp"
 
@@ -18,8 +19,9 @@ struct File {
    New_String read_into_string();
 };
 
-File::~File() { // @Temporary: Not checking the error-code
-   int err = fclose(fd);
+File::~File() {
+   if (fclose(fd) != 0)
+      fprintf(stderr, "failed to close the file-descriptor of '%s'\n", path);
 }
 
 long File::file_length() {
@@ -53,7 +55,8 @@ struct Directory {
 };
 
 Directory::~Directory() { // @Temporary: Not checking the error-code
-   int err = closedir(fd);
+   if (closedir(fd) != 0)
+      fprintf(stderr, "failed to close the (directory) file-descriptor of '%s'\n", path);
 }
 
 bool Directory::is_empty() {
@@ -265,12 +268,14 @@ Ex_Res exists(const char *path) {
    return ret;
 }
 
-bool makedir(const char *dirpath, uint modes) {
+bool makedir(const char *dirpath, uint modes, bool panic = true) {
    if (mkdir(dirpath, modes) != 0) {
-      fprintf(stderr, "failed to create directory at %s\n", dirpath);
+      if (panic) {
+         fprintf(stderr, "failed to create directory at %s\n", dirpath);
+         raise(SIGINT);
+      }
       return false;
    }
-
    return true;
 }
 
@@ -340,7 +345,7 @@ bool move_directory_copy(Arena *arena, const char *oldpath, const char *newpath)
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!move_file(arena, old_filepath.buf, new_filepath.buf)) return false;
       } else {
-         if (!makedir(new_filepath.buf, filestat.perms)) return false; // Create the new directory with same file-perms of the old-directory
+         if (!makedir(new_filepath.buf, filestat.perms, false)) return false; // Create the new directory with same file-perms of the old-directory
          if (!move_directory_copy(arena, old_filepath.buf, new_filepath.buf)) return false;
       }
    }

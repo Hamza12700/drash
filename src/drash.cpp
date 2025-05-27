@@ -33,7 +33,7 @@ Drash init_drash(Arena *arena) {
    if (strlen(home_env) > home_len) {
       fprintf(stderr, "HOME environment variable too long: %zu\n", strlen(home_env));
       printf("max length %u characters\n", home_len);
-      abort();
+      raise(SIGINT);
    }
 
    char drash_dir[150] = {0};
@@ -46,7 +46,7 @@ Drash init_drash(Arena *arena) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   Drash drash;
+   Drash drash = {};
    drash.files = alloc_string(arena, sizeof(drash_dir)+50);
    drash.metadata = alloc_string(arena, sizeof(drash_dir)+50);
 
@@ -73,8 +73,8 @@ bool Drash::is_empty() {
    while ((rdir = readdir(dir.fd))) {
       count += 1;
 
-      if (strcmp(rdir->d_name, ".") == 0 || strcmp(rdir->d_name, "..") == 0) continue;
-      if (strcmp(rdir->d_name, "last") == 0) {
+      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
+      if (match_string(rdir->d_name, "last")) {
          count -= 1;
          continue;
       }
@@ -105,7 +105,7 @@ Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) {
       abort();
    }
 
-   char type[type_len] = {0};
+   char type[20] = {0};
    file_content->remove(file_content->len()-1); // Remove the newline-character
    snprintf(type, type_len, "%s", file_content->buf);
 
@@ -395,7 +395,7 @@ void Drash::remove(Arena *arena, int argc, char **argv) {
    }
 
    if (argc == 0) {
-      fprintf(stderr, "Missing argment 'file|directory' name\n");
+      fprintf(stderr, "Missing argument 'file|directory' name\n");
       return;
    }
 

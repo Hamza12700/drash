@@ -41,22 +41,24 @@ Drash init_drash(Arena *arena) {
 
    int err = 0;
    err = mkdir(drash_dir, DIR_PERM);
-
-   if (errno != EEXIST) {
-      assert_err(err != 0, "mkdir failed to creaet drash directory");
-   }
+   bool found_drash = false;
+   if (errno == EEXIST) found_drash = true;
+   else assert_err(err != 0, "mkdir failed to creaet drash directory");
 
    Drash drash = {};
    drash.files = alloc_string(arena, sizeof(drash_dir)+50);
-   drash.metadata = alloc_string(arena, sizeof(drash_dir)+50);
-
    format_string(&drash.files, "%/files", drash_dir);
+
+   drash.metadata = alloc_string(arena, sizeof(drash_dir)+50);
+   format_string(&drash.metadata, "%/metadata", drash_dir);
+
+   if (found_drash) return drash;
+
    err = mkdir(drash.files.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");
    }
 
-   format_string(&drash.metadata, "%/metadata", drash_dir);
    err = mkdir(drash.metadata.buf, DIR_PERM);
    if (errno != EEXIST) {
       assert_err(err != 0, "mkdir failed to creaet drash directory");

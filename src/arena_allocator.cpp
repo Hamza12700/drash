@@ -3,6 +3,7 @@
 
 #include <sys/mman.h>
 #include "types.cpp"
+#include "memory_pool.cpp"
 
 struct Arena {
    void *buffer = NULL;
@@ -15,6 +16,8 @@ struct Arena {
    void free_arena();
 };
 
+static auto arena_pool = make_pool<Arena>(10);
+
 void *Arena::alloc(int bytes) {
    if (pos+bytes <= cap) {
       void *mem = (char *)buffer+pos;
@@ -26,12 +29,12 @@ void *Arena::alloc(int bytes) {
       int new_size = cap*2;
       while (new_size < bytes) new_size *= 2;
       auto mem = allocate(new_size);
-      auto new_arena = (Arena *)xcalloc(sizeof(Arena), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+      auto new_arena = arena_pool.create();
 
-      new_arena->buffer = mem;
-      new_arena->cap = new_size;
-      new_arena->pos += bytes;
-      next = new_arena;
+      new_arena.buffer = mem;
+      new_arena.cap = new_size;
+      new_arena.pos += bytes;
+      next = &new_arena;
       return mem;
    }
 
@@ -47,13 +50,13 @@ void *Arena::alloc(int bytes) {
       while (new_size < bytes) new_size *= 2;
 
       auto mem = allocate(new_size);
-      auto new_arena = (Arena *)xcalloc(sizeof(Arena), 1); // @Speed @Temporary: Instead of malloc'ing every-time a new arena is needed, allocate a contiguous memory that holds some amount of arena-allocator struct and just index into that.
+      auto new_arena = arena_pool.create();
 
-      new_arena->buffer = mem;
-      new_arena->pos += bytes;
-      new_arena->cap = new_size;
+      new_arena.buffer = mem;
+      new_arena.pos += bytes;
+      new_arena.cap = new_size;
 
-      next_arena->next = new_arena;
+      next_arena->next = &new_arena;
       return mem;
    } else {
       void *mem = (char *)next_arena->buffer+next_arena->pos;
@@ -65,11 +68,13 @@ void *Arena::alloc(int bytes) {
 void Arena::free_arena() {
    unmap(buffer, cap);
    Arena *next_arena = next;
-   while (true) { // @Leak: Not free'ing the malloc'd arena struct
+   while (true) {
       if (!next_arena) return;
       unmap(next_arena->buffer, next_arena->cap);
       next_arena = next_arena->next;
    }
+
+   pool_free(&arena_pool);
 }
 
 Arena make_arena(int size) {

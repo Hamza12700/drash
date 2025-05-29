@@ -149,20 +149,18 @@ void Drash::cat(Arena *arena, const char *filename) {
 }
 
 void Drash::empty_drash(Arena *arena) {
-   auto dir = open_dir(metadata.buf);
+   auto dir = open_dir(files.buf);
    if (dir.is_empty()) {
       printf("Drashcan is already empty\n");
       return;
    }
 
-   struct dirent *rdir;
+   struct dirent *rdir = NULL;
    int count = 0;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      if (strcmp(rdir->d_name, "last") == 0) continue;
       count += 1;
    }
-   rewinddir(dir.fd); // Reset the position of the directory back to start.
 
    printf("\nTotal entries: %d\n", count);
    printf("Empty drash directory? [Y/n]: ");
@@ -175,13 +173,9 @@ void Drash::empty_drash(Arena *arena) {
       return;
    }
 
-   if (!remove_files(arena, files.buf)) return;
-
-   while ((rdir = readdir(dir.fd)) != NULL) {
-      if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto path = format_string(arena, "%/%", metadata.buf, rdir->d_name);
-      unlink(path.buf);
-   }
+   if (!remove_dir(arena, files.buf)) return; // This is also removes the parent directory
+   if (!makedir(files.buf, DIR_PERM)) return;
+   if (!remove_files(arena, metadata.buf)) return;
 }
 
 void Drash::list_files(Arena *arena) {

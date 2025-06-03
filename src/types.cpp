@@ -5,10 +5,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <limits.h>
 
 #include "assert.cpp"
 
-#define VERSION "1.0.3"
+#define VERSION "1.0.4"
 
 typedef unsigned int uint;
 
@@ -21,11 +22,6 @@ typedef int8_t  i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
-
-#define MAX_U8  1 << 8
-#define MAX_U16 1 << 16
-#define MAX_U32 1 << 32
-#define MAX_U64 1 << 64
 
 const int page_size = getpagesize();
 
@@ -74,6 +70,12 @@ void *reallocate(void *old_addr, int old_size, int new_size) {
 void unmap(void *addr, int length) {
    assert_err(munmap(addr, length) != 0, "munmap failed");
    addr = NULL; // Because the mapped memory is no longer available the address is invalid, so it is better to set it to null.
+}
+
+uint page_align(uint size) {
+   uint page_align = page_size;
+   while (page_align < size) page_align *= 2;
+   return page_align;
 }
 
 #endif // TYPES_H

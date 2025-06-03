@@ -120,7 +120,7 @@ static void print_help() {
    }
 }
 
-static void force_remove_files(Arena *arena, int argc, char **argv) {
+static void force_remove_files(Allocator allocator, int argc, char **argv) {
    if (argc == 1) {
       fprintf(stderr, "Missing argument file(s)\n");
       return;
@@ -141,13 +141,13 @@ static void force_remove_files(Arena *arena, int argc, char **argv) {
       }
 
       if (is_dir(path)) {
-         remove_dir(arena, path);
+         remove_dir(allocator, path);
          continue;
       }
    }
 }
 
-void handle_opts(Arena *arena, char **argv, const int argc) {
+void handle_opts(Allocator allocator, char **argv, const int argc) {
    const char *arg = argv[0] += 1;
    if (arg[0] == '-') arg += 1;
 
@@ -162,14 +162,14 @@ void handle_opts(Arena *arena, char **argv, const int argc) {
             return;
          }
 
-         case Option::Force: return force_remove_files(arena, argc, argv);
+         case Option::Force: return force_remove_files(allocator, argc, argv);
       }
    }
 
    fprintf(stderr, "Unkonwn option: %s\n", arg);
 }
 
-void handle_commands(char **argv, int argc, Drash *drash, Arena *arena) {
+void handle_commands(char **argv, int argc, Drash *drash, Allocator allocator) {
    for (int i = 0; i < argc; i++) {
       const char *arg = argv[i];
 
@@ -181,11 +181,11 @@ void handle_commands(char **argv, int argc, Drash *drash, Arena *arena) {
          argc -= 1;
 
          switch (cmd.action) {
-            case Command::List:    return drash->list_files(arena);
-            case Command::Empty:   return drash->empty_drash(arena);
-            case Command::Restore: return drash->restore(arena, argc, argv);
-            case Command::Remove:  return drash->remove(arena, argc, argv);
-            case Command::Cat:     return drash->cat(arena, *(argv));
+            case Command::List:    return drash->list_files(allocator);
+            case Command::Empty:   return drash->empty_drash(allocator);
+            case Command::Restore: return drash->restore(allocator, argc, argv);
+            case Command::Remove:  return drash->remove(allocator, argc, argv);
+            case Command::Cat:     return drash->cat(allocator, *(argv));
          }
       }
    }

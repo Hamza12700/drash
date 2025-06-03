@@ -15,8 +15,7 @@ struct File {
    long file_length();
 
    // Read the entire contents of the file into a string.
-   New_String read_into_string(Arena *arena);
-   New_String read_into_string();
+   New_String read_into_string(Allocator allocator);
 };
 
 File::~File() {
@@ -32,16 +31,9 @@ long File::file_length() {
    return file_size;
 }
 
-New_String File::read_into_string(Arena *arena) {
+New_String File::read_into_string(Allocator allocator) {
    const int filelen = file_length();
-   auto buf = alloc_string(arena, filelen);
-   fread(buf.buf, 1, filelen, fd);
-   return buf;
-}
-
-New_String File::read_into_string() {
-   const int filelen = file_length();
-   auto buf = malloc_string(filelen);
+   auto buf = alloc_string(allocator, filelen);
    fread(buf.buf, 1, filelen, fd);
    return buf;
 }
@@ -54,7 +46,7 @@ struct Directory {
    bool is_empty();
 };
 
-Directory::~Directory() { // @Temporary: Not checking the error-code
+Directory::~Directory() {
    if (closedir(fd) != 0)
       fprintf(stderr, "failed to close the (directory) file-descriptor of '%s'\n", path);
 }
@@ -141,18 +133,25 @@ bool remove_file(const char *path) {
 }
 
 // Copies the (oldpath) file to file (newpath) and removes the oldpath
-bool copy_move_file(Arena *arena, const char *oldpath, const char *newpath) {
+bool copy_move_file(Allocator allocator, const char *oldpath, const char *newpath) {
    auto file = open_file(oldpath, "rb");
-   auto file_content = file.read_into_string(arena);
+   auto file_content = file.read_into_string(allocator);
 
    auto newfile = open_file(newpath, "wb");
-   write(fileno(newfile.fd), file_content.buf, file_content.cap); // @Speed @Memory: After writing the file contents, the allocated space becomes garbage.
+   write(fileno(newfile.fd), file_content.buf, file_content.cap);
+
+   // @NOTE:
+   //
+   // We don't want to reset the allocator itself, instead we want to reset the allocator that is stored in the New_String.
+   // That's because the string could ask for memory that can't be fit in the passed allocator argument, in that case
+   // the allocator would allocate memory and store a pointer to the next allocated memory and its context.
+
+   file_content.allocator.reset(file_content.cap);
    return remove_file(oldpath);
 }
 
-// Move file and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_file(Arena *arena, const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_file(Allocator allocator, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {
@@ -162,13 +161,13 @@ bool move_file(Arena *arena, const char *oldpath, const char *newpath, bool disp
          return false;
       }
 
-      return copy_move_file(arena, oldpath, newpath);
+      return copy_move_file(allocator, oldpath, newpath);
    }
 
    return true;
 }
 
-New_String file_basename(Arena *arena, New_String *path) {
+New_String file_basename(Allocator allocator, New_String *path) {
    const int pathlen = path->len();
 
    if ((*path)[pathlen-1] == '/') {
@@ -185,7 +184,7 @@ New_String file_basename(Arena *arena, New_String *path) {
 
    if (!contain_slash) return *path;
 
-   auto buffer = alloc_string(arena, pathlen+1);
+   auto buffer = alloc_string(allocator, pathlen+1);
    int file_idx = 0;
 
    for (int i = strlen(path->buf); (*path)[i] != '/'; i--) {
@@ -198,13 +197,12 @@ New_String file_basename(Arena *arena, New_String *path) {
    return buffer;
 }
 
-New_String file_basename(Arena *arena, const char *path) {
-   New_String tmp = {0};
+New_String file_basename(Allocator allocator, const char *path) {
+   New_String tmp = {};
    tmp.buf = (char *)path;
    tmp.cap = strlen(path)+1;
-   tmp.arena = arena;
-   tmp.flags |= Referenced;
-   return file_basename(arena, &tmp);
+   tmp.allocator = allocator;
+   return file_basename(allocator, &tmp);
 }
 
 Directory open_dir(const char *dir_path) {
@@ -229,7 +227,7 @@ enum File_Type : u8 {
 
 struct Ex_Res {
    // Should be 16 bits wide? [en.wikipedia.org/wiki/Unix_file_types#Numeric]
-   u16 perms = 0; // @Robustness: Validate if this is correct.
+   u16 perms = 0; // @Robustness: Confirm, if this is correct.
 
    bool found = false;
    File_Type type = ft_unknown;
@@ -272,7 +270,8 @@ bool makedir(const char *dirpath, uint modes, bool panic = true) {
    if (mkdir(dirpath, modes) != 0) {
       if (panic) {
          fprintf(stderr, "failed to create directory at %s\n", dirpath);
-         raise(SIGINT);
+         fprintf(stderr, "[Error]: '%s'\n", strerror(errno));
+         abort();
       }
       return false;
    }
@@ -280,39 +279,50 @@ bool makedir(const char *dirpath, uint modes, bool panic = true) {
 }
 
 // Remove all files inside a directory
-bool remove_files(Arena *arena, const char *dirpath) {
+bool remove_files(Allocator allocator, const char *dirpath) {
    auto dir = open_dir(dirpath);
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(allocator, "%/%", (char *)dirpath, rdir->d_name);
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
-      } else if (!remove_files(arena, fullpath.buf)) return false;
+      } else if (!remove_files(allocator, fullpath.buf)) return false;
    }
 
    return true;
 }
 
-bool remove_dir(Arena *arena, const char *dirpath) {
+bool remove_dir(Allocator allocator, const char *dirpath) {
    auto dir = open_dir(dirpath);
+
+   // :MemoryUsage
+   //
+   // This routine recursively remove files and directories and allocates memory for those filepaths,
+   // to avoid using alot of memory, we keep track of the total memory allocations and at the end of the each recursive-call
+   // we mark the allocated memory as free.
+   uint proc_mem_usage = 0;
+
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(allocator, "%/%", (char *)dirpath, rdir->d_name);
+      proc_mem_usage += fullpath.cap;
+
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
-      } else if (!remove_dir(arena, fullpath.buf)) return false;
+      } else if (!remove_dir(allocator, fullpath.buf)) return false;
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(allocator, "%/%", (char *)dirpath, rdir->d_name);
+      proc_mem_usage += fullpath.cap;
 
       if (rmdir(fullpath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -320,7 +330,7 @@ bool remove_dir(Arena *arena, const char *dirpath) {
          return false;
       }
 
-      if (!remove_dir(arena, fullpath.buf)) return false;
+      if (!remove_dir(allocator, fullpath.buf)) return false;
    }
 
    if (rmdir(dirpath) != 0) { // Lastly, remove the parent directory
@@ -329,31 +339,42 @@ bool remove_dir(Arena *arena, const char *dirpath) {
       return false;
    }
 
+   allocator.reset(proc_mem_usage);
    return true;
 }
 
-bool move_directory_copy(Arena *arena, const char *oldpath, const char *newpath) {
+bool copy_move_directory(Allocator allocator, const char *oldpath, const char *newpath) {
    auto dir = open_dir(oldpath);
+
+   // :MemoryUsage
+   //
+   // This routine recursively remove files and directories by copying them and that takes alot of memory,
+   // to avoid using alot of memory, we keep track of the total memory allocations and at the end of the each recursive-call
+   // we mark the allocated memory as free.
+   uint proc_mem_usage = 0;
+
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto old_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
-      auto new_filepath = format_string(arena, "%/%", (char *)newpath, rdir->d_name);
+      auto old_filepath = format_string(allocator, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = format_string(allocator, "%/%", (char *)newpath, rdir->d_name);
+      proc_mem_usage += old_filepath.cap + new_filepath.cap;
       auto filestat = exists(old_filepath.buf);
 
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
-         if (!move_file(arena, old_filepath.buf, new_filepath.buf)) return false;
+         if (!move_file(allocator, old_filepath.buf, new_filepath.buf)) return false;
       } else {
-         if (!makedir(new_filepath.buf, filestat.perms, false)) return false; // Create the new directory with same file-perms of the old-directory
-         if (!move_directory_copy(arena, old_filepath.buf, new_filepath.buf)) return false;
+         makedir(new_filepath.buf, filestat.perms); // Create the new directory with same file-perms of the old-directory
+         if (!copy_move_directory(allocator, old_filepath.buf, new_filepath.buf)) return false;
       }
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto new_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = format_string(allocator, "%/%", (char *)oldpath, rdir->d_name);
+      proc_mem_usage += new_filepath.cap;
 
       if (rmdir(new_filepath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -361,7 +382,7 @@ bool move_directory_copy(Arena *arena, const char *oldpath, const char *newpath)
          return false;
       }
 
-      if (!remove_dir(arena, new_filepath.buf)) return false;
+      if (!remove_dir(allocator, new_filepath.buf)) return false;
    }
 
    if (rmdir(oldpath) != 0) { // Lastly, remove the parent directory
@@ -370,16 +391,18 @@ bool move_directory_copy(Arena *arena, const char *oldpath, const char *newpath)
       return false;
    }
 
+   allocator.reset(proc_mem_usage);
    return true;
 }
 
 // Move direcotry and handle different filesystems.
 // The 'display_err' doesn't get inherit from other function calls. It only get's applied to 'rename' syscall
-bool move_directory(Arena *arena, const char *oldpath, const char *newpath, bool display_err = true) {
+bool move_directory(Allocator allocator, const char *oldpath, const char *newpath, bool display_err = true) {
    if (rename(oldpath, newpath) != 0) {
       if (errno != EXDEV) {
          if (display_err) {
-            report_error(arena, "failed to move '%' to '%'\n", oldpath, newpath);
+            fprintf(stderr, "failed to move '%s' to '%s'\n", oldpath, newpath);
+            fprintf(stderr, "[Error]: '%s'\n", strerror(errno));
             return false;
          }
          return false;
@@ -387,7 +410,7 @@ bool move_directory(Arena *arena, const char *oldpath, const char *newpath, bool
 
       auto dirstat = exists(oldpath);
       makedir(newpath, dirstat.perms);
-      return move_directory_copy(arena, oldpath, newpath);
+      return copy_move_directory(allocator, oldpath, newpath);
    }
 
    return true;

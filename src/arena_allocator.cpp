@@ -3,86 +3,129 @@
 
 #include <sys/mman.h>
 #include "types.cpp"
-#include "memory_pool.cpp"
+#include "allocator_interface.cpp"
 
 struct Arena {
-   void *buffer = NULL;
-   Arena *next = NULL;
+   void  *buf;
+   Arena *next;
 
-   uint pos = 0;
-   uint cap = 0;
+   uint cap;
+   uint pos;
 
-   void *alloc(int bytes);
-   void free_arena();
+   void *alloc(uint size, Allocator *context = NULL);
+   void reset(uint pos); // Only, set's the current allocator position to 'pos'
+   void arena_free();
+   Allocator  allocator();
 };
 
-static auto arena_pool = make_pool<Arena>(10);
+void *arena_alloc(void *context, uint size) {
+   auto arena = (Arena *)context;
+   return arena->alloc(size);
+}
 
-void *Arena::alloc(int bytes) {
-   if (pos+bytes <= cap) {
-      void *mem = (char *)buffer+pos;
-      pos += bytes;
+void *arena_alloc(void *context, uint size, Allocator *with_context = NULL) {
+   auto arena = (Arena *)context;
+   return arena->alloc(size, with_context);
+}
+
+void arena_arena_reset(void *context, uint pos) {
+   auto arena = (Arena *)context;
+   return arena->reset(pos);
+}
+
+void Arena::reset(uint pos) {
+   if (this->pos < pos) return;
+   else this->pos -= pos;
+}
+
+void Arena::arena_free() {
+   unmap(buf, cap);
+   auto *arena = next;
+   while (arena) { // @Leak: not free'ing the malloc'd 'Arena' strcut  :ArenaRemoveMalloc
+      unmap(arena->buf, arena->cap);
+      arena = arena->next;
+   }
+}
+
+Allocator Arena::allocator() {
+   Allocator ret = {};
+
+   ret.context  = this;
+   ret.fn_reset = arena_arena_reset;
+   ret.fn_alloc = arena_alloc;
+
+   ret.fn_alloc_with_context = arena_alloc;
+   return ret;
+}
+
+void *Arena::alloc(uint size, Allocator *context) {
+   if (pos+size <= cap) {
+      void *mem = (char *)buf+pos;
+      memset(mem, 0, size);
+      pos += size;
+
+      if (!context) return mem;
+
+      *context = this->allocator();
       return mem;
    }
 
    if (!next) {
-      int new_size = cap*2;
-      while (new_size < bytes) new_size *= 2;
+      uint new_size = cap * 4;
+      while (new_size < size) new_size *= 2;
       auto mem = allocate(new_size);
-      auto new_arena = arena_pool.create();
+      auto new_arena = (Arena *)xcalloc(1, sizeof(Arena)); // @Temporary: We should be using a memory-pool here, instead of calling mallo  :ArenaRemoveMalloc
 
-      new_arena.buffer = mem;
-      new_arena.cap = new_size;
-      new_arena.pos += bytes;
-      next = &new_arena;
+      new_arena->buf = mem;
+      new_arena->cap = new_size;
+      new_arena->pos += size;
+      next = new_arena;
+      if (!context) return mem;
+
+      *context = new_arena->allocator();
       return mem;
    }
 
    Arena *next_arena = next;
    while (true) {
       if (!next_arena->next) break;
-      if (next_arena->pos+bytes <= next_arena->cap) break;
+      if (next_arena->pos+size <= next_arena->cap) break;
       next_arena = next_arena->next;
    }
 
-   if (next_arena->pos+bytes > next_arena->cap) {
-      int new_size = next_arena->cap*2;
-      while (new_size < bytes) new_size *= 2;
+   if (next_arena->pos+size <= next_arena->cap) {
+      void *mem = (char *)next_arena->buf + next_arena->pos;
+      next_arena->pos += size;
+      memset(mem, 0, size);
 
-      auto mem = allocate(new_size);
-      auto new_arena = arena_pool.create();
-
-      new_arena.buffer = mem;
-      new_arena.pos += bytes;
-      new_arena.cap = new_size;
-
-      next_arena->next = &new_arena;
-      return mem;
-   } else {
-      void *mem = (char *)next_arena->buffer+next_arena->pos;
-      next_arena->pos += bytes;
+      if (!context) return mem;
+      *context = next_arena->allocator();
       return mem;
    }
+
+   uint new_size = next_arena->cap * 4;
+   while (new_size < size)
+      new_size *= 2;
+
+   auto mem = allocate(new_size);
+   auto new_arena = (Arena *)xcalloc(1, sizeof(Arena)); // :ArenaRemoveMalloc
+
+   new_arena->buf = mem;
+   new_arena->pos += size;
+   new_arena->cap = new_size;
+
+   next_arena->next = new_arena;
+   if (!context) return mem;
+
+   *context = new_arena->allocator();
+   return mem;
 }
 
-void Arena::free_arena() {
-   unmap(buffer, cap);
-   Arena *next_arena = next;
-   while (true) {
-      if (!next_arena) return;
-      unmap(next_arena->buffer, next_arena->cap);
-      next_arena = next_arena->next;
-   }
-
-   pool_free(&arena_pool);
-}
-
-Arena make_arena(int size) {
-   Arena ret;
-   int page_align = page_size;
-   while (page_align < size) page_align *= 2;
-   ret.buffer = allocate(page_align);
-   ret.cap = page_align;
+Arena make_arena(uint size) {
+   Arena ret = {};
+   auto new_size = page_align(size);
+   ret.buf = allocate(new_size);
+   ret.cap = new_size;
    return ret;
 }
 

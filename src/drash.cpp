@@ -179,10 +179,10 @@ void Drash::list_files(Allocator allocator) {
 
    auto dir = open_dir(metadata.buf);
    printf("\nDrash'd Files:\n\n");
-   uint mem_usage = 0;
 
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd)) != NULL) {
+      uint mem_usage = 0;
 
       // We can't simply compare the first character of 'd_name' because if a file starts with a '.' then it gets skipped.
       // That's because 'd_name[256]' holds every file names with some sort-of padding between them.

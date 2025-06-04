@@ -74,9 +74,10 @@ int main(int argc, char *argv[]) {
       } else fprintf(lastfile.fd, "%s", current_file.buf);
    }
 
-   uint mem_usage = 0; // :MemoryUsage Reset the allocated memory for each iteration of the loop
 
    for (int i = 0; i < argc; i++) {
+      uint mem_usage = 0; // :MemoryUsage Reset the allocated memory for each iteration of the loop
+
       const char *arg = argv[i];
       auto filestat = exists(arg);
 

@@ -49,12 +49,13 @@ void Arena::arena_free() {
 
 Allocator Arena::allocator() {
    Allocator ret = {};
+   auto vtable = (Allocator::Vtable *)alloc(sizeof(Allocator::Vtable));
 
    ret.context  = this;
-   ret.fn_reset = arena_arena_reset;
-   ret.fn_alloc = arena_alloc;
-
-   ret.fn_alloc_with_context = arena_alloc;
+   ret.vtable = vtable;
+   vtable->fn_reset = arena_arena_reset;
+   vtable->fn_alloc = arena_alloc;
+   vtable->fn_alloc_with_context = arena_alloc;
    return ret;
 }
 

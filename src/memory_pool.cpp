@@ -1,35 +1,17 @@
 #ifndef MEM_POOL
 #define MEM_POOL
 
-#include "types.cpp"
+#include "allocator_interface.cpp"
 
 template<typename T>
 struct Pool { // @Temporary: For now, it only creates the objects and doesn't free them
    T  *ptr = NULL;
+   Allocator allocator;
+
    u16 pos = 0;
    u16 cap = 0;
 
-   enum Alloc_Type {
-      MALLOC,
-      ARENA,
-   };
-
-   Alloc_Type type = MALLOC;
-
    T create() {
-      if (pos >= cap) {
-         assert(type == ARENA, "can't grow the memory pool with arena (TODO)");
-
-         if (type == MALLOC) {
-            u16 new_size = cap*2;
-            auto mem = (T *)xcalloc(cap*2, sizeof(T));
-            memcpy(mem, ptr, cap*sizeof(T));
-            free(ptr);
-            ptr = mem;
-            cap = new_size;
-         }
-      }
-
       auto ret = ptr[pos*sizeof(T)];
       pos += 1;
       return ret;

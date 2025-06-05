@@ -64,8 +64,8 @@ bool Directory::is_empty() {
    return false;
 }
 
-File open_file(const char *file_path, const char *modes) {
-   FILE *file = fopen(file_path, modes);
+File open_file(const char *file_path, const char *mode) {
+   FILE *file = fopen(file_path, mode);
 
    if (file == NULL) {
       fprintf(stderr, "failed to open file: %s\n", file_path);
@@ -126,6 +126,7 @@ bool is_dir(const char *path) {
 bool remove_file(const char *path) {
    if (unlink(path) != 0) {
       fprintf(stderr, "failed to remove file '%s'\n", path);
+      fprintf(stderr, "- '%s'\n", strerror(errno));
       return false;
    }
 

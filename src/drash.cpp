@@ -255,6 +255,10 @@ void Drash::restore(Allocator allocator, const int argc, char **argv) {
 
       auto file = open_file(last.buf, "r");
       auto filename = file.read_into_string(allocator);
+      {
+         auto filelen = filename.len();
+         if (filename[filelen-1] == '/') filename.remove(filelen - 1);
+      }
 
       auto info_path = format_string(allocator, "%/%.info", metadata.buf, filename.buf);
       auto file_info = open_file(info_path.buf, "r");
@@ -363,6 +367,7 @@ void Drash::restore(Allocator allocator, const int argc, char **argv) {
             }
 
             fprintf(stderr, "[Error]: Failed to restore '%s'\n", file);
+            fprintf(stderr, "- '%s'\n", strerror(errno));
             continue;
          }
       } else if (!move_file(allocator, drashpath.buf, info.path.buf, false)) {
@@ -373,10 +378,23 @@ void Drash::restore(Allocator allocator, const int argc, char **argv) {
          }
 
          fprintf(stderr, "[Error]: Failed to restore '%s'\n", file);
+         fprintf(stderr, "- '%s'\n", strerror(errno));
          continue;
       }
 
       remove_file(path.buf);
+
+      auto filename = file_basename(allocator, file);
+      auto lastfile_path = format_string(allocator, "%/last", metadata.buf);
+      auto lastfile_info = exists(lastfile_path.buf);
+      if (!lastfile_info.found) return;
+
+      auto lastfile = open_file(lastfile_path.buf, "r");
+      auto lastfile_name = lastfile.read_into_string(allocator);
+      auto filelen = lastfile_name.len();
+      if (lastfile_name[filelen-1] == '/') lastfile_name.remove(filelen - 1);
+
+      if (match_string(&lastfile_name, &filename)) remove_file(lastfile_path.buf);
    }
 }
 

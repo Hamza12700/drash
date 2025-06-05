@@ -1,9 +1,9 @@
 cc=g++
 
 debug: src/main.cpp
-	$(cc) -D"DEBUG" -fno-exceptions -fno-rtti -Werror=format-security -Wall -Wextra -Wstrict-overflow -Wformat -Wswitch -g src/main.cpp -o ./build/debug
+	$(cc) -D"DEBUG" -fno-exceptions -fno-rtti -Werror=format-security -Wall -Wextra -Wformat -Wswitch -g src/main.cpp -o ./build/debug
 	cp build/debug ~/.local/bin/debug-drash
 
 opt: src/main.cpp
-	$(cc) -fno-delete-null-pointer-checks -fno-exceptions -fno-rtti -O2 -static src/main.cpp -o ./build/drash
+	$(cc) -fno-delete-null-pointer-checks -Wno-stringop-overflow -fno-exceptions -fno-rtti -O2 -static src/main.cpp -o ./build/drash
 	cp build/drash ~/.local/bin

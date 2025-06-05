@@ -5,16 +5,6 @@
 
 #include "allocator_interface.cpp"
 
-bool match_string(const char *one, const char *two) {
-   int onelen = strlen(one);
-   int twolen = strlen(two);
-   if (onelen != twolen) return false;
-
-   for (int i = 0; i < onelen; i++)
-      if (one[i] != two[i]) return false;
-   return true;
-}
-
 // Dynamically growable String
 struct New_String {
    char *buf = NULL;
@@ -36,6 +26,25 @@ private:
    void alloc_grow();
    void alloc_grow(int size);
 };
+
+bool match_string(New_String *a, New_String *b) {
+   if (a->len() != b->len()) return false;
+
+   for (int i = 0; i < a->cap; i++)
+      if ((*a)[i] != (*b)[i]) return false;
+   return true;
+}
+
+bool match_string(const char *one, const char *two) {
+   int onelen = strlen(one);
+   int twolen = strlen(two);
+   if (onelen != twolen) return false;
+
+   for (int i = 0; i < onelen; i++)
+      if (one[i] != two[i]) return false;
+   return true;
+}
+
 
 void New_String::alloc_grow() {
    int new_size = cap*2;

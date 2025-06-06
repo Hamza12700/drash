@@ -16,6 +16,7 @@ struct File {
 
    // Read the entire contents of the file into a string.
    New_String read_into_string(Allocator allocator);
+   Temp_String read_into_tstring(Allocator allocator);
 };
 
 File::~File() {
@@ -34,6 +35,13 @@ long File::file_length() {
 New_String File::read_into_string(Allocator allocator) {
    const int filelen = file_length();
    auto buf = alloc_string(allocator, filelen);
+   fread(buf.buf, 1, filelen, fd);
+   return buf;
+}
+
+Temp_String File::read_into_tstring(Allocator allocator) {
+   const int filelen = file_length();
+   auto buf = temp_string(allocator, filelen);
    fread(buf.buf, 1, filelen, fd);
    return buf;
 }
@@ -136,18 +144,10 @@ bool remove_file(const char *path) {
 // Copies the (oldpath) file to file (newpath) and removes the oldpath
 bool copy_move_file(Allocator allocator, const char *oldpath, const char *newpath) {
    auto file = open_file(oldpath, "rb");
-   auto file_content = file.read_into_string(allocator);
+   auto file_content = file.read_into_tstring(allocator);
 
    auto newfile = open_file(newpath, "wb");
    write(fileno(newfile.fd), file_content.buf, file_content.cap);
-
-   // @NOTE:
-   //
-   // We don't want to reset the allocator itself, instead we want to reset the allocator that is stored in the New_String.
-   // That's because the string could ask for memory that can't be fit in the passed allocator argument, in that case
-   // the allocator would allocate memory and store a pointer to the next allocated memory and its context.
-
-   file_content.allocator.reset(file_content.cap);
    return remove_file(oldpath);
 }
 
@@ -299,31 +299,24 @@ bool remove_files(Allocator allocator, const char *dirpath) {
 bool remove_dir(Allocator allocator, const char *dirpath) {
    auto dir = open_dir(dirpath);
 
-   // :MemoryUsage
-   //
-   // This routine recursively remove files and directories and allocates memory for those filepaths,
-   // to avoid using alot of memory, we keep track of the total memory allocations and at the end of the each recursive-call
-   // we mark the allocated memory as free.
-   uint proc_mem_usage = 0;
-
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-
-      auto fullpath = format_string(allocator, "%/%", (char *)dirpath, rdir->d_name);
-      proc_mem_usage += fullpath.cap;
+      auto fullpath = tprint(allocator, "%/%", (char *)dirpath, rdir->d_name);
 
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
-      } else if (!remove_dir(allocator, fullpath.buf)) return false;
+         continue;
+      }
+
+      if (!remove_dir(allocator, fullpath.buf)) return false;
    }
 
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string(allocator, "%/%", (char *)dirpath, rdir->d_name);
-      proc_mem_usage += fullpath.cap;
+      auto fullpath = tprint(allocator, "%/%", (char *)dirpath, rdir->d_name);
 
       if (rmdir(fullpath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -334,33 +327,24 @@ bool remove_dir(Allocator allocator, const char *dirpath) {
       if (!remove_dir(allocator, fullpath.buf)) return false;
    }
 
-   if (rmdir(dirpath) != 0) { // Lastly, remove the parent directory
+   if (rmdir(dirpath) != 0) { // Lastly, remove the directory itself
       fprintf(stderr, "failed to remove directory\n");
       perror("rmdir -");
       return false;
    }
 
-   allocator.reset(proc_mem_usage);
    return true;
 }
 
 bool copy_move_directory(Allocator allocator, const char *oldpath, const char *newpath) {
    auto dir = open_dir(oldpath);
 
-   // :MemoryUsage
-   //
-   // This routine recursively remove files and directories by copying them and that takes alot of memory,
-   // to avoid using alot of memory, we keep track of the total memory allocations and at the end of the each recursive-call
-   // we mark the allocated memory as free.
-   uint proc_mem_usage = 0;
-
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto old_filepath = format_string(allocator, "%/%", (char *)oldpath, rdir->d_name);
-      auto new_filepath = format_string(allocator, "%/%", (char *)newpath, rdir->d_name);
-      proc_mem_usage += old_filepath.cap + new_filepath.cap;
+      auto old_filepath = tprint(allocator, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = tprint(allocator, "%/%", (char *)newpath, rdir->d_name);
       auto filestat = exists(old_filepath.buf);
 
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
@@ -374,8 +358,7 @@ bool copy_move_directory(Allocator allocator, const char *oldpath, const char *n
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto new_filepath = format_string(allocator, "%/%", (char *)oldpath, rdir->d_name);
-      proc_mem_usage += new_filepath.cap;
+      auto new_filepath = tprint(allocator, "%/%", (char *)oldpath, rdir->d_name);
 
       if (rmdir(new_filepath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -392,7 +375,6 @@ bool copy_move_directory(Allocator allocator, const char *oldpath, const char *n
       return false;
    }
 
-   allocator.reset(proc_mem_usage);
    return true;
 }
 

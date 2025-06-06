@@ -2,7 +2,6 @@
 #define ARENA_ALLOC
 
 #include <sys/mman.h>
-#include "types.cpp"
 #include "allocator_interface.cpp"
 
 struct Arena {
@@ -13,7 +12,7 @@ struct Arena {
    uint pos;
 
    void *alloc(uint size, Allocator *context = NULL);
-   void reset(uint pos); // Only, set's the current allocator position to 'pos'
+   void reset(uint pos); // Set's the allocator position and memset
    void arena_free();
    Allocator  allocator();
 };
@@ -36,6 +35,7 @@ void arena_arena_reset(void *context, uint pos) {
 void Arena::reset(uint pos) {
    if (this->pos < pos) return;
    else this->pos -= pos;
+   memset((char *)buf+this->pos, 0, pos);
 }
 
 void Arena::arena_free() {
@@ -62,7 +62,6 @@ Allocator Arena::allocator() {
 void *Arena::alloc(uint size, Allocator *context) {
    if (pos+size <= cap) {
       void *mem = (char *)buf+pos;
-      memset(mem, 0, size);
       pos += size;
 
       if (!context) return mem;
@@ -73,7 +72,7 @@ void *Arena::alloc(uint size, Allocator *context) {
 
    if (!next) {
       uint new_size = cap * 4;
-      while (new_size < size) new_size *= 2;
+      while (new_size < size) new_size *= 4;
       auto mem = allocate(new_size);
       auto new_arena = (Arena *)xcalloc(1, sizeof(Arena)); // @Temporary: We should be using a memory-pool here, instead of calling mallo  :ArenaRemoveMalloc
 
@@ -89,24 +88,23 @@ void *Arena::alloc(uint size, Allocator *context) {
 
    Arena *next_arena = next;
    while (true) {
+
+      if (next_arena->pos+size <= next_arena->cap) {
+         void *mem = (char *)next_arena->buf + next_arena->pos;
+         next_arena->pos += size;
+
+         if (!context) return mem;
+         *context = next_arena->allocator();
+         return mem;
+      }
+
       if (!next_arena->next) break;
-      if (next_arena->pos+size <= next_arena->cap) break;
       next_arena = next_arena->next;
-   }
-
-   if (next_arena->pos+size <= next_arena->cap) {
-      void *mem = (char *)next_arena->buf + next_arena->pos;
-      next_arena->pos += size;
-      memset(mem, 0, size);
-
-      if (!context) return mem;
-      *context = next_arena->allocator();
-      return mem;
    }
 
    uint new_size = next_arena->cap * 4;
    while (new_size < size)
-      new_size *= 2;
+      new_size *= 4;
 
    auto mem = allocate(new_size);
    auto new_arena = (Arena *)xcalloc(1, sizeof(Arena)); // :ArenaRemoveMalloc

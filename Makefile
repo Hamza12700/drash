@@ -5,5 +5,5 @@ debug: src/main.cpp
 	cp build/debug ~/.local/bin/debug-drash
 
 opt: src/main.cpp
-	$(cc) -fno-delete-null-pointer-checks -Wno-stringop-overflow -fno-exceptions -fno-rtti -O2 -static src/main.cpp -o ./build/drash
+	$(cc) -g -fno-delete-null-pointer-checks -Wno-stringop-overflow -fno-exceptions -fno-rtti -O2 -static src/main.cpp -o ./build/drash
 	cp build/drash ~/.local/bin

@@ -159,55 +159,6 @@ New_String alloc_string(Allocator allocator, const char *str) {
    return ret;
 }
 
-struct Temp_String : public New_String { // "Inheritance for the WIN" in sarcasm qoutes
-   ~Temp_String() {
-      allocator.reset(cap);
-   };
-};
-
-Temp_String temp_string(Allocator allocator, uint size) {
-   Temp_String ret = {};
-   Allocator context = {};
-
-   ret.buf = (char *)allocator.alloc(size+1, &context);
-   ret.cap = size+1;
-   ret.allocator = context;
-   return ret;
-}
-
-template<typename ...Args>
-Temp_String tprint(Allocator allocator, const char *fmt, const Args ...args) {
-   const auto arg_list = { args... };
-   const int format_len = strlen(fmt);
-   int total_size = 0;
-
-   for (const auto arg : arg_list)
-      total_size += strlen(arg);
-
-   auto buffer = temp_string(allocator, format_len + total_size);
-
-   uint arg_idx = 0;
-   int filled_buffer = 0;
-
-   for (int i = 0; i < format_len; i++) {
-      if (fmt[i] == '%') {
-         if (arg_idx < arg_list.size()) {
-            auto arg = *(std::next(arg_list.begin(), arg_idx++));
-            filled_buffer += buffer.concat(arg);
-            continue;
-         }
-
-         fprintf(stderr, "tprint - not enough arguments provided for format string");
-         abort();
-      }
-
-      buffer[filled_buffer] = fmt[i];
-      filled_buffer += 1;
-   }
-
-   return buffer;
-}
-
 template<typename ...Args>
 New_String format_string(Allocator allocator, const char *fmt_string, const Args ...args) {
    const auto arg_list = { args... };

@@ -4,17 +4,32 @@
 #include <sys/mman.h>
 #include "allocator_interface.cpp"
 
+struct Arena_Checkpoint {
+  // Because, every arena is 4x times bigger in size of its parent arena,
+  // we can simply check if the capacity of the arena matches and because the
+  // linked-list of arena's is in ascending order if can simply traverse the list to find the match.
+
+  uint cap;
+  uint mark;
+};
+
 struct Arena {
    void  *buf;
    Arena *next;
+   Arena *prev;
+   Arena *last; // The last one to allocate memory. If null then the last one is the current arena
 
    uint cap;
    uint pos;
 
+   Arena_Checkpoint checkpoint();
+   void restore(Arena_Checkpoint checkpoint); // Sets the position to checkpoint.
+
    void *alloc(uint size, Allocator *context = NULL);
-   void reset(uint pos); // Set's the allocator position and memset
    void arena_free();
-   Allocator  allocator();
+
+   // @Cleanup: I don't think that the 'Allocator Vtable' needs to live in the arena memory because it's small enough to fit in the stack-space.
+   Allocator  allocator(); // This creates the 'Allocator Vtable' struct in the arena memory
 };
 
 void *arena_alloc(void *context, uint size) {
@@ -27,15 +42,47 @@ void *arena_alloc(void *context, uint size, Allocator *with_context = NULL) {
    return arena->alloc(size, with_context);
 }
 
-void arena_arena_reset(void *context, uint pos) {
-   auto arena = (Arena *)context;
-   return arena->reset(pos);
+Arena_Checkpoint Arena::checkpoint() {
+   Arena_Checkpoint checkpoint;
+   if (last) {
+      checkpoint.cap = last->cap;
+      checkpoint.mark = last->pos;
+   } else {
+      checkpoint.cap = cap;
+      checkpoint.mark = pos;
+   }
+
+   return checkpoint;
 }
 
-void Arena::reset(uint pos) {
-   if (this->pos < pos) return;
-   else this->pos -= pos;
-   memset((char *)buf+this->pos, 0, pos);
+void Arena::restore(Arena_Checkpoint checkpoint) {
+   if (!last) {
+      memset((char *)buf+checkpoint.mark, 0, pos-checkpoint.mark);
+      pos = checkpoint.mark;
+      return;
+   }
+
+   if (checkpoint.cap == last->cap) {
+      memset((char *)last->buf+checkpoint.mark, 0, last->pos-checkpoint.mark);
+      last->pos = checkpoint.mark;
+      return;
+   }
+
+   auto arena = last;
+   while (true) {
+      if (arena->cap > checkpoint.cap) arena = arena->prev;
+      else if (arena->cap < checkpoint.cap) arena = arena->next;
+
+      // @Cleanup:
+      // For now, we only reset the position of the matched arena but this is
+      // wrong if the arena allocated a new arena before the checkpoint then the
+      // newly created arena and beyond that should get reset to zero. :ArenaMemory
+      else if (arena->cap == checkpoint.cap) {
+         memset((char *)arena->buf+checkpoint.mark, 0, arena->pos-checkpoint.mark);
+         arena->pos = checkpoint.mark;
+         return;
+      }
+   }
 }
 
 void Arena::arena_free() {
@@ -53,7 +100,6 @@ Allocator Arena::allocator() {
 
    ret.context  = this;
    ret.vtable = vtable;
-   vtable->fn_reset = arena_arena_reset;
    vtable->fn_alloc = arena_alloc;
    vtable->fn_alloc_with_context = arena_alloc;
    return ret;
@@ -79,7 +125,10 @@ void *Arena::alloc(uint size, Allocator *context) {
       new_arena->buf = mem;
       new_arena->cap = new_size;
       new_arena->pos += size;
+      new_arena->prev = this;
       next = new_arena;
+      last = new_arena;
+
       if (!context) return mem;
 
       *context = new_arena->allocator();
@@ -93,6 +142,7 @@ void *Arena::alloc(uint size, Allocator *context) {
          void *mem = (char *)next_arena->buf + next_arena->pos;
          next_arena->pos += size;
 
+         last = next_arena;
          if (!context) return mem;
          *context = next_arena->allocator();
          return mem;
@@ -112,8 +162,10 @@ void *Arena::alloc(uint size, Allocator *context) {
    new_arena->buf = mem;
    new_arena->pos += size;
    new_arena->cap = new_size;
-
+   new_arena->prev = this;
+   last = new_arena;
    next_arena->next = new_arena;
+
    if (!context) return mem;
 
    *context = new_arena->allocator();

@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 
    // Handle option arguments
    if (argv[0][0] == '-') {
-      handle_opts(arena_alloc, argv, argc);
+      handle_opts(&arena, argv, argc);
       return 0;
    }
 
@@ -30,11 +30,13 @@ int main(int argc, char *argv[]) {
    if (!filestat.found) {
       for (auto cmd : commands) {
          if (match_string(argv[0], cmd.name)) {
-            handle_commands(argv, argc, &drash, arena_alloc);
+            handle_commands(argv, argc, &drash, &arena);
             return 0;
          }
       }
    }
+
+   auto checkpoint = arena.checkpoint();
 
    // Save the last filename
    const char *file = argv[argc-1];
@@ -49,7 +51,7 @@ int main(int argc, char *argv[]) {
    } else if (!ex_res.found) {
       for (auto cmd : commands) {
          if (match_string(file, cmd.name)) {
-            handle_commands(argv, argc, &drash, arena_alloc);
+            handle_commands(argv, argc, &drash, &arena);
             return 0;
          }
       }
@@ -76,8 +78,6 @@ int main(int argc, char *argv[]) {
 
 
    for (int i = 0; i < argc; i++) {
-      uint mem_usage = 0; // :MemoryUsage Reset the allocated memory for each iteration of the loop
-
       const char *arg = argv[i];
       auto filestat = exists(arg);
 
@@ -102,7 +102,6 @@ int main(int argc, char *argv[]) {
       auto path = alloc_string(arena_alloc, arg);
       auto filename = file_basename(arena_alloc, &path);
       auto metadata_path = format_string(arena_alloc, "%/%.info", drash.metadata.buf, filename.buf);
-      mem_usage += (path.cap + filename.cap + metadata_path.cap);
 
       ex_res = exists(metadata_path.buf);
       if (ex_res.found) {
@@ -124,11 +123,10 @@ int main(int argc, char *argv[]) {
       fprintf(file_info.fd, "Path: %s/%s\nType: %s\n", current_dir, path.buf, type);
 
       auto drash_file = format_string(arena_alloc, "%/%", drash.files.buf, filename.buf);
-      mem_usage += drash_file.cap;
 
-      if (filestat.type == ft_dir) move_directory(arena_alloc, arg, drash_file.buf);
-      else move_file(arena_alloc, arg, drash_file.buf);
-      arena_alloc.reset(mem_usage);
+      if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);
+      else move_file(&arena, arg, drash_file.buf);
+      arena.restore(checkpoint);
    }
 
    arena.arena_free();

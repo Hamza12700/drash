@@ -48,7 +48,7 @@ bool match_string(const char *one, const char *two) {
 
 void New_String::alloc_grow() {
    int new_size = cap*2;
-   auto new_buffer = arena->alloc(new_size, NULL);
+   auto new_buffer = arena->alloc(new_size);
    memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
    cap = new_size;
@@ -57,7 +57,7 @@ void New_String::alloc_grow() {
 
 void New_String::alloc_grow(int size) {
    assert(size < cap, "(new_string) - new-size is less than to string capacity");
-   auto new_buffer = arena->alloc(size, NULL);
+   auto new_buffer = arena->alloc(size);
    memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
    cap = size;

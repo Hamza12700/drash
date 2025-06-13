@@ -1,0 +1,37 @@
+The 'Allocator' interface struct has a 'void *context' which is used to get the context
+about the underlying allocator. And a 'Vtable' which holds the pointers to functions of
+the allocator. Those functions takes the 'context' and cast to the correct allocator type.
+
+The problem that I'm having with this interface is that how do I get information about the
+allocator? Currently, I'm trying to reduce the memory usage because there isn't a good way
+of resetting the allocator in a state that doesn't break other allocated-space. Because of
+this there is a lot of wasted space that never gets used.
+
+I could bloat the 'Allocator' interface to have more functions for specific tasks like the
+one mentioned above but that would make it every annoying to implement those functions for
+an allocator that don't need those things. So, the one obvious solution is to have
+explicit allocator function argument, if the function wants to do something specific to
+that allocator then it can do so and other functions that expects the 'Allocator'
+interface then the explicit allocator should be able to create the allocator interface and
+pass to functions which requires the 'Allocator' interface.
+
+Personally, I like passing allocators explicitly, because that gives me more context
+about the function, like: how it's allocating and what kind-of allocator is it using.
+Because you can imagine running into a situation where you are deep in the function calls
+and you wanna know what allocator this routine is using but you don't have this
+information because all you have is a vague allocator-interface. This makes debugging
+harder because you have you to know what was the allocator that produce the interface.
+Not to mentioned that you can cast the 'context' into the wrong allocator type and that
+would give you incorrect values.
+
+Alright now, How do I implement a 'reset' function for an 'Arena' allocator which
+holds pointers to other Arena's? Because you can't simply just set the position of the
+arena, you also needs to take care of other arena's. If the requested memory can't fit in
+the current arena then it will allocate a memory buffer large enough to hold the requested
+memory and create a new arena which holds the information about that memory. Because of
+this complication you can't simply reset the current arena, you need a way to tell if the
+next arena have to reset its position or not. One solution to this problem is that when
+you allocate something, that 'allocate' function will set a bitflag in the arena in which
+the allocation was done so that later when we wanna reset the allocator we simply look at
+the which arena has the bitflag set from the last allocations and reset that and do same
+for other arena's.

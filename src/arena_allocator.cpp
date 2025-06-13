@@ -5,7 +5,7 @@
 #include "types.cpp"
 
 struct Arena_Checkpoint {
-  // Because, every arena is 4x times bigger in size of its parent arena,
+  // Because, every arena is bigger in size of its parent arena,
   // we can simply check if the capacity of the arena matches and because the
   // linked-list of arena's is in ascending order if can simply traverse the list to find the match.
 
@@ -23,9 +23,9 @@ struct Arena {
    uint pos;
 
    Arena_Checkpoint checkpoint();
-   void restore(Arena_Checkpoint checkpoint); // Sets the position to checkpoint.
+   void restore(Arena_Checkpoint checkpoint);
 
-   void *alloc(uint size, Arena *context = NULL);
+   void *alloc(long size);
    void arena_free();
 };
 
@@ -81,14 +81,11 @@ void Arena::arena_free() {
    }
 }
 
-void *Arena::alloc(uint size, Arena *context) {
+void *Arena::alloc(long size) {
    if (pos+size <= cap) {
       void *mem = (char *)buf+pos;
       pos += size;
 
-      if (!context) return mem;
-
-      context = this;
       return mem;
    }
 
@@ -105,9 +102,6 @@ void *Arena::alloc(uint size, Arena *context) {
       next = new_arena;
       last = new_arena;
 
-      if (!context) return mem;
-
-      context = new_arena;
       return mem;
    }
 
@@ -118,8 +112,6 @@ void *Arena::alloc(uint size, Arena *context) {
          next_arena->pos += size;
 
          last = next_arena;
-         if (!context) return mem;
-         context = next_arena;
          return mem;
       }
 
@@ -141,9 +133,6 @@ void *Arena::alloc(uint size, Arena *context) {
    last = new_arena;
    next_arena->next = new_arena;
 
-   if (!context) return mem;
-
-   context = new_arena;
    return mem;
 }
 

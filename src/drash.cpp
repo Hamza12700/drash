@@ -7,8 +7,8 @@
 #define DIR_PERM 0740
 
 struct Drash_Info {
-   New_String path = {};
-   File_Type type = ft_unknown;
+   New_String path;
+   File_Type type;
 };
 
 struct Drash {

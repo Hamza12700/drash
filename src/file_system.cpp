@@ -16,7 +16,7 @@ struct File {
    long file_length();
 
    // Read the entire contents of the file into a string.
-   New_String read_into_string(Allocator allocator);
+   New_String read_into_string(Arena *arena);
 };
 
 File::~File() {
@@ -32,9 +32,9 @@ long File::file_length() {
    return file_size;
 }
 
-New_String File::read_into_string(Allocator allocator) {
+New_String File::read_into_string(Arena *arena) {
    const int filelen = file_length();
-   auto buf = alloc_string(allocator, filelen);
+   auto buf = alloc_string(arena, filelen);
    fread(buf.buf, 1, filelen, fd);
    return buf;
 }
@@ -138,9 +138,7 @@ bool remove_file(const char *path) {
 bool copy_move_file(Arena *arena, const char *oldpath, const char *newpath) {
    auto file = open_file(oldpath, "rb");
    auto checkpoint = arena->checkpoint();
-   auto alloc = arena->allocator();
-
-   auto file_content = file.read_into_string(alloc);
+   auto file_content = file.read_into_string(arena);
 
    auto newfile = open_file(newpath, "wb");
    write(fileno(newfile.fd), file_content.buf, file_content.cap);
@@ -166,7 +164,7 @@ bool move_file(Arena *arena, const char *oldpath, const char *newpath, bool disp
    return true;
 }
 
-New_String file_basename(Allocator allocator, New_String *path) {
+New_String file_basename(Arena *arena, New_String *path) {
    const int pathlen = path->len();
 
    if ((*path)[pathlen-1] == '/') {
@@ -183,7 +181,7 @@ New_String file_basename(Allocator allocator, New_String *path) {
 
    if (!contain_slash) return *path;
 
-   auto buffer = alloc_string(allocator, pathlen+1);
+   auto buffer = alloc_string(arena, pathlen+1);
    int file_idx = 0;
 
    for (int i = strlen(path->buf); (*path)[i] != '/'; i--) {
@@ -196,12 +194,12 @@ New_String file_basename(Allocator allocator, New_String *path) {
    return buffer;
 }
 
-New_String file_basename(Allocator allocator, const char *path) {
+New_String file_basename(Arena *arena, const char *path) {
    New_String tmp = {};
    tmp.buf = (char *)path;
    tmp.cap = strlen(path)+1;
-   tmp.allocator = allocator;
-   return file_basename(allocator, &tmp);
+   tmp.arena = arena;
+   return file_basename(arena, &tmp);
 }
 
 Directory open_dir(const char *dir_path) {
@@ -280,14 +278,13 @@ bool makedir(const char *dirpath, uint modes, bool panic = true) {
 // Remove all files inside a directory
 bool remove_files(Arena *arena, const char *dirpath) {
    auto checkpoint = arena->checkpoint();
-   auto alloc = arena->allocator();
    auto dir = open_dir(dirpath);
 
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto fullpath = format_string(alloc, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
          if (!remove_file(fullpath.buf)) return false;
@@ -301,12 +298,11 @@ bool remove_files(Arena *arena, const char *dirpath) {
 bool remove_dir(Arena *arena, const char *dirpath) {
    auto dir = open_dir(dirpath);
    auto checkpoint = arena->checkpoint();
-   auto alloc = arena->allocator();
 
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string(alloc, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
 
       auto filestat = exists(fullpath.buf);
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
@@ -320,7 +316,7 @@ bool remove_dir(Arena *arena, const char *dirpath) {
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto fullpath = format_string(alloc, "%/%", (char *)dirpath, rdir->d_name);
+      auto fullpath = format_string(arena, "%/%", (char *)dirpath, rdir->d_name);
 
       if (rmdir(fullpath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -343,14 +339,14 @@ bool remove_dir(Arena *arena, const char *dirpath) {
 
 bool copy_move_directory(Arena *arena, const char *oldpath, const char *newpath) {
    auto dir = open_dir(oldpath);
-   auto alloc = arena->allocator();
+   auto checkpoint = arena->checkpoint();
 
    struct dirent *rdir;
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
 
-      auto old_filepath = format_string(alloc, "%/%", (char *)oldpath, rdir->d_name);
-      auto new_filepath = format_string(alloc, "%/%", (char *)newpath, rdir->d_name);
+      auto old_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = format_string(arena, "%/%", (char *)newpath, rdir->d_name);
       auto filestat = exists(old_filepath.buf);
 
       if (filestat.type == ft_file || filestat.type == ft_lnk) {
@@ -364,7 +360,7 @@ bool copy_move_directory(Arena *arena, const char *oldpath, const char *newpath)
    rewinddir(dir.fd);
    while ((rdir = readdir(dir.fd))) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
-      auto new_filepath = format_string(alloc, "%/%", (char *)oldpath, rdir->d_name);
+      auto new_filepath = format_string(arena, "%/%", (char *)oldpath, rdir->d_name);
 
       if (rmdir(new_filepath.buf) != 0) {
          fprintf(stderr, "failed to remove directory\n");
@@ -381,6 +377,7 @@ bool copy_move_directory(Arena *arena, const char *oldpath, const char *newpath)
       return false;
    }
 
+   arena->restore(checkpoint);
    return true;
 }
 

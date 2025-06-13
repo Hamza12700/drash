@@ -3,13 +3,13 @@
 
 #include <iterator> // Can't remove this, because we are using variadic arguments in templates that gets turned into a list or whatever
 
-#include "allocator_interface.cpp"
+#include "arena_allocator.cpp"
 
 // Dynamically growable String
 struct New_String {
-   char *buf = NULL;
-   Allocator allocator;
-   int cap = 0;
+   char  *buf;
+   Arena *arena;
+   int    cap;
 
    int len();
    int concat(const char *str);
@@ -48,7 +48,7 @@ bool match_string(const char *one, const char *two) {
 
 void New_String::alloc_grow() {
    int new_size = cap*2;
-   auto new_buffer = allocator.alloc(new_size, NULL);
+   auto new_buffer = arena->alloc(new_size, NULL);
    memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
    cap = new_size;
@@ -57,7 +57,7 @@ void New_String::alloc_grow() {
 
 void New_String::alloc_grow(int size) {
    assert(size < cap, "(new_string) - new-size is less than to string capacity");
-   auto new_buffer = allocator.alloc(size, NULL);
+   auto new_buffer = arena->alloc(size, NULL);
    memcpy(new_buffer, buf, cap);
    buf = (char *)new_buffer;
    cap = size;
@@ -137,30 +137,27 @@ New_String alloc_string(void *buffer, int size) {
    return ret;
 }
 
-New_String alloc_string(Allocator allocator, uint size) {
-   New_String ret;
-   Allocator context = {};
-
-   ret.buf = (char *)allocator.alloc(size+1, &context);
+New_String alloc_string(Arena *arena, int size) {
+   New_String ret = {};
+   ret.buf = (char *)arena->alloc(size+1);
    ret.cap = size+1;
-   ret.allocator = context;
+   ret.arena = arena;
    return ret;
 }
 
-New_String alloc_string(Allocator allocator, const char *str) {
+New_String alloc_string(Arena *arena, const char *str) {
    New_String ret;
    uint size = strlen(str)+1;
-   Allocator context = {};
 
-   ret.buf = (char *)allocator.alloc(size, &context);
+   ret.buf = (char *)arena->alloc(size);
    ret.cap = size;
-   ret.allocator = context;
+   ret.arena = arena;
    ret.assign_string(str);
    return ret;
 }
 
 template<typename ...Args>
-New_String format_string(Allocator allocator, const char *fmt_string, const Args ...args) {
+New_String format_string(Arena *arena, const char *fmt_string, const Args ...args) {
    const auto arg_list = { args... };
    const int format_len = strlen(fmt_string);
    int total_size = 0;
@@ -168,7 +165,7 @@ New_String format_string(Allocator allocator, const char *fmt_string, const Args
    for (const auto arg : arg_list)
       total_size += strlen(arg);
 
-   auto dyn_string = alloc_string(allocator, format_len + total_size);
+   auto dyn_string = alloc_string(arena, format_len + total_size);
    uint arg_idx = 0;
    int filled_buffer = 0;
 
@@ -250,8 +247,8 @@ void format_string(New_String *buffer, const char *fmt_string, const Args ...arg
 }
 
 template<typename ...Args>
-void fatal_error(Allocator allocator, const char *fmt, Args ...args) {
-   auto err = format_string(allocator, fmt, args...);
+void fatal_error(Arena *arena, const char *fmt, Args ...args) {
+   auto err = format_string(arena, fmt, args...);
 
    fprintf(stderr, "[ERROR]: %s\n", err.buf);
    fprintf(stderr, "- %s\n", strerror(errno));
@@ -259,8 +256,8 @@ void fatal_error(Allocator allocator, const char *fmt, Args ...args) {
 }
 
 template<typename ...Args>
-void report_error(Allocator allocator, const char *fmt, Args ...args) {
-   auto err = format_string(allocator, fmt, args...);
+void report_error(Arena *arena, const char *fmt, Args ...args) {
+   auto err = format_string(arena, fmt, args...);
 
    fprintf(stderr, "[ERROR]: %s\n", err.buf);
    fprintf(stderr, "- %s\n", strerror(errno));

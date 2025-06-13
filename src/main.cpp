@@ -13,7 +13,6 @@ int main(int argc, char *argv[]) {
    argc -= 1;
 
    auto arena = make_arena(page_size*4);
-   auto arena_alloc = arena.allocator();
 
    // Handle option arguments
    if (argv[0][0] == '-') {
@@ -24,7 +23,7 @@ int main(int argc, char *argv[]) {
    const char *current_dir = getenv("PWD");
    assert(current_dir == NULL, "PWD envirnoment not found");
 
-   auto drash = init_drash(arena_alloc);
+   auto drash = init_drash(&arena);
 
    auto filestat = exists(argv[0]);
    if (!filestat.found) {
@@ -65,13 +64,13 @@ int main(int argc, char *argv[]) {
       argc -= 1;
 
    } else {
-      auto filepath = format_string(arena_alloc, "%/last", drash.metadata.buf);
+      auto filepath = format_string(&arena, "%/last", drash.metadata.buf);
       auto lastfile = open_file(filepath.buf, "w");
 
-      auto current_file = alloc_string(arena_alloc, file);
+      auto current_file = alloc_string(&arena, file);
 
       if (current_file[0] == '/') {
-         auto filename = file_basename(arena_alloc, &current_file);
+         auto filename = file_basename(&arena, &current_file);
          fprintf(lastfile.fd, "%s", filename.buf);
       } else fprintf(lastfile.fd, "%s", current_file.buf);
    }
@@ -99,9 +98,9 @@ int main(int argc, char *argv[]) {
          continue;
       }
 
-      auto path = alloc_string(arena_alloc, arg);
-      auto filename = file_basename(arena_alloc, &path);
-      auto metadata_path = format_string(arena_alloc, "%/%.info", drash.metadata.buf, filename.buf);
+      auto path = alloc_string(&arena, arg);
+      auto filename = file_basename(&arena, &path);
+      auto metadata_path = format_string(&arena, "%/%.info", drash.metadata.buf, filename.buf);
 
       ex_res = exists(metadata_path.buf);
       if (ex_res.found) {
@@ -122,7 +121,7 @@ int main(int argc, char *argv[]) {
 
       fprintf(file_info.fd, "Path: %s/%s\nType: %s\n", current_dir, path.buf, type);
 
-      auto drash_file = format_string(arena_alloc, "%/%", drash.files.buf, filename.buf);
+      auto drash_file = format_string(&arena, "%/%", drash.files.buf, filename.buf);
 
       if (filestat.type == ft_dir) move_directory(&arena, arg, drash_file.buf);
       else move_file(&arena, arg, drash_file.buf);

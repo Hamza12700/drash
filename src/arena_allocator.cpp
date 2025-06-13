@@ -2,7 +2,7 @@
 #define ARENA_ALLOC
 
 #include <sys/mman.h>
-#include "allocator_interface.cpp"
+#include "types.cpp"
 
 struct Arena_Checkpoint {
   // Because, every arena is 4x times bigger in size of its parent arena,
@@ -25,22 +25,9 @@ struct Arena {
    Arena_Checkpoint checkpoint();
    void restore(Arena_Checkpoint checkpoint); // Sets the position to checkpoint.
 
-   void *alloc(uint size, Allocator *context = NULL);
+   void *alloc(uint size, Arena *context = NULL);
    void arena_free();
-
-   // @Cleanup: I don't think that the 'Allocator Vtable' needs to live in the arena memory because it's small enough to fit in the stack-space.
-   Allocator  allocator(); // This creates the 'Allocator Vtable' struct in the arena memory
 };
-
-void *arena_alloc(void *context, uint size) {
-   auto arena = (Arena *)context;
-   return arena->alloc(size);
-}
-
-void *arena_alloc(void *context, uint size, Allocator *with_context = NULL) {
-   auto arena = (Arena *)context;
-   return arena->alloc(size, with_context);
-}
 
 Arena_Checkpoint Arena::checkpoint() {
    Arena_Checkpoint checkpoint;
@@ -94,25 +81,14 @@ void Arena::arena_free() {
    }
 }
 
-Allocator Arena::allocator() {
-   Allocator ret = {};
-   auto vtable = (Allocator::Vtable *)alloc(sizeof(Allocator::Vtable));
-
-   ret.context  = this;
-   ret.vtable = vtable;
-   vtable->fn_alloc = arena_alloc;
-   vtable->fn_alloc_with_context = arena_alloc;
-   return ret;
-}
-
-void *Arena::alloc(uint size, Allocator *context) {
+void *Arena::alloc(uint size, Arena *context) {
    if (pos+size <= cap) {
       void *mem = (char *)buf+pos;
       pos += size;
 
       if (!context) return mem;
 
-      *context = this->allocator();
+      context = this;
       return mem;
    }
 
@@ -131,20 +107,19 @@ void *Arena::alloc(uint size, Allocator *context) {
 
       if (!context) return mem;
 
-      *context = new_arena->allocator();
+      context = new_arena;
       return mem;
    }
 
    Arena *next_arena = next;
    while (true) {
-
       if (next_arena->pos+size <= next_arena->cap) {
          void *mem = (char *)next_arena->buf + next_arena->pos;
          next_arena->pos += size;
 
          last = next_arena;
          if (!context) return mem;
-         *context = next_arena->allocator();
+         context = next_arena;
          return mem;
       }
 
@@ -168,7 +143,7 @@ void *Arena::alloc(uint size, Allocator *context) {
 
    if (!context) return mem;
 
-   *context = new_arena->allocator();
+   context = new_arena;
    return mem;
 }
 

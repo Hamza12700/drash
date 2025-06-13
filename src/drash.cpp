@@ -15,17 +15,17 @@ struct Drash {
    New_String files;    // Path to drash files directory
    New_String metadata; // Path to metadata about the drash files
 
-   Drash_Info parse_info(Allocator allocator, New_String *file_content);
+   Drash_Info parse_info(Arena *arena, New_String *file_content);
 
    void empty_drash(Arena *arena);
    void list_files(Arena *arena);
-   void cat(Allocator arena, const char *filename);
+   void cat(Arena *arena, const char *filename);
    void restore(Arena *arena, int argc, char **argv);
    void remove(Arena *arena, int argc, char **argv);
    bool is_empty();
 };
 
-Drash init_drash(Allocator allocator) {
+Drash init_drash(Arena *arena) {
    const char *home_env = getenv("HOME");
    assert_err(home_env == NULL, "failed to get HOME environment variable");
 
@@ -40,10 +40,10 @@ Drash init_drash(Allocator allocator) {
    format_string(drash_dir, "%/%", home_env, (const char *)".local/share/Drash"); // @Cleanup: Just put it in the HOME/.drash? Why it needs be in .local/share?
 
    Drash drash = {};
-   drash.files = alloc_string(allocator, sizeof(drash_dir)+50);
+   drash.files = alloc_string(arena, sizeof(drash_dir)+50);
    format_string(&drash.files, "%/files", drash_dir);
 
-   drash.metadata = alloc_string(allocator, sizeof(drash_dir)+50);
+   drash.metadata = alloc_string(arena, sizeof(drash_dir)+50);
    format_string(&drash.metadata, "%/metadata", drash_dir);
 
    auto filestat = exists(drash_dir);
@@ -79,14 +79,14 @@ bool Drash::is_empty() {
    return true;
 }
 
-Drash_Info Drash::parse_info(Allocator allocator, New_String *file_content) {
+Drash_Info Drash::parse_info(Arena *arena, New_String *file_content) {
    Drash_Info drash_info = {};
    file_content->skip(strlen("Path: ")); // Skip the prefix
 
    int count = 0;
    while ((*file_content)[count] != '\n') count += 1;
 
-   drash_info.path = alloc_string(allocator, count);
+   drash_info.path = alloc_string(arena, count);
    for (int i = 0; i < count; i++) {
       drash_info.path[i] = (*file_content)[i];
    }
@@ -114,13 +114,13 @@ Drash_Info Drash::parse_info(Allocator allocator, New_String *file_content) {
    return drash_info;
 }
 
-void Drash::cat(Allocator allocator, const char *filename) {
+void Drash::cat(Arena *arena, const char *filename) {
    if (!filename) {
       fprintf(stderr, "No filename provided!\n");
       return;
    }
-   auto file = file_basename(allocator, filename);
-   auto fullpath = format_string(allocator, "%/%", files.buf, file.buf);
+   auto file = file_basename(arena, filename);
+   auto fullpath = format_string(arena, "%/%", files.buf, file.buf);
    auto filestat = exists(fullpath.buf);
    if (!filestat.found) {
       fprintf(stderr, "No filename '%s' in the drashcan!\n", file.buf);
@@ -137,7 +137,7 @@ void Drash::cat(Allocator allocator, const char *filename) {
    }
 
    auto drashfile = open_file(fullpath.buf, "r");
-   auto content = drashfile.read_into_string(allocator);
+   auto content = drashfile.read_into_string(arena);
    write(STDOUT_FILENO, content.buf, content.cap);
 }
 
@@ -180,7 +180,6 @@ void Drash::list_files(Arena *arena) {
    auto dir = open_dir(metadata.buf);
    printf("\nDrash'd Files:\n\n");
 
-   auto alloc = arena->allocator();
    auto checkpoint = arena->checkpoint();
 
    struct dirent *rdir;
@@ -195,16 +194,16 @@ void Drash::list_files(Arena *arena) {
       if (match_string(rdir->d_name, ".") || match_string(rdir->d_name, "..")) continue;
       if (match_string(rdir->d_name, "last")) continue;
 
-      auto path = format_string(alloc, "%/%", metadata.buf, rdir->d_name);
+      auto path = format_string(arena, "%/%", metadata.buf, rdir->d_name);
       auto file = open_file(path.buf, "r");
-      auto content = file.read_into_string(alloc);
+      auto content = file.read_into_string(arena);
 
-      auto info = parse_info(alloc, &content);
+      auto info = parse_info(arena, &content);
       mem_usage += (path.cap + content.cap + info.path.cap);
 
       if (info.type == ft_file) {
-         auto filename = file_basename(alloc, &info.path);
-         auto drashpath = format_string(alloc, "%/%", files.buf, filename.buf);
+         auto filename = file_basename(arena, &info.path);
+         auto drashpath = format_string(arena, "%/%", files.buf, filename.buf);
          mem_usage += filename.cap + drashpath.cap;
 
          auto file = open_file(drashpath.buf, "r");
@@ -248,11 +247,9 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
       return;
    }
 
-   auto alloc = arena->allocator();
-
    // Restore the last drash'd file/directory
    if (argv[0][0] == '-') {
-      auto last = format_string(alloc, "%/last", metadata.buf);
+      auto last = format_string(arena, "%/last", metadata.buf);
       auto last_filestat = exists(last.buf);
       if (!last_filestat.found) {
          printf("Nothing to restore!\n");
@@ -260,17 +257,17 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
       }
 
       auto file = open_file(last.buf, "r");
-      auto filename = file.read_into_string(alloc);
+      auto filename = file.read_into_string(arena);
       {
          auto filelen = filename.len();
          if (filename[filelen-1] == '/') filename.remove(filelen - 1);
       }
 
-      auto info_path = format_string(alloc, "%/%.info", metadata.buf, filename.buf);
+      auto info_path = format_string(arena, "%/%.info", metadata.buf, filename.buf);
       auto file_info = open_file(info_path.buf, "r");
-      auto file_info_content = file_info.read_into_string(alloc);
+      auto file_info_content = file_info.read_into_string(arena);
 
-      auto info = parse_info(alloc, &file_info_content);
+      auto info = parse_info(arena, &file_info_content);
       auto filestat = exists(info.path.buf);
 
       if (filestat.found) {
@@ -295,7 +292,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
          if (filestat.type == ft_dir) remove_dir(arena, info.path.buf);
          else remove_file(info.path.buf);
 
-         auto drashfile = format_string(alloc, "%/%", files.buf, (char *)filename.buf);
+         auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename.buf);
          if (filestat.type == ft_file) move_file(arena, drashfile.buf, info.path.buf);
          else move_directory(arena, drashfile.buf, info.path.buf);
 
@@ -304,7 +301,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
          return;
       }
 
-      auto drashfile = format_string(alloc, "%/%", files.buf, (char *)filename.buf);
+      auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename.buf);
       if (filestat.type == ft_file) move_file(arena, drashfile.buf, info.path.buf);
       else move_directory(arena, drashfile.buf, info.path.buf);
       remove_file(info_path.buf);
@@ -314,7 +311,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
 
    for (int i = 0; i < argc; i++) {
       const char *file = argv[i];
-      auto path = format_string(alloc, "%/%.info", metadata.buf, (char *)file);
+      auto path = format_string(arena, "%/%.info", metadata.buf, (char *)file);
 
       if (!file_exists(path.buf)) {
          printf("No file or directory named: %s\n", file);
@@ -322,8 +319,8 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
       }
 
       auto info_file = open_file(path.buf, "r");
-      auto content = info_file.read_into_string(alloc);
-      auto info = parse_info(alloc, &content);
+      auto content = info_file.read_into_string(arena);
+      auto info = parse_info(arena, &content);
       auto filestat = exists(info.path.buf);
 
       if (filestat.found) {
@@ -348,7 +345,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
          if (filestat.type == ft_dir) remove_dir(arena, info.path.buf);
          else remove_file(info.path.buf);
 
-         auto drashpath = format_string(alloc, "%/%", files.buf, (char *)file);
+         auto drashpath = format_string(arena, "%/%", files.buf, (char *)file);
          auto drash_filestat = exists(drashpath.buf);
          if (drash_filestat.type == ft_dir) {
             if (!move_directory(arena, drashpath.buf, info.path.buf)) continue;
@@ -358,7 +355,7 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
          continue;
       }
 
-      auto drashpath = format_string(alloc, "%/%", files.buf, (char *)file);
+      auto drashpath = format_string(arena, "%/%", files.buf, (char *)file);
       auto drash_filestat = exists(drashpath.buf);
 
       //
@@ -390,13 +387,13 @@ void Drash::restore(Arena *arena, const int argc, char **argv) {
 
       remove_file(path.buf);
 
-      auto filename = file_basename(alloc, file);
-      auto lastfile_path = format_string(alloc, "%/last", metadata.buf);
+      auto filename = file_basename(arena, file);
+      auto lastfile_path = format_string(arena, "%/last", metadata.buf);
       auto lastfile_info = exists(lastfile_path.buf);
       if (!lastfile_info.found) return;
 
       auto lastfile = open_file(lastfile_path.buf, "r");
-      auto lastfile_name = lastfile.read_into_string(alloc);
+      auto lastfile_name = lastfile.read_into_string(arena);
       auto filelen = lastfile_name.len();
       if (lastfile_name[filelen-1] == '/') lastfile_name.remove(filelen - 1);
 
@@ -415,12 +412,11 @@ void Drash::remove(Arena *arena, int argc, char **argv) {
       return;
    }
 
-   auto alloc = arena->allocator();
    auto checkpoint = arena->checkpoint();
 
    for (int i = 0; i < argc; i++) {
       const char *filename = argv[i];
-      auto drashfile = format_string(alloc, "%/%", files.buf, (char *)filename);
+      auto drashfile = format_string(arena, "%/%", files.buf, (char *)filename);
       auto ex_res = exists(drashfile.buf);
 
       if (!ex_res.found) {
@@ -432,10 +428,10 @@ void Drash::remove(Arena *arena, int argc, char **argv) {
          if (!remove_dir(arena, drashfile.buf)) continue;
       } else remove_file(drashfile.buf);
 
-      auto infopath = format_string(alloc, "%/%.info", metadata.buf, (char *)filename);
+      auto infopath = format_string(arena, "%/%.info", metadata.buf, (char *)filename);
       remove_file(infopath.buf);
 
-      auto lastfile_path = format_string(alloc, "%/%", metadata.buf, (char *)"last");
+      auto lastfile_path = format_string(arena, "%/%", metadata.buf, (char *)"last");
       auto lastfile = fopen(lastfile_path.buf, "r");
       if (!lastfile) return;
 
@@ -444,7 +440,7 @@ void Drash::remove(Arena *arena, int argc, char **argv) {
          .path = lastfile_path.buf
       };
 
-      auto content = last_file.read_into_string(alloc);
+      auto content = last_file.read_into_string(arena);
       if (match_string(filename, content.buf)) remove_file(lastfile_path.buf);
       arena->restore(checkpoint);
    }

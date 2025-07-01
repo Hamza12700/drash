@@ -47,16 +47,12 @@ Drash init_drash(Arena *arena) {
    format_string(&drash.metadata, "%/metadata", drash_dir);
 
    auto filestat = exists(drash_dir);
-   if (filestat.type != ft_dir) {
-      fprintf(stderr, "'%s' isn't a directory\n", drash_dir);
-      raise(SIGINT);
+   if (!filestat.found) {
+      makedir(drash_dir, DIR_PERM);
+      makedir(drash.files.buf, DIR_PERM);
+      makedir(drash.metadata.buf, DIR_PERM);
    }
 
-   if (filestat.found) return drash;
-
-   makedir(drash_dir, DIR_PERM);
-   makedir(drash.files.buf, DIR_PERM);
-   makedir(drash.metadata.buf, DIR_PERM);
    return drash;
 }
 

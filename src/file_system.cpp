@@ -323,8 +323,6 @@ bool remove_dir(Arena *arena, const char *dirpath) {
       perror("rmdir -");
       return false;
     }
-
-    if (!remove_dir(arena, fullpath.buf)) return false;
   }
 
   if (rmdir(dirpath) != 0) { // Lastly, remove the directory itself

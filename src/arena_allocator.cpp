@@ -7,7 +7,7 @@
 struct Arena_Checkpoint {
   // Because, every arena is bigger in size of its parent arena,
   // we can simply check if the capacity of the arena matches and because the
-  // linked-list of arena's is in ascending order if can simply traverse the list to find the match.
+  // linked-list of arena's is sorted we can simply traverse the list to find the match.
 
   int cap;
   int mark;

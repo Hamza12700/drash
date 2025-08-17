@@ -53,7 +53,7 @@ filestat :: proc(path: string, allocator := context.allocator) -> (File_Info, li
 
   info := File_Info{
     fullpath = fullpath,
-    name     = filename(fullpath),
+    name     = get_basename(fullpath),
     size     = st.size,
     type     = type,
   };
@@ -61,8 +61,7 @@ filestat :: proc(path: string, allocator := context.allocator) -> (File_Info, li
   return info, .NONE;
 }
 
-@(private, require_results)
-filename :: proc(path: string) -> string {
+get_basename :: proc(path: string) -> string {
   if path == "" do return ".";
 
 	is_separator :: proc(c: byte) -> bool {

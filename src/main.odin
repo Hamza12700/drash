@@ -3,13 +3,14 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:sys/posix" // This link with `libc'
+import "core:sys/linux"
 import "core:strings"
 import "base:runtime"
 import "core:mem"
 
 VERSION :: "2.0.0"
 
-PATH_MAX :: PAGE_SIZE
+PATH_MAX :: int(PAGE_SIZE)
 
 main :: proc() {
   using fmt;
@@ -38,11 +39,11 @@ main :: proc() {
     return;
   }
 
-  // Save the lsat filename
+  /* Save the lsat filename
   filepath := args[len(args)-1];
-  if len(filepath) >= posix.PATH_MAX {
+  if len(filepath) >= PATH_MAX {
     println("Filename '%s...' is too long", filepath[:10]);
-    println("Max Path length is %d", posix.PATH_MAX);
+    println("Max Path length is %d", PATH_MAX
 
   } else {
     filestat, errno := filestat(filepath);
@@ -61,13 +62,14 @@ main :: proc() {
       }
     }  
   }
+  */
 
   for arg in args {
     free_all(context.temp_allocator);
     
-    if len(arg) >= posix.PATH_MAX {
+    if len(arg) >= PATH_MAX {
       println("Filename '%s...' is too long", arg[:10]);
-      println("Max Path length is %d", posix.PATH_MAX);
+      println("Max Path length is %d", PATH_MAX);
       continue;
     }
 
@@ -113,6 +115,7 @@ Option_Action :: enum {
   Version,
   List,
   Restore,
+  Empty,
   Remove,
   Cat,
 }
@@ -147,6 +150,12 @@ OPTIONS :: []Option{
     name = "restore",
     desc = "Restore file(s) back to its original location",
     action = .Restore
+  },
+
+  {
+    name = "empty",
+    desc = "Wipe-out all the files in the drashcan",
+    action = .Empty
   },
 
   {
@@ -220,11 +229,12 @@ handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: ^[]string) {
   switch  action {
   case .Help:    display_help();
   case .Version: fmt.println("drash version: ", VERSION);
-  case .Force:   force_remove_files(arena, &files);
-  case .Restore: drash_restore(drash, &files);
-  case .Remove:  drash_remove(drash, &files);
-  case .List:    drash_list(drash, &files);
-  case .Cat:     drash_cat(drash, &files);
+  case .Force:   force_remove_files(arena, files);
+  case .Restore: drash_restore(drash, files);
+  case .Empty:   drash_empty(arena, drash, files);
+  case .Remove:  drash_remove(arena, drash, files);
+  case .List:    drash_list(drash, files);
+  case .Cat:     drash_cat(drash, files);
   }
 }
 
@@ -238,7 +248,7 @@ display_help :: proc() {
   }
 }
 
-force_remove_files :: proc(arena: ^Arena, args: ^[]string) {
+force_remove_files :: proc(arena: ^Arena, args: []string) {
   if len(args) == 0 {
     fmt.println("Missing argument file(s)");
     return;
@@ -270,11 +280,25 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
     return;
   }
 
-  if fileinfo.type == .Symlink {
+  #partial switch fileinfo.type {
+  case .Symlink: {
     if err := os.remove(filepath); err != .NONE {
       fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
-      return;
     }
+    return;
+  }
+
+  case .Regular: {
+    if err := os.remove(filepath); err != .NONE {
+      fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
+    }
+    return;
+  }
+
+  case: {
+    fmt.println("Unexpected filetype: ", fileinfo.type);
+    return;
+  }
   }
 
   // If not file or symlink then it's probably a directory
@@ -295,9 +319,9 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
     if fileinfo.type == .Directory {
       remove_files(arena, fileinfo.fullpath);
     } else {
-      err := os.remove(fileinfo.fullpath);
-      if err != .NONE {
-        fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, err);
+      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, context.temp_allocator));
+      if errno != .NONE {
+        fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, errno);
         continue;
       }
     }
@@ -307,20 +331,19 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
   for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
     filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
     if filename == "." || filename == ".." do continue;
+    fullpath := fmt.ctprintf("%s/%s", filepath, filename);
 
-    fullpath := fmt.tprintf("%s/%s", filepath, filename);
-
-    err := os.remove_directory(fullpath);
-    if err != .NONE {
-      fmt.printf("Failed to remove file '%s' because %s\n", filename, err);
+    errno = linux.rmdir(fullpath);
+    if errno != .NONE {
+      fmt.printf("Failed to remove file '%s' because %s\n", filename, errno);
       continue;
     }
   }
 
   // Lastly, remove the parent/root directory
-  err := os.remove_directory(filepath);
-  if err != .NONE {
-    fmt.printf("Failed to remove file '%s' because %s\n", filepath, err);
+  errno = linux.rmdir(strings.clone_to_cstring(filepath, context.temp_allocator));
+  if errno != .NONE {
+    fmt.printf("Failed to remove file '%s' because %s\n", filepath, errno);
     return;
   }
 

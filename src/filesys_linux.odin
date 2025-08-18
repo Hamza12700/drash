@@ -1,6 +1,8 @@
 package main
 
 import "core:sys/linux"
+import "core:sys/posix"
+import "core:os"
 import "core:strings"
 import "core:mem"
 import "core:fmt"
@@ -103,4 +105,90 @@ get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno)
 
     resize(&buf, len(buf)+PATH_MAX);
 	}
+}
+
+// Recursively, remove files/directories
+// 
+// @NOTE:
+// This function explicity takes the 'Arena' allocator data because it needs to perform
+// operations that are only valid for that allocator and because the 'context.allocator'
+// data is a 'rawptr (void *)' it can be type-casted to anything. To avoid this problem
+// the function require's the allocator data to explicity passed in.
+// 
+// Because this function is recursive, every function-call saves the allocator state so
+// when a recursive call is done it would reset the allocator to its previous state.
+//
+remove_files :: proc(arena: ^Arena, filepath: string) {
+  context.temp_allocator = mem.Allocator{arena_allocator_proc, arena};
+
+  checkpoint := arena_checkpoint(arena);
+  fileinfo, errno := filestat(filepath, context.temp_allocator);
+  if errno != .NONE {
+    fmt.println("File not found:", filepath);
+    return;
+  }
+
+  #partial switch fileinfo.type {
+  case .Symlink: {
+    if err := os.remove(filepath); err != .NONE {
+      fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
+    }
+    return;
+  }
+
+  case .Regular: {
+    if err := os.remove(filepath); err != .NONE {
+      fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
+    }
+    return;
+  }
+  }
+
+  assert(fileinfo.type == .Directory);
+  filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
+
+  dir := posix.opendir(filepath_cstring);
+  assert(dir != nil);
+  defer posix.closedir(dir);
+
+  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
+    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
+    if filename == "." || filename == ".." { continue; }
+
+    fullpath := fmt.tprintf("%s/%s", filepath, filename);
+    fileinfo, errno := filestat(fullpath, context.temp_allocator);
+    assert(errno == .NONE); // This should never happen because `readdir` returns valid files
+
+    if fileinfo.type == .Directory {
+      remove_files(arena, fileinfo.fullpath);
+    } else {
+      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, context.temp_allocator));
+      if errno != .NONE {
+        fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, errno);
+        continue;
+      }
+    }
+  }
+
+  posix.rewinddir(dir);
+  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
+    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
+    if filename == "." || filename == ".." do continue;
+    fullpath := fmt.ctprintf("%s/%s", filepath, filename);
+
+    errno = linux.rmdir(fullpath);
+    if errno != .NONE {
+      fmt.printf("Failed to remove file '%s' because %s\n", filename, errno);
+      continue;
+    }
+  }
+
+  // Lastly, remove the parent/root directory
+  errno = linux.rmdir(strings.clone_to_cstring(filepath, context.temp_allocator));
+  if errno != .NONE {
+    fmt.printf("Failed to remove file '%s' because %s\n", filepath, errno);
+    return;
+  }
+
+  arena_restore(arena, checkpoint);
 }

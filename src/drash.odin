@@ -29,19 +29,19 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
     if rdir == nil do break;
 
     filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." || filename == "last" do continue;
+    if filename == "." || filename == ".." do continue;
 
     fullpath := fmt.tprintf("%s/%s", drash.metadata, filename);
-    fd, errno := linux.open(strings.clone_to_cstring(fullpath, context.temp_allocator), {}); // Open_Flags 'RDONLY' is default
+    info_fd, errno := linux.open(strings.clone_to_cstring(fullpath, context.temp_allocator), {}); // Open_Flags 'RDONLY' is default
     assert(errno == .NONE);
-    defer linux.close(fd);
+    defer linux.close(info_fd);
 
     st: linux.Stat;
-    errno = linux.fstat(fd, &st);
+    errno = linux.fstat(info_fd, &st);
     assert(errno == .NONE);
 
     buffer := make([]u8, st.size);
-    _, errno = linux.read(fd, buffer[:]);
+    _, errno = linux.read(info_fd, buffer[:]);
     assert(errno == .NONE);
 
     buffer = buffer[len("Path: "):]; // Skip the prefix
@@ -59,6 +59,14 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
     }
 
     type: File_Type = filetype == "file" ? .Regular : .Directory;
+
+    drash_fd: linux.Fd;
+    drash_fd, errno = linux.open(fmt.ctprintf("%s/%s", drash.files, get_basename(path)), {});
+    assert(errno == .NONE);
+    defer linux.close(drash_fd);
+
+    errno = linux.fstat(drash_fd, &st);
+    assert(errno == .NONE);
 
     append(&drash_files, Drash_Info{
       path = path,
@@ -85,7 +93,7 @@ init_drash :: proc() -> Drash {
   };
 
   err := os.make_directory(drash_dirpath);
-  if err == os.EEXIST { return drash; }
+  if err == os.EEXIST do return drash;
   assert(err == .NONE);
 
   err = os.make_directory(drash.files);
@@ -116,7 +124,55 @@ drash_remove :: proc(#no_alias arena: ^Arena, drash: ^Drash, args: []string) {
   }
 }
 
+drash_empty :: proc(#no_alias arena: ^Arena, drash: ^Drash) {
+  drash_files_info := parse_drash_info(drash);
+  if len(drash_files_info) == 0 {
+    fmt.println("Drashcan is empty!");
+    return;
+  }
+
+  remove_files(arena, drash.files);
+  err := os.make_directory(drash.files);
+  if err != .NONE {
+    fmt.printf("Failed to create directory '%s' because: %s\n",
+      get_basename(drash.files), err);
+  }
+
+  remove_files(arena, drash.metadata);
+  err = os.make_directory(drash.metadata);
+  if err != .NONE {
+    fmt.printf("Failed to create directory '%s' because: %s\n",
+      get_basename(drash.metadata), err);
+  }
+}
+
+drash_cat :: proc(drash: ^Drash, files: []string) {
+  drash_files := parse_drash_info(drash);
+  for file in files {
+    for drash_info in drash_files {
+      if file == drash_info.name {
+        free_all(context.temp_allocator);
+
+        fd, errno := linux.open(fmt.ctprintf("%s/%s", drash.files, file), {});
+        if errno != .NONE {
+          fmt.println("Failed to open '%s' because: %s\n", file, errno);
+          continue;
+        }
+        defer linux.close(fd);
+
+        buffer := make([]u8, drash_info.size, context.temp_allocator);
+        _, errno = linux.read(fd, buffer[:]);
+        if errno != .NONE {
+          fmt.println("Failed to read '%s' because: %s\n", file, errno);
+          continue;
+        }
+
+        fmt.printf("\n-- %s: --\n\n", file);
+        fmt.printf("%s", buffer);
+      }
+    }
+  }
+}
+
 drash_restore :: proc(drash: ^Drash, args: []string) {}
 drash_list :: proc(drash: ^Drash, args: []string) {}
-drash_cat :: proc(drash: ^Drash, args: []string) {}
-drash_empty :: proc(arena: ^Arena, drash: ^Drash, files: []string) {}

@@ -2,11 +2,8 @@ package main
 
 import "core:fmt"
 import "core:os"
-import "core:sys/posix" // This link with `libc'
-import "core:sys/linux"
 import "core:strings"
 import "base:runtime"
-import "core:mem"
 
 VERSION :: "2.0.0"
 
@@ -35,34 +32,9 @@ main :: proc() {
   drash := init_drash();
 
   if args[0][0] == '-' {
-    handle_opts(&temp_arena, &drash, &args);
+    handle_opts(&temp_arena, &drash, args);
     return;
   }
-
-  /* Save the lsat filename
-  filepath := args[len(args)-1];
-  if len(filepath) >= PATH_MAX {
-    println("Filename '%s...' is too long", filepath[:10]);
-    println("Max Path length is %d", PATH_MAX
-
-  } else {
-    filestat, errno := filestat(filepath);
-    if errno == .NONE {
-      if filestat.type == .Symlink {
-        err := os.remove(filepath);
-        if err != .NONE {
-          printf("Failed to remove the symlink because '%s'\n", err);
-        }
-      } else {
-        last_filepath := tprintf("%s/last", drash.metadata);
-        err := os.write_entire_file_or_err(last_filepath, transmute([]u8) filestat.name);
-        if err != .NONE {
-          printf("Failed to write to '%s' because %s\n", last_filepath, err);
-        }
-      }
-    }  
-  }
-  */
 
   for arg in args {
     free_all(context.temp_allocator);
@@ -177,7 +149,7 @@ OPTIONS :: []Option{
   },
 }
 
-parse_options :: proc(args: ^[]string) -> Option_Action {
+parse_options :: proc(args: []string) -> Option_Action {
   arg := args[0][1:];
   if arg == "" {
     fmt.println("Invalid option format");
@@ -222,7 +194,7 @@ parse_options :: proc(args: ^[]string) -> Option_Action {
   os.exit(1);
 }
 
-handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: ^[]string) {
+handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
   action := parse_options(args);
   files := args[1:]; // Skip the option argument
 
@@ -231,7 +203,7 @@ handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: ^[]string) {
   case .Version: fmt.println("drash version: ", VERSION);
   case .Force:   force_remove_files(arena, files);
   case .Restore: drash_restore(drash, files);
-  case .Empty:   drash_empty(arena, drash, files);
+  case .Empty:   drash_empty(arena, drash);
   case .Remove:  drash_remove(arena, drash, files);
   case .List:    drash_list(drash, files);
   case .Cat:     drash_cat(drash, files);
@@ -257,95 +229,4 @@ force_remove_files :: proc(arena: ^Arena, args: []string) {
   for filepath in args {
     remove_files(arena, filepath);
   }
-}
-
-// Recursively, remove files/directories
-// 
-// @NOTE:
-// This function explicity takes the 'Arena' allocator data because it needs to perform
-// operations that are only valid for that allocator and because the 'context.allocator'
-// data is a 'rawptr (void *)' it can be type-casted to anything. To avoid this problem
-// the function require's the allocator data to explicity passed in.
-// 
-// Because this function is recursive, every function-call saves the allocator state so
-// when a recursive call is done it would reset the allocator to its previous state.
-//
-remove_files :: proc(arena: ^Arena, filepath: string) {
-  context.temp_allocator = mem.Allocator{arena_allocator_proc, arena};
-
-  checkpoint := arena_checkpoint(arena);
-  fileinfo, errno := filestat(filepath, context.temp_allocator);
-  if errno != .NONE {
-    fmt.println("File not found:", filepath);
-    return;
-  }
-
-  #partial switch fileinfo.type {
-  case .Symlink: {
-    if err := os.remove(filepath); err != .NONE {
-      fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
-    }
-    return;
-  }
-
-  case .Regular: {
-    if err := os.remove(filepath); err != .NONE {
-      fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
-    }
-    return;
-  }
-
-  case: {
-    fmt.println("Unexpected filetype: ", fileinfo.type);
-    return;
-  }
-  }
-
-  // If not file or symlink then it's probably a directory
-  filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
-
-  dir := posix.opendir(filepath_cstring);
-  assert(dir != nil);
-  defer posix.closedir(dir);
-
-  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
-    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." { continue; }
-
-    fullpath := fmt.tprintf("%s/%s", filepath, filename);
-    fileinfo, errno := filestat(fullpath, context.temp_allocator);
-    assert(errno == .NONE); // This should never happen because `readdir` returns valid files
-
-    if fileinfo.type == .Directory {
-      remove_files(arena, fileinfo.fullpath);
-    } else {
-      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, context.temp_allocator));
-      if errno != .NONE {
-        fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, errno);
-        continue;
-      }
-    }
-  }
-
-  posix.rewinddir(dir);
-  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
-    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." do continue;
-    fullpath := fmt.ctprintf("%s/%s", filepath, filename);
-
-    errno = linux.rmdir(fullpath);
-    if errno != .NONE {
-      fmt.printf("Failed to remove file '%s' because %s\n", filename, errno);
-      continue;
-    }
-  }
-
-  // Lastly, remove the parent/root directory
-  errno = linux.rmdir(strings.clone_to_cstring(filepath, context.temp_allocator));
-  if errno != .NONE {
-    fmt.printf("Failed to remove file '%s' because %s\n", filepath, errno);
-    return;
-  }
-
-  arena_restore(arena, checkpoint);
 }

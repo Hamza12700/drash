@@ -5,6 +5,7 @@ import "core:sys/linux"
 import "core:strings"
 import "core:os"
 import "core:fmt"
+import "core:mem"
 
 Drash :: struct {
   files:    string,
@@ -77,6 +78,14 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
   }
 
   return drash_files;
+}
+
+check_file_in_drash :: proc(drash: ^Drash, filename: string) -> (int, bool) {
+  drash_files := parse_drash_info(drash);
+  for drash_info, i in drash_files {
+    if drash_info.name == filename do return i, true;
+  }
+  return -1, false;
 }
 
 init_drash :: proc() -> Drash {
@@ -174,5 +183,49 @@ drash_cat :: proc(drash: ^Drash, files: []string) {
   }
 }
 
-drash_restore :: proc(drash: ^Drash, args: []string) {}
-drash_list :: proc(drash: ^Drash, args: []string) {}
+drash_restore :: proc(drash: ^Drash, files: []string) {
+  drash_files := parse_drash_info(drash);
+  for file in files {
+    idx, found := check_file_in_drash(drash, file);
+    if !found {
+      fmt.printf("No file exists in the drashcan: '%s'\n", file);
+      continue;
+    }
+
+    drash_filepath := fmt.ctprintf("%s/%s", drash.files, file);
+    errno := linux.rename(drash_filepath, strings.clone_to_cstring(drash_files[idx].path, context.temp_allocator));
+    if errno != .NONE {
+      fmt.printf("Failed to move '%s' because: %s\n", file, errno);
+      continue;
+    }
+
+    file_infopath := fmt.ctprintf("%s/%s.info", drash.metadata, file);
+    errno = linux.unlink(file_infopath);
+    if errno != .NONE {
+      fmt.printf("Failed to remove '%s' because: %s\n", file, errno);
+      continue;
+    }
+
+    fmt.println("Restore:", drash_files[idx].path);
+  }
+}
+
+drash_list :: proc(drash: ^Drash) {
+  using mem;
+
+  drash_files := parse_drash_info(drash);
+  if len(drash_files) == 0 {
+    fmt.println("Drashcan is empty!");
+    return;
+  }
+
+  fmt.println();
+  for drash_file in drash_files {
+    filesize := drash_file.size;
+    if      filesize > Gigabyte do filesize /= Gigabyte;
+    else if filesize > Megabyte do filesize /= Megabyte;
+    else if filesize > Kilobyte do filesize /= Kilobyte;
+
+    fmt.printf("- %s | %d\n", drash_file.path, filesize);
+  }
+}

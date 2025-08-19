@@ -58,7 +58,9 @@ main :: proc() {
     }
 
     metadata_path := tprintf("%s/%s.info", drash.metadata, fileinfo.name);
-    if os.exists(metadata_path) {} // nocheckin
+    if os.exists(metadata_path) {
+      unreachable(); // nocheckin
+    }
 
     type: string;
     {
@@ -205,7 +207,7 @@ handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
   case .Restore: drash_restore(drash, files);
   case .Empty:   drash_empty(arena, drash);
   case .Remove:  drash_remove(arena, drash, files);
-  case .List:    drash_list(drash, files);
+  case .List:    drash_list(drash);
   case .Cat:     drash_cat(drash, files);
   }
 }

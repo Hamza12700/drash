@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:sys/linux"
 import "base:runtime"
 
 VERSION :: "2.0.0"
@@ -14,7 +15,9 @@ main :: proc() {
 
   arena: Arena;
   temp_arena: Arena;
-  context.allocator = arena_allocator(&arena);
+
+  // Allocations that need to live throught out the lifetime of the program isn't very huge.
+  context.allocator = arena_allocator(&arena, PAGE_SIZE * 4);
   context.temp_allocator = arena_allocator(&temp_arena);
 
   // Converting the '[]cstring' (null-terminated strings) to '[]string' (proper string-type)
@@ -52,8 +55,9 @@ main :: proc() {
     }
 
     if fileinfo.type == .Symlink {
-      err := os.remove(arg);
-      assert(err == .NONE);
+      errno := linux.unlink(strings.clone_to_cstring(arg, context.temp_allocator));
+      assert(errno == .NONE);
+      printf("Removed Symlink: %s\n", arg);
       continue;
     }
 

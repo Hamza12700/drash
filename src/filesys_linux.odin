@@ -121,7 +121,10 @@ get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno)
 remove_files :: proc(arena: ^Arena, filepath: string) {
   context.temp_allocator = mem.Allocator{arena_allocator_proc, arena};
 
-  checkpoint := arena_checkpoint(arena);
+  prev_offset := arena.offset;
+  defer arena_restore(arena, prev_offset);
+
+  filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
   fileinfo, errno := filestat(filepath, context.temp_allocator);
   if errno != .NONE {
     fmt.println("File not found:", filepath);
@@ -130,22 +133,21 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
 
   #partial switch fileinfo.type {
   case .Symlink: {
-    if err := os.remove(filepath); err != .NONE {
+    if err := linux.unlink(filepath_cstring); err != .NONE {
       fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
     }
     return;
   }
 
   case .Regular: {
-    if err := os.remove(filepath); err != .NONE {
+    if err := linux.unlink(filepath_cstring); err != .NONE {
       fmt.printf("Failed to remove '%s' because: %s\n", fileinfo.name, err);
     }
     return;
   }
   }
 
-  assert(fileinfo.type == .Directory);
-  filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
+  assert(fileinfo.type == .Directory); // Sanity check
 
   dir := posix.opendir(filepath_cstring);
   assert(dir != nil);
@@ -153,7 +155,7 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
 
   for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
     filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." { continue; }
+    if filename == "." || filename == ".." do continue;
 
     fullpath := fmt.tprintf("%s/%s", filepath, filename);
     fileinfo, errno := filestat(fullpath, context.temp_allocator);
@@ -184,11 +186,9 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
   }
 
   // Lastly, remove the parent/root directory
-  errno = linux.rmdir(strings.clone_to_cstring(filepath, context.temp_allocator));
+  errno = linux.rmdir(filepath_cstring);
   if errno != .NONE {
     fmt.printf("Failed to remove file '%s' because %s\n", filepath, errno);
     return;
   }
-
-  arena_restore(arena, checkpoint);
 }

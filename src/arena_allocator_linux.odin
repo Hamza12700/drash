@@ -4,12 +4,8 @@ import "core:sys/linux"
 import "core:slice"
 import "core:os"
 import "core:mem"
-import "base:runtime"
-
-Arena_Checkpoint :: struct {
-  ptr: rawptr,
-  prev_offset: uint,
-}
+import "core:fmt"
+import "base:intrinsics"
 
 Arena :: struct {
   buf:  []byte,
@@ -34,13 +30,6 @@ arena_allocator :: proc(arena: ^Arena, init_size: uint = mem.Megabyte) -> mem.Al
   return mem.Allocator{arena_allocator_proc, arena};
 }
 
-arena_checkpoint :: proc(arena: ^Arena) -> Arena_Checkpoint {
-  return {
-    ptr = mem.ptr_offset(raw_data(arena.buf), arena.offset),
-    prev_offset = arena.offset,
-  };
-}
-
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int, old_memory: rawptr, old_size: int,
                             location := #caller_location) -> ([]byte, mem.Allocator_Error)
@@ -60,17 +49,20 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
   return nil, .Mode_Not_Implemented;
 }
 
-arena_restore :: proc(arena: ^Arena, checkpoint: Arena_Checkpoint) {
-  // It is kind-of stupid to call 'mem.free_with_size' because under the hood it would
-  // just call 'arena_clear_at' but because the core library Tracking-Allocator operators
-  // on the standard 'Allocator' interface to trace memory usage that's why it's like this.
-  mem.free_with_size(checkpoint.ptr, int(arena.offset));
-  arena.offset = checkpoint.prev_offset;
+// @Robustness: Don't forget about other chained Arena's.
+arena_restore :: proc(arena: ^Arena, prev_offset: uint) {
+  assert(prev_offset < arena.offset); // Sanity check
+
+  ptr_offset := mem.ptr_offset(raw_data(arena.buf), int(prev_offset));
+  mem.free_with_size(ptr_offset, int(arena.offset - prev_offset));
+  arena.offset = prev_offset;
 }
 
 arena_clear_at :: proc(arena: ^Arena, start_addr: rawptr, len: int) -> ([]byte, mem.Allocator_Error) {
-  if len <= 0 do return nil, .None;
-  runtime.mem_zero(start_addr, len);
+  if len <= 0          do return nil, .Invalid_Argument;
+  if start_addr == nil do return nil, .Invalid_Pointer;
+
+  intrinsics.mem_zero(start_addr, len);
   return nil, .None;
 }
 
@@ -155,12 +147,12 @@ arena_resize :: proc(arena: ^Arena, old_size: uint, old_mem: rawptr, new_size, a
 
 // Resets the arena and other arena's to zero
 arena_clear_all :: proc(arena: ^Arena) -> ([]byte, mem.Allocator_Error) {
-  runtime.mem_zero(raw_data(arena.buf), int(arena.offset));
+  intrinsics.mem_zero(raw_data(arena.buf), int(arena.offset));
   arena.offset = 0;
 
   next := arena.next;
   for next != nil {
-    runtime.mem_zero(raw_data(next.buf), int(next.offset));
+    intrinsics.mem_zero(raw_data(next.buf), int(next.offset));
     next.offset = 0;
     next = next.next;
   }
@@ -181,11 +173,5 @@ allocate_page :: proc(size: uint) -> []byte {
 
 deallocate_page :: proc(mem: []byte) {
   err := linux.munmap(slice.as_ptr(mem), len(mem));
-  assert(err == .NONE);
-}
-
-deallocate_raw_page :: proc(mem_ptr: rawptr, mem_len: uint) {
-  assert((mem_len % PAGE_SIZE) == 0);
-  err := linux.munmap(mem_ptr, mem_len);
   assert(err == .NONE);
 }

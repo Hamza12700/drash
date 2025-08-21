@@ -114,7 +114,7 @@ init_drash :: proc() -> Drash {
   return drash;
 }
 
-drash_remove :: proc(#no_alias arena: ^Arena, drash: ^Drash, args: []string) {
+drash_remove :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
   drash_files_info := parse_drash_info(drash);
   for drash_info in drash_files_info {
     for filename in args {
@@ -133,7 +133,7 @@ drash_remove :: proc(#no_alias arena: ^Arena, drash: ^Drash, args: []string) {
   }
 }
 
-drash_empty :: proc(#no_alias arena: ^Arena, drash: ^Drash) {
+drash_empty :: proc(arena: ^Arena, drash: ^Drash) {
   drash_files_info := parse_drash_info(drash);
   if len(drash_files_info) == 0 {
     fmt.println("Drashcan is empty!");
@@ -211,8 +211,6 @@ drash_restore :: proc(drash: ^Drash, files: []string) {
 }
 
 drash_list :: proc(drash: ^Drash) {
-  using mem;
-
   drash_files := parse_drash_info(drash);
   if len(drash_files) == 0 {
     fmt.println("Drashcan is empty!");
@@ -221,11 +219,10 @@ drash_list :: proc(drash: ^Drash) {
 
   fmt.println();
   for drash_file in drash_files {
-    filesize := drash_file.size;
-    if      filesize > Gigabyte do filesize /= Gigabyte;
-    else if filesize > Megabyte do filesize /= Megabyte;
-    else if filesize > Kilobyte do filesize /= Kilobyte;
-
-    fmt.printf("- %s | %d\n", drash_file.path, filesize);
+    if drash_file.type == .Regular {
+      fmt.printf("- %s | %M\n", drash_file.path, drash_file.size);
+    } else {
+      fmt.printf("- %s/\n", drash_file.path);
+    }
   }
 }

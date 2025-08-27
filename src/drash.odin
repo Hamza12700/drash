@@ -44,7 +44,6 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
     buffer := make([]u8, st.size);
     _, errno = linux.read(info_fd, buffer[:]);
     assert(errno == .NONE);
-
     buffer = buffer[len("Path: "):]; // Skip the prefix
 
     // Add the path until the newline-character
@@ -53,14 +52,12 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
 
     // Skip the prefix and add the filetype until the newline character
     filetype := string(buffer[len("Type: "):strings.index(string(buffer), "\n")]);
-
     if filetype != "file" && filetype != "directory" {
       unreachable();
       //continue;
     }
 
     type: File_Type = filetype == "file" ? .Regular : .Directory;
-
     drash_fd: linux.Fd;
     drash_fd, errno = linux.open(fmt.ctprintf("%s/%s", drash.files, get_basename(path)), {});
     assert(errno == .NONE);
@@ -68,7 +65,6 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
 
     errno = linux.fstat(drash_fd, &st);
     assert(errno == .NONE);
-
     append(&drash_files, Drash_Info{
       path = path,
       name = get_basename(path),
@@ -76,7 +72,6 @@ parse_drash_info :: proc(drash: ^Drash) -> [dynamic]Drash_Info {
       type = type,
     });
   }
-
   return drash_files;
 }
 
@@ -95,7 +90,6 @@ init_drash :: proc() -> Drash {
 
   buffer: [100]u8;
   drash_dirpath := fmt.bprintf(buffer[:], "%s/.local/share/Drash", home);
-
   drash := Drash{
     files = fmt.aprintf("%s/files", drash_dirpath),
     metadata = fmt.aprintf("%s/metadata", drash_dirpath),
@@ -107,10 +101,8 @@ init_drash :: proc() -> Drash {
 
   err = os.make_directory(drash.files);
   assert(err == .NONE);
-
   err = os.make_directory(drash.metadata);
   assert(err == .NONE);
-
   return drash;
 }
 
@@ -175,7 +167,6 @@ drash_cat :: proc(drash: ^Drash, files: []string) {
           fmt.println("Failed to read '%s' because: %s\n", file, errno);
           continue;
         }
-
         fmt.printf("\n-- %s: --\n\n", file);
         fmt.printf("%s", buffer);
       }

@@ -7,18 +7,14 @@ import "core:sys/linux"
 import "base:runtime"
 
 VERSION :: "2.0.0"
-
 PATH_MAX :: int(PAGE_SIZE)
 
 main :: proc() {
   using fmt;
-
   arena: Arena;
   temp_arena: Arena;
-
-  // Allocations that need to live throught out the lifetime of the program isn't very huge.
-  context.allocator = arena_allocator(&arena, PAGE_SIZE * 4);
-  context.temp_allocator = arena_allocator(&temp_arena);
+  context.allocator = arena_allocator(&arena, PAGE_SIZE * 4); // Doesn't need to be huge
+  context.temp_allocator = arena_allocator(&temp_arena);      // Defaults to 1-Megabyte of memory
 
   // Converting the '[]cstring' (null-terminated strings) to '[]string' (proper string-type)
   args := make([]string, len(runtime.args__))
@@ -69,8 +65,11 @@ main :: proc() {
     type: string;
     {
       buffer: [20]u8;
-      if fileinfo.type == .Directory do type = bprintf(buffer[:], "directory");
-      else { type = bprintf(buffer[:], "file"); }
+      if fileinfo.type == .Directory {
+        type = bprintf(buffer[:], "directory"); 
+      } else {
+        type = bprintf(buffer[:], "file"); 
+      }
     }
 
     metadata := tprintf("Path: %s\nType: %s\n", fileinfo.fullpath, type);
@@ -101,7 +100,6 @@ Option_Action :: enum {
 Option :: struct {
   name: string,
   desc: string,
-
   action: Option_Action,
 }
 
@@ -111,43 +109,36 @@ OPTIONS :: []Option{
     desc = "Force remove file(s) (don't store it in the drashcan)",
     action = .Force
   },
-
   {
     name = "list|l",
     desc = "List files stored in the drashcan",
     action = .List
   },
-
   {
     name = "help|h",
     desc = "Display the help message",
     action = .Help
   },
-
   {
     name = "restore",
     desc = "Restore file(s) back to its original location",
     action = .Restore
   },
-
   {
     name = "empty",
     desc = "Wipe-out all the files in the drashcan",
     action = .Empty
   },
-
   {
     name = "remove|rm",
     desc = "Remove file(s) stored in the drashcan",
     action = .Remove
   },
-
   {
     name = "version|v",
     desc = "Display the version of the binary",
     action = .Version
   },
-
   {
     name = "cat",
     desc = "Print out the file contents",
@@ -161,8 +152,7 @@ parse_options :: proc(args: []string) -> Option_Action {
     fmt.println("Invalid option format");
     os.exit(1);
   }
-
-  if arg[0] == '-' { arg = arg[1:]; }
+  if arg[0] == '-' do arg = arg[1:];
 
   for option in OPTIONS {
     name := option.name;
@@ -172,18 +162,15 @@ parse_options :: proc(args: []string) -> Option_Action {
     {
       x := 0;
       is_prefix := false;
-
       for char, i in name {
         if !is_prefix {
           if char == '|' {
             is_prefix = true; 
             continue;
           }
-
           fullname[i] = u8(char);
           continue;
         }
-
         prefix[x] = u8(char); 
         x += 1;
       }
@@ -203,7 +190,6 @@ parse_options :: proc(args: []string) -> Option_Action {
 handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
   action := parse_options(args);
   files := args[1:]; // Skip the option argument
-
   switch  action {
   case .Help:    display_help();
   case .Version: fmt.println("drash version: ", VERSION);
@@ -218,7 +204,6 @@ handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
 
 display_help :: proc() {
   fmt.println("Usage: drash [OPTIONS] [FILES]..");
-
   fmt.println("\nOptions:\n");
   for opt in OPTIONS {
     fmt.printf("   %-10s",   opt.name);
@@ -231,7 +216,6 @@ force_remove_files :: proc(arena: ^Arena, args: []string) {
     fmt.println("Missing argument file(s)");
     return;
   }
-
   for filepath in args {
     remove_files(arena, filepath);
   }

@@ -10,7 +10,6 @@ import "base:intrinsics"
 Arena :: struct {
   buf:  []byte,
   next: ^Arena,
-
   offset:  uint,
 }
 
@@ -25,7 +24,6 @@ arena_allocator :: proc(arena: ^Arena, init_size: uint = mem.Megabyte) -> mem.Al
   } else {
     aligned_size = init_size; 
   }
-
   arena.buf = allocate_page(aligned_size);
   return mem.Allocator{arena_allocator_proc, arena};
 }
@@ -45,14 +43,12 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
   case .Query_Features, .Query_Info: return nil, .Mode_Not_Implemented;
   }
-
   return nil, .Mode_Not_Implemented;
 }
 
 // @Robustness: Don't forget about other chained Arena's.
 arena_restore :: proc(arena: ^Arena, prev_offset: uint) {
   assert(prev_offset < arena.offset); // Sanity check
-
   ptr_offset := mem.ptr_offset(raw_data(arena.buf), int(prev_offset));
   mem.free_with_size(ptr_offset, int(arena.offset - prev_offset));
   arena.offset = prev_offset;
@@ -68,7 +64,6 @@ arena_clear_at :: proc(arena: ^Arena, start_addr: rawptr, len: int) -> ([]byte, 
 
 arena_alloc :: proc(arena: ^Arena, size, alignment: uint) -> ([]byte, mem.Allocator_Error) {
   align_size := alignment;
-
   if (size % align_size) != 0 {
     for align_size < size { align_size += alignment; }
   } else {
@@ -87,7 +82,6 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint) -> ([]byte, mem.Alloca
     for new_size < align_size {
       new_size *= 4;
     }
-
     mem := allocate_page(new_size);
     new_arena, err := new(Arena); // @Temporary: Should be using a memory-pool here
     assert(err == .None);
@@ -105,7 +99,6 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint) -> ([]byte, mem.Alloca
       arena_next.offset += align_size;
       return mem, .None;
     }
-
     if arena_next.next == nil { break; };
     arena_next = arena_next.next;
   }
@@ -126,21 +119,26 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint) -> ([]byte, mem.Alloca
 }
 
 arena_resize :: proc(arena: ^Arena, old_size: uint, old_mem: rawptr, new_size, alignment: uint) -> ([]byte, mem.Allocator_Error) {
-  assert(alignment == 1);
   assert(new_size >= old_size); // Can't shrink it
+  align_size := alignment;
+  if (new_size % alignment) != 0 {
+    for align_size < new_size {
+      align_size += alignment;
+    }
+  } else {
+    align_size = new_size;
+  }
 
-  current_pos := uintptr(arena.offset) + uintptr(slice.as_ptr(arena.buf));
+  current_pos := uintptr(arena.offset) + uintptr(raw_data(arena.buf));
   old_pos := uintptr(old_mem) + uintptr(old_size);
-
-  if current_pos == old_pos && arena.offset + (new_size-old_size) <= len(arena.buf) {
-    mem := arena.buf[arena.offset-old_size:][:new_size];
-    arena.offset += new_size-old_size;
+  if current_pos == old_pos && arena.offset + (align_size-old_size) <= len(arena.buf) {
+    mem := arena.buf[arena.offset-old_size:][:align_size];
+    arena.offset += align_size-old_size;
     return mem, .None;
   }
 
-  mem, err := arena_alloc(arena, new_size, alignment);
+  mem, err := arena_alloc(arena, align_size, alignment);
   if err != .None { return nil, err; }
-
   copy(mem, slice.bytes_from_ptr(old_mem, int(old_size)));
   return mem, .None;
 }
@@ -148,26 +146,24 @@ arena_resize :: proc(arena: ^Arena, old_size: uint, old_mem: rawptr, new_size, a
 // Resets the arena and other arena's to zero
 arena_clear_all :: proc(arena: ^Arena) -> ([]byte, mem.Allocator_Error) {
   intrinsics.mem_zero(raw_data(arena.buf), int(arena.offset));
-  arena.offset = 0;
 
+  arena.offset = 0;
   next := arena.next;
   for next != nil {
     intrinsics.mem_zero(raw_data(next.buf), int(next.offset));
     next.offset = 0;
     next = next.next;
   }
-
   return nil, .None;
 }
 
 @(require_results)
 allocate_page :: proc(size: uint) -> []byte {
   using linux;
-  assert((size % PAGE_SIZE) == 0);
 
+  assert((size % PAGE_SIZE) == 0);
   mem_ptr, err := mmap(0, size, {.READ, .WRITE}, {.PRIVATE, .ANONYMOUS});
   assert(err == .NONE);
-
   return slice.bytes_from_ptr(mem_ptr, int(size));
 }
 

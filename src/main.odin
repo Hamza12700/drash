@@ -29,7 +29,6 @@ main :: proc() {
 
   args = args[1:];
   drash := init_drash();
-
   if args[0][0] == '-' {
     handle_opts(&temp_arena, &drash, args);
     return;
@@ -37,7 +36,6 @@ main :: proc() {
 
   for arg in args {
     free_all(context.temp_allocator);
-    
     if len(arg) >= PATH_MAX {
       println("Filename '%s...' is too long", arg[:10]);
       println("Max Path length is %d", PATH_MAX);
@@ -58,8 +56,10 @@ main :: proc() {
     }
 
     metadata_path := tprintf("%s/%s.info", drash.metadata, fileinfo.name);
-    if os.exists(metadata_path) {
-      unreachable(); // nocheckin
+    _, errno = filestat(metadata_path, context.temp_allocator);
+    if errno == .NONE {
+      printf("File '%s' already exists in the drashcan!\n", fileinfo.name);
+      continue;
     }
 
     type: string;

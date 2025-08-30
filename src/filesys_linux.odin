@@ -119,10 +119,9 @@ get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno)
 // when a recursive call is done it would reset the allocator to its previous state.
 //
 remove_files :: proc(arena: ^Arena, filepath: string) {
-  context.temp_allocator = mem.Allocator{arena_allocator_proc, arena};
-
-  prev_offset := arena.offset;
-  defer arena_restore(arena, prev_offset);
+  temp := temp_begin(arena);
+  defer temp_end(temp);
+  context.temp_allocator = arena_allocator_interface(temp.arena);
 
   filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
   fileinfo, errno := filestat(filepath, context.temp_allocator);
@@ -146,7 +145,6 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
     return;
   }
   }
-
   assert(fileinfo.type == .Directory); // Sanity check
 
   dir := posix.opendir(filepath_cstring);

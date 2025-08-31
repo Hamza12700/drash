@@ -121,10 +121,10 @@ get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno)
 remove_files :: proc(arena: ^Arena, filepath: string) {
   temp := temp_begin(arena);
   defer temp_end(temp);
-  context.temp_allocator = arena_allocator_interface(temp.arena);
+  allocator := arena_allocator_interface(temp.arena);
 
-  filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
-  fileinfo, errno := filestat(filepath, context.temp_allocator);
+  filepath_cstring := strings.clone_to_cstring(filepath, allocator);
+  fileinfo, errno := filestat(filepath, allocator);
   if errno != .NONE {
     fmt.println("File not found:", filepath);
     return;
@@ -156,13 +156,13 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
     if filename == "." || filename == ".." do continue;
 
     fullpath := fmt.tprintf("%s/%s", filepath, filename);
-    fileinfo, errno := filestat(fullpath, context.temp_allocator);
+    fileinfo, errno := filestat(fullpath, allocator);
     assert(errno == .NONE); // This should never happen because `readdir` returns valid files
 
     if fileinfo.type == .Directory {
       remove_files(arena, fileinfo.fullpath);
     } else {
-      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, context.temp_allocator));
+      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, allocator));
       if errno != .NONE {
         fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, errno);
         continue;

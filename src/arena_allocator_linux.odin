@@ -12,20 +12,20 @@ PAGE_SIZE :uint: 4096 // On pretty-much every Linux-System
 
 Arena :: struct {
   backing_buffer: rawptr,
-  reserve_size: u32, // Size of the allocated backing buffer
-  commit_size: u32,  // Used memory
+  reserve_size: uint, // Size of the allocated backing buffer
+  commit_size:  uint,  // Used memory
 
   prev: ^Arena,    // previous arena in chain
   current: ^Arena, // current arena in chain
 }
 
 // - arena globals
-ARENA_DEFAULT_RESERVE_SIZE :u32: mem.Megabyte * 2;
+ARENA_DEFAULT_RESERVE_SIZE :uint: mem.Megabyte * 2;
 
 // - arena creation/destruction
-arena_allocate :: proc(reserve_size: u32 = ARENA_DEFAULT_RESERVE_SIZE) -> ^Arena {
+arena_allocate :: proc(reserve_size := ARENA_DEFAULT_RESERVE_SIZE) -> ^Arena {
   reserve_size := reserve_size;
-  reserve_size = u32(align_pow2(uint(reserve_size), PAGE_SIZE));
+  reserve_size = align_pow2(uint(reserve_size), PAGE_SIZE);
   backing_buffer := allocate_page(uint(reserve_size));
   assert(backing_buffer != nil);
 
@@ -33,6 +33,7 @@ arena_allocate :: proc(reserve_size: u32 = ARENA_DEFAULT_RESERVE_SIZE) -> ^Arena
   arena.backing_buffer = backing_buffer;
   arena.current = arena;
   arena.commit_size = size_of(Arena);
+  arena.reserve_size = reserve_size;
   return arena;
 }
 
@@ -56,7 +57,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
   switch mode {
   case .Alloc,  .Alloc_Non_Zeroed:   return arena_push(arena, size, align);
   case .Resize, .Resize_Non_Zeroed:  return arena_resize(arena, old_memory, uint(old_size), size, align);
-  case .Free:                        return arena_pop(arena, u32(old_size));
+  case .Free:                        return arena_pop(arena, uint(old_size));
   case .Free_All: {
     arena_destroy(arena);
     return nil, .None;
@@ -72,9 +73,15 @@ arena_push :: proc(arena: ^Arena, size, align: uint) -> ([]byte, mem.Allocator_E
   current := arena.current;
   align_size := align_pow2(size, align);
 
-  if (align_size + uint(current.commit_size)) > auto_cast current.reserve_size {
+  if (align_size + current.commit_size) > current.reserve_size {
     res_size := align_pow2(align_size + size_of(Arena), align);
-    new_arena := arena_allocate(u32(res_size) + ARENA_DEFAULT_RESERVE_SIZE);
+    // allocate default reserve size if the requested memory size is smaller
+    new_arena: ^Arena;
+    if res_size <= auto_cast ARENA_DEFAULT_RESERVE_SIZE {
+      new_arena = arena_allocate(ARENA_DEFAULT_RESERVE_SIZE);
+    } else {
+      new_arena = arena_allocate(res_size + ARENA_DEFAULT_RESERVE_SIZE);
+    }
     new_arena.prev = arena;
     arena.current = new_arena;
     new_arena.current = new_arena;
@@ -83,15 +90,15 @@ arena_push :: proc(arena: ^Arena, size, align: uint) -> ([]byte, mem.Allocator_E
 
   mem_offset := uintptr(current.backing_buffer) + uintptr(current.commit_size);
   mem := slice.bytes_from_ptr(rawptr(mem_offset), int(align_size));
-  current.commit_size += u32(align_size);
+  current.commit_size += align_size;
   return mem, .None;
 }
 
-arena_pop :: proc(arena: ^Arena, size: u32) -> ([]byte, mem.Allocator_Error) {
+arena_pop :: proc(arena: ^Arena, size: uint) -> ([]byte, mem.Allocator_Error) {
   current := arena.current;
-  assert((current.commit_size + size) < current.reserve_size); // Sanity check
-  ptr_offset := uintptr(current.commit_size) + uintptr(size);
-  intrinsics.mem_zero(rawptr(ptr_offset), size - current.commit_size);
+  assert((current.commit_size - size) < current.reserve_size); // Sanity check
+  ptr_offset := uintptr(current.backing_buffer) + uintptr(size);
+  intrinsics.mem_zero(rawptr(ptr_offset), current.commit_size - size);
   return nil, .None;
 }
 
@@ -99,12 +106,12 @@ arena_pop :: proc(arena: ^Arena, size: u32) -> ([]byte, mem.Allocator_Error) {
 arena_resize :: proc(arena: ^Arena, old_mem: rawptr, old_size, size, align: uint) -> ([]byte, mem.Allocator_Error) {
   current := arena.current;
   prev_pos := uintptr(old_mem);
-  cur_pos := uintptr(current.backing_buffer) + uintptr(current.commit_size - u32(old_size));
+  cur_pos := uintptr(current.backing_buffer) + uintptr(current.commit_size - old_size);
   align_size := align_pow2(size, align);
 
   if prev_pos == cur_pos {
-    assert(align_size > old_size); // Can't shrink it (for now)
-    current.commit_size += u32(align_size);
+    assert(align_size > old_size); // Can't shrink it
+    current.commit_size += align_size;
     return slice.bytes_from_ptr(rawptr(cur_pos), int(align_size)), .None;
   }
   return arena_push(arena, align_size, align);
@@ -113,7 +120,7 @@ arena_resize :: proc(arena: ^Arena, old_mem: rawptr, old_size, size, align: uint
 // - temporary arena scopes
 Temp_Arena :: struct {
   arena: ^Arena,
-  pos: u32,
+  pos: uint,
 }
 
 temp_begin :: proc(arena: ^Arena) -> Temp_Arena {

@@ -11,8 +11,10 @@ PATH_MAX :: int(PAGE_SIZE)
 
 main :: proc() {
   using fmt;
-  arena := arena_allocate();
-  context.allocator = arena_allocator_interface(arena);
+  arena: Arena;
+  temp_arena: Arena;
+  context.allocator = arena_allocator(&arena, PAGE_SIZE * 4); // Doesn't need to be huge
+  context.temp_allocator = arena_allocator(&temp_arena);      // Defaults to 1-Megabyte of memory
 
   // Converting the '[]cstring' (null-terminated strings) to '[]string' (proper string-type)
   args := make([]string, len(runtime.args__))
@@ -28,7 +30,7 @@ main :: proc() {
   args = args[1:];
   drash := init_drash();
   if args[0][0] == '-' {
-    handle_opts(arena, &drash, args);
+    handle_opts(&temp_arena, &drash, args);
     return;
   }
 
@@ -101,7 +103,7 @@ Option :: struct {
   action: Option_Action,
 }
 
-OPTIONS :: [?]Option{
+OPTIONS :: []Option{
   {
     name = "force|f",
     desc = "Force remove file(s) (don't store it in the drashcan)",
@@ -150,7 +152,6 @@ parse_options :: proc(args: []string) -> Option_Action {
     fmt.println("Invalid option format");
     os.exit(1);
   }
-
   if arg[0] == '-' do arg = arg[1:];
 
   for option in OPTIONS {
@@ -189,7 +190,6 @@ parse_options :: proc(args: []string) -> Option_Action {
 handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
   action := parse_options(args);
   files := args[1:]; // Skip the option argument
-
   switch  action {
   case .Help:    display_help();
   case .Version: fmt.println("drash version: ", VERSION);
@@ -205,7 +205,6 @@ handle_opts :: proc(arena: ^Arena, drash: ^Drash, args: []string) {
 display_help :: proc() {
   fmt.println("Usage: drash [OPTIONS] [FILES]..");
   fmt.println("\nOptions:\n");
-
   for opt in OPTIONS {
     fmt.printf("   %-10s",   opt.name);
     fmt.printf("   %-10s\n", opt.desc);
@@ -217,7 +216,6 @@ force_remove_files :: proc(arena: ^Arena, args: []string) {
     fmt.println("Missing argument file(s)");
     return;
   }
-
   for filepath in args {
     remove_files(arena, filepath);
   }

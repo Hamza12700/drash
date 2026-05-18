@@ -25,32 +25,32 @@ File_Type :: enum {
 }
 
 @(require_results)
-filestat :: proc(path: string, allocator := context.allocator) -> (File_Info, linux.Errno) {
-  using linux;
-
+filestat :: proc(path: string, alloc: mem.Allocator) -> (File_Info, linux.Errno) {
+  path := path;
   fullpath : string;
   if path[0] != '/' { // Path is not an absolute-path
-    cwd, err := get_working_directory(allocator);
+    cwd, err := get_working_directory(alloc);
     if err != .NONE do return {}, err;
 
-    fullpath = fmt.aprintf("%s/%s", cwd, path, allocator=allocator);
+    if path[len(path)-1] == '/' do path = path[:len(path)-1];
+    fullpath = fmt.aprintf("%s/%s", cwd, path, allocator=alloc);
   } else {
     fullpath = path; 
   }
 
-  st: Stat = ---;
-  err := lstat(strings.clone_to_cstring(fullpath, context.temp_allocator), &st);
+  st: linux.Stat;
+  err := linux.lstat(strings.clone_to_cstring(fullpath, alloc), &st);
   if err != .NONE do return {}, err;
 
   type : File_Type;
-  switch (st.mode & S_IFMT) {
-  case S_IFBLK:  type = .Block_Device
-  case S_IFCHR:  type = .Character_Device
-  case S_IFDIR:  type = .Directory
-  case S_IFIFO:  type = .Named_Pipe
-  case S_IFLNK:  type = .Symlink
-  case S_IFREG:  type = .Regular
-  case S_IFSOCK: type = .Socket
+  switch (st.mode & linux.S_IFMT) {
+  case linux.S_IFBLK:  type = .Block_Device
+  case linux.S_IFCHR:  type = .Character_Device
+  case linux.S_IFDIR:  type = .Directory
+  case linux.S_IFIFO:  type = .Named_Pipe
+  case linux.S_IFLNK:  type = .Symlink
+  case linux.S_IFREG:  type = .Regular
+  case linux.S_IFSOCK: type = .Socket
   }
 
   info := File_Info{
@@ -59,7 +59,6 @@ filestat :: proc(path: string, allocator := context.allocator) -> (File_Info, li
     size     = st.size,
     type     = type,
   };
-
   return info, .NONE;
 }
 
@@ -89,10 +88,10 @@ get_basename :: proc(path: string) -> string {
 	return path;
 }
 
-get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno) {
+get_working_directory :: proc(alloc: mem.Allocator) -> (string, linux.Errno) {
   // Maximum path-length on most Linux-Systems
 	PATH_MAX :: 4096;
-	buf := make([dynamic]u8, PATH_MAX, allocator);
+	buf := make([dynamic]u8, PATH_MAX, alloc);
 
 	for {
     #no_bounds_check n, errno := linux.getcwd(buf[:]);
@@ -107,22 +106,10 @@ get_working_directory :: proc(allocator: mem.Allocator) -> (string, linux.Errno)
 	}
 }
 
-// Recursively, remove files/directories
-// 
-// @NOTE:
-// This function explicity takes the 'Arena' allocator data because it needs to perform
-// operations that are only valid for that allocator and because the 'context.allocator'
-// data is a 'rawptr (void *)' it can be type-casted to anything. To avoid this problem
-// the function require's the allocator data to explicity passed in.
-// 
-// Because this function is recursive, every function-call saves the allocator state so
-// when a recursive call is done it would reset the allocator to its previous state.
-//
+// Recursively remove files/directories
 remove_files :: proc(arena: ^Arena, filepath: string) {
-  context.temp_allocator = mem.Allocator{arena_allocator_proc, arena};
-
-  prev_offset := arena.offset;
-  defer arena_restore(arena, prev_offset);
+  temp := arena_temp_begin(arena);
+  defer arena_temp_end(temp);
 
   filepath_cstring := strings.clone_to_cstring(filepath, context.temp_allocator);
   fileinfo, errno := filestat(filepath, context.temp_allocator);
@@ -148,7 +135,6 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
   }
 
   assert(fileinfo.type == .Directory); // Sanity check
-
   dir := posix.opendir(filepath_cstring);
   assert(dir != nil);
   defer posix.closedir(dir);

@@ -7,14 +7,13 @@ import "core:sys/linux"
 import "base:runtime"
 
 VERSION :: "2.0.0"
-PATH_MAX :: int(PAGE_SIZE)
+PATH_MAX :: PAGE_SIZE
 
 main :: proc() {
-  using fmt;
-  arena: Arena;
-  temp_arena: Arena;
-  context.allocator = arena_allocator(&arena, PAGE_SIZE * 4); // Doesn't need to be huge
-  context.temp_allocator = arena_allocator(&temp_arena);      // Defaults to 1-Megabyte of memory
+  arena := arena_alloc_and_init(PAGE_SIZE*4);
+  temp_arena := arena_alloc_and_init(PAGE_SIZE*8);
+  context.allocator = arena_allocator(arena);
+  context.temp_allocator = arena_allocator(temp_arena); 
 
   // Converting the '[]cstring' (null-terminated strings) to '[]string' (proper string-type)
   args := make([]string, len(runtime.args__))
@@ -23,42 +22,42 @@ main :: proc() {
   }
 
   if len(args) == 1 {
-    println("Missing argument file(s)");
+    fmt.println("Missing argument file(s)");
     return;
   }
 
   args = args[1:];
   drash := init_drash();
   if args[0][0] == '-' {
-    handle_opts(&temp_arena, &drash, args);
+    handle_opts(temp_arena, &drash, args);
     return;
   }
 
   for arg in args {
     free_all(context.temp_allocator);
     if len(arg) >= PATH_MAX {
-      println("Filename '%s...' is too long", arg[:10]);
-      println("Max Path length is %d", PATH_MAX);
+      fmt.println("Filename '%s...' is too long", arg[:10]);
+      fmt.println("Max Path length is %d", PATH_MAX);
       continue;
     }
 
-    fileinfo, errno := filestat(arg);
+    fileinfo, errno := filestat(arg, context.temp_allocator);
     if errno != .NONE {
-      printf("File not found: '%s'\n", arg); 
+      fmt.printf("File not found: '%s'\n", arg); 
       continue;
     }
 
     if fileinfo.type == .Symlink {
       errno := linux.unlink(strings.clone_to_cstring(arg, context.temp_allocator));
       assert(errno == .NONE);
-      printf("Removed Symlink: %s\n", arg);
+      fmt.printf("Removed Symlink: %s\n", arg);
       continue;
     }
 
-    metadata_path := tprintf("%s/%s.info", drash.metadata, fileinfo.name);
+    metadata_path := fmt.tprintf("%s/%s.info", drash.metadata, fileinfo.name);
     _, errno = filestat(metadata_path, context.temp_allocator);
     if errno == .NONE {
-      printf("File '%s' already exists in the drashcan!\n", fileinfo.name);
+      fmt.printf("File '%s' already exists in the drashcan!\n", fileinfo.name);
       continue;
     }
 
@@ -66,21 +65,35 @@ main :: proc() {
     {
       buffer: [20]u8;
       if fileinfo.type == .Directory {
-        type = bprintf(buffer[:], "directory"); 
+        type = fmt.bprintf(buffer[:], "directory"); 
       } else {
-        type = bprintf(buffer[:], "file"); 
+        type = fmt.bprintf(buffer[:], "file"); 
       }
     }
 
-    metadata := tprintf("Path: %s\nType: %s\n", fileinfo.fullpath, type);
-    err := os.write_entire_file_or_err(metadata_path, transmute([]u8) metadata);
+    metadata := fmt.tprintf("Path: %s\nType: %s\n", fileinfo.fullpath, type);
+    err := os.write_entire_file(metadata_path, metadata);
     if err != .NONE {
-      printf("failed to write file '%s' because %s\n", metadata_path, err); 
+      fmt.printf("failed to write file '%s' because %s\n", metadata_path, err); 
     }
 
-    drash_path := tprintf("%s/%s", drash.files, fileinfo.name);
-    if err = os.rename(arg, drash_path); err != .NONE {
-      printf("Failed to move the file '%s' because '%s'\n", fileinfo.name, err);
+    drash_path := fmt.tprintf("%s/%s", drash.files, fileinfo.name);
+    oldpath := strings.clone_to_cstring(arg, context.temp_allocator);
+    newpath := strings.clone_to_cstring(drash_path, context.temp_allocator);
+    err = linux.rename(oldpath, newpath);
+    if err == .EXDEV {
+      newfd, oldfd: linux.Fd;
+      newfd, err = linux.open(newpath, {.WRONLY});
+      assert(err == .NONE);
+      oldfd, err = linux.open(oldpath, {});
+      assert(err == .NONE);
+      _, err = linux.sendfile(newfd, oldfd, nil, fileinfo.size);
+      if err != .NONE {
+        fmt.eprintf("failed to move file '%s' to '%s'\n", fileinfo.name, drash_path);
+        continue;
+      }
+    } else if err != .NONE {
+      fmt.printf("Failed to move the file '%s' because '%s'\n", fileinfo.name, err);
       continue;
     }
   }

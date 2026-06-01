@@ -1,7 +1,6 @@
 package main
 
 import "core:sys/linux"
-import "core:sys/posix"
 import "core:os"
 import "core:strings"
 import "core:mem"
@@ -135,39 +134,50 @@ remove_files :: proc(arena: ^Arena, filepath: string) {
   }
 
   assert(fileinfo.type == .Directory); // Sanity check
-  dir := posix.opendir(filepath_cstring);
-  assert(dir != nil);
-  defer posix.closedir(dir);
+  dirfd: linux.Fd;
+  dirfd, errno = linux.open(filepath_cstring, {.DIRECTORY});
+  if errno != .NONE {
+    fmt.printf("Failed to open directory '%s' because: %s\n", filepath, errno);
+    return;
+  }
+  defer linux.close(dirfd);
 
-  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
-    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." do continue;
+  dirents_buffer: [8192]u8;
+  for {
+    bytes_read, err := linux.getdents(dirfd, dirents_buffer[:]);
+    if err != .NONE {
+      fmt.printf("Failed to read directory '%s' because: %s\n", filepath, err);
+      return;
+    }
+    if bytes_read == 0 do break;
 
-    fullpath := fmt.tprintf("%s/%s", filepath, filename);
-    fileinfo, errno := filestat(fullpath, context.temp_allocator);
-    assert(errno == .NONE); // This should never happen because `readdir` returns valid files
+    offset: int;
+    for dirent in linux.dirent_iterate_buf(dirents_buffer[:bytes_read], &offset) {
+      filename := linux.dirent_name(dirent);
+      if filename == "." || filename == ".." do continue;
 
-    if fileinfo.type == .Directory {
-      remove_files(arena, fileinfo.fullpath);
-    } else {
-      errno = linux.unlink(strings.clone_to_cstring(fileinfo.fullpath, context.temp_allocator));
-      if errno != .NONE {
-        fmt.printf("Failed to remove file '%s' because: %s\n", fileinfo.name, errno);
+      fullpath := fmt.tprintf("%s/%s", filepath, filename);
+      file_type := File_Type.Regular;
+      if dirent.type == .DIR {
+        file_type = .Directory;
+      } else if dirent.type == .UNKNOWN {
+        fileinfo, errno := filestat(fullpath, context.temp_allocator);
+        assert(errno == .NONE); // This should never happen because `getdents` returns valid files
+        file_type = fileinfo.type;
+      }
+
+      if file_type == .Directory {
+        remove_files(arena, fullpath);
+      } else if file_type == .Regular {
+        errno = linux.unlink(strings.clone_to_cstring(fullpath, context.temp_allocator));
+        if errno != .NONE {
+          fmt.printf("Failed to remove file '%s' because: %s\n", filename, errno);
+          continue;
+        }
+      } else {
+        fmt.eprintln("Skipping file '%s' because unknown filetype '%s'\n", filename, file_type);
         continue;
       }
-    }
-  }
-
-  posix.rewinddir(dir);
-  for rdir := posix.readdir(dir); rdir != nil; rdir = posix.readdir(dir) {
-    filename := strings.truncate_to_byte(string(rdir.d_name[:]), 0);
-    if filename == "." || filename == ".." do continue;
-    fullpath := fmt.ctprintf("%s/%s", filepath, filename);
-
-    errno = linux.rmdir(fullpath);
-    if errno != .NONE {
-      fmt.printf("Failed to remove file '%s' because %s\n", filename, errno);
-      continue;
     }
   }
 

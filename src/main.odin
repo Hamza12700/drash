@@ -10,8 +10,8 @@ VERSION :: "2.0.0"
 PATH_MAX :: PAGE_SIZE
 
 main :: proc() {
-  arena := arena_alloc_and_init(PAGE_SIZE*4);
-  temp_arena := arena_alloc_and_init(PAGE_SIZE*8);
+  arena := arena_alloc_and_init(4<<20);
+  temp_arena := arena_alloc_and_init(8<<20);
   context.allocator = arena_allocator(arena);
   context.temp_allocator = arena_allocator(temp_arena); 
 

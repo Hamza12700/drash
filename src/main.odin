@@ -71,30 +71,32 @@ main :: proc() {
       }
     }
 
+    // Store the file/directory
+    drash_path := fmt.tprintf("%s/%s", drash.files, fileinfo.name);
+    oldpath := strings.clone_to_cstring(arg, context.temp_allocator);
+    newpath := strings.clone_to_cstring(drash_path, context.temp_allocator);
+    errno = linux.rename(oldpath, newpath);
+    if errno == .EXDEV {
+      newfd, oldfd: linux.Fd;
+      newfd, errno = linux.open(newpath, {.WRONLY});
+      assert(errno == .NONE);
+      oldfd, errno = linux.open(oldpath, {});
+      assert(errno == .NONE);
+      _, errno = linux.sendfile(newfd, oldfd, nil, fileinfo.size);
+      if errno != .NONE {
+        fmt.eprintf("failed to move file '%s' to '%s'\n", fileinfo.name, drash_path);
+        continue;
+      }
+    } else if errno != .NONE {
+      fmt.printf("Failed to move the file '%s' because '%s'\n", fileinfo.name, errno);
+      continue;
+    }
+
+    // Write the metadata
     metadata := fmt.tprintf("Path: %s\nType: %s\n", fileinfo.fullpath, type);
     err := os.write_entire_file(metadata_path, metadata);
     if err != .NONE {
       fmt.printf("failed to write file '%s' because %s\n", metadata_path, err); 
-    }
-
-    drash_path := fmt.tprintf("%s/%s", drash.files, fileinfo.name);
-    oldpath := strings.clone_to_cstring(arg, context.temp_allocator);
-    newpath := strings.clone_to_cstring(drash_path, context.temp_allocator);
-    err = linux.rename(oldpath, newpath);
-    if err == .EXDEV {
-      newfd, oldfd: linux.Fd;
-      newfd, err = linux.open(newpath, {.WRONLY});
-      assert(err == .NONE);
-      oldfd, err = linux.open(oldpath, {});
-      assert(err == .NONE);
-      _, err = linux.sendfile(newfd, oldfd, nil, fileinfo.size);
-      if err != .NONE {
-        fmt.eprintf("failed to move file '%s' to '%s'\n", fileinfo.name, drash_path);
-        continue;
-      }
-    } else if err != .NONE {
-      fmt.printf("Failed to move the file '%s' because '%s'\n", fileinfo.name, err);
-      continue;
     }
   }
 }

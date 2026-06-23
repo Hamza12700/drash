@@ -3,7 +3,7 @@ package main
 import "core:mem"
 import "core:sys/linux"
 
-PAGE_SIZE :: mem.DEFAULT_PAGE_SIZE;
+PAGE_SIZE :: 4 * 1024;
 
 Arena :: struct {
   prev: ^Arena,
@@ -18,7 +18,7 @@ Temp_Arena :: struct {
 }
 
 arena_alloc_and_init :: proc(size: int) -> ^Arena {
-  aligned_size := align_pow2(size, mem.DEFAULT_PAGE_SIZE);
+  aligned_size := align_pow2(size, mem.PAGE_SIZE);
   mem_ptr, errno := linux.mmap(0, uint(aligned_size), {.READ, .WRITE}, {.PRIVATE, .ANONYMOUS}, -1);
   assert(errno == .NONE);
 
